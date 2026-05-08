@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDSQ Pickleball - Event Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { gdsq: '#0044CC', gdsqRed: '#E32636' } } } }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-100 flex justify-center">
+    <div class="w-full max-w-md bg-white min-h-screen relative pb-28" x-data="eventDetails()" x-init="init()">
+        <div class="px-5 mt-6 mb-8">
+            <h1 class="text-2xl font-bold text-gray-900 mb-5" x-text="sessionTitle">Weekend Social Play</h1>
+            <p class="text-sm font-semibold text-gray-900">Sat, May 24, 2026 | 9:00 AM</p>
+            <p class="text-sm font-semibold text-gray-900">THB 250</p>
+
+            <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
+                <p x-text="statusMessage"></p>
+            </div>
+        </div>
+
+        <div class="fixed bottom-0 left-0 w-full bg-white border-t p-4 z-50 flex justify-between items-center">
+            <div class="pl-2">
+                <p class="text-[10px] font-bold text-gray-500 uppercase">Spots Left</p>
+                <p class="text-3xl font-black text-gdsq">
+                    <span x-text="spotsLeft">0</span>
+                    <span class="text-base text-gray-400">/ <span x-text="maxPlayers">0</span></span>
+                </p>
+                <p class="mt-1 text-[11px] font-semibold text-gray-500">
+                    <span x-text="joinedCount">0</span> joined
+                    <span x-show="waitlistCount > 0"> · <span x-text="waitlistCount"></span> waitlist</span>
+                </p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button
+                    class="bg-gdsq text-white font-bold py-3.5 px-6 rounded-xl flex items-center gap-2 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    x-show="!userStatus"
+                    @click="confirmRsvp()"
+                    :disabled="isLoading || !lineUid"
+                >
+                    <span x-show="!isLoading">Confirm RSVP</span>
+                    <span x-show="isLoading">Confirming...</span>
+                    <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
+                </button>
+
+                <div x-show="userStatus" class="flex items-center gap-2">
+                    <div class="rounded-xl bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
+                        <i class="fa-solid fa-check mr-1" x-show="userStatus === 'Joined'"></i>
+                        <i class="fa-solid fa-clock mr-1" x-show="userStatus === 'Waitlist'"></i>
+                        <span x-text="userStatus === 'Joined' ? 'Confirmed' : 'Waitlisted'"></span>
+                    </div>
+                    <button
+                        class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        @click="cancelRsvp()"
+                        :disabled="isLoading || !lineUid"
+                    >
+                        <span x-show="!isLoading">Cancel</span>
+                        <span x-show="isLoading">Cancelling...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function eventDetails() {
+            return {
+                lineUid: null,
+                displayName: null,
+                sessionId: new URLSearchParams(window.location.search).get('sessionId') || 1,
+                sessionTitle: 'Weekend Social Play',
+                maxPlayers: 0,
+                joinedCount: 0,
+                waitlistCount: 0,
+                spotsLeft: 0,
+                userStatus: null,
+                isLoading: false,
+                statusMessage: 'กำลังโหลดข้อมูลกิจกรรม...',
+
+                async init() {
+                    try {
+                        await this.loadSession();
+
+                        const configResponse = await fetch('/api/config');
+                        const config = await configResponse.json();
+
+                        if (!config.liffId) {
+                            this.statusMessage = 'ยังไม่ได้ตั้งค่า LINE LIFF ID ในไฟล์ .env';
+                            return;
+                        }
+
+                        await liff.init({ liffId: config.liffId });
+
+                        if (!liff.isLoggedIn()) {
+                            liff.login();
+                            return;
+                        }
+
+                        const profile = await liff.getProfile();
+
+                        this.lineUid = profile.userId;
+                        this.displayName = profile.displayName;
+                        this.statusMessage = `เข้าสู่ระบบ LINE แล้ว: ${this.displayName}`;
+                        await this.loadSession();
+                    } catch (error) {
+                        console.error('LIFF initialization error:', error);
+                        this.statusMessage = 'เชื่อมต่อ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                    }
+                },
+
+                async loadSession() {
+                    const params = this.lineUid
+                        ? `?lineUid=${encodeURIComponent(this.lineUid)}`
+                        : '';
+                    const response = await fetch(`/api/session/${this.sessionId}${params}`);
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Failed to load session');
+                    }
+
+                    this.sessionTitle = result.session.title;
+                    this.maxPlayers = result.session.maxPlayers;
+                    this.joinedCount = result.session.joinedCount;
+                    this.waitlistCount = result.session.waitlistCount;
+                    this.spotsLeft = result.session.spotsLeft;
+                    this.userStatus = result.session.userStatus;
+                },
+
+                async confirmRsvp() {
+                    if (!this.lineUid) {
+                        this.statusMessage = 'กรุณารอให้ LINE โหลดข้อมูลผู้ใช้ให้เสร็จก่อน';
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.statusMessage = 'กำลังยืนยัน RSVP...';
+
+                    try {
+                        const response = await fetch('/api/rsvp', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                displayName: this.displayName,
+                                sessionId: this.sessionId
+                            })
+                        });
+
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Failed to confirm RSVP');
+                        }
+
+                        this.statusMessage = result.message;
+                        this.userStatus = result.status;
+                        await this.loadSession();
+                    } catch (error) {
+                        console.error('RSVP error:', error);
+                        this.statusMessage = 'ยืนยัน RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async cancelRsvp() {
+                    if (!this.lineUid) {
+                        this.statusMessage = 'กรุณารอให้ LINE โหลดข้อมูลผู้ใช้ให้เสร็จก่อน';
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.statusMessage = 'กำลังยกเลิก RSVP...';
+
+                    try {
+                        const response = await fetch('/api/rsvp', {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                sessionId: this.sessionId
+                            })
+                        });
+
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Failed to cancel RSVP');
+                        }
+
+                        this.userStatus = null;
+                        this.statusMessage = result.message;
+                        await this.loadSession();
+                    } catch (error) {
+                        console.error('Cancel RSVP error:', error);
+                        this.statusMessage = 'ยกเลิก RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
