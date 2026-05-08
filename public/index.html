@@ -94,10 +94,16 @@
                             return;
                         }
 
-                        await liff.init({ liffId: config.liffId });
+                       await liff.init({
+    liffId: config.liffId,
+    withLoginOnExternalBrowser: true
+});
 
                         if (!liff.isLoggedIn()) {
-                            liff.login();
+                           liff.login({
+    redirectUri: window.location.origin + window.location.pathname + window.location.search
+});
+
                             return;
                         }
 
@@ -109,7 +115,7 @@
                         await this.loadSession();
                     } catch (error) {
                         console.error('LIFF initialization error:', error);
-                        this.statusMessage = 'เชื่อมต่อ LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                        this.statusMessage = `เชื่อมต่อ LINE ไม่สำเร็จ: ${error.message || 'กรุณาลองใหม่อีกครั้ง'}`;
                     }
                 },
 
