@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +11,8 @@ const HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const adminPassword = process.env.ADMIN_PASSWORD;
+const adminSessionSecret = process.env.ADMIN_SESSION_SECRET || supabaseKey;
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY environment variables.');
@@ -22,6 +25,79 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const adminCookieName = 'gdsq_admin_session';
+
+function parseCookies(cookieHeader = '') {
+  return Object.fromEntries(
+    cookieHeader
+      .split(';')
+      .map((cookie) => cookie.trim())
+      .filter(Boolean)
+      .map((cookie) => {
+        const separatorIndex = cookie.indexOf('=');
+        if (separatorIndex === -1) return [cookie, ''];
+        return [
+          decodeURIComponent(cookie.slice(0, separatorIndex)),
+          decodeURIComponent(cookie.slice(separatorIndex + 1))
+        ];
+      })
+  );
+}
+
+function createAdminToken() {
+  const timestamp = Date.now().toString();
+  const signature = crypto
+    .createHmac('sha256', adminSessionSecret)
+    .update(timestamp)
+    .digest('hex');
+  return `${timestamp}.${signature}`;
+}
+
+function isValidAdminToken(token) {
+  if (!token || !token.includes('.')) return false;
+
+  const [timestamp, signature] = token.split('.');
+  const issuedAt = Number(timestamp);
+  const maxAgeMs = 1000 * 60 * 60 * 12;
+
+  if (!issuedAt || Date.now() - issuedAt > maxAgeMs) {
+    return false;
+  }
+
+  const expectedSignature = crypto
+    .createHmac('sha256', adminSessionSecret)
+    .update(timestamp)
+    .digest('hex');
+
+  if (signature.length !== expectedSignature.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+
+function requireAdmin(req, res, next) {
+  if (!adminPassword) {
+    return res.status(503).json({
+      success: false,
+      message: 'Admin password is not configured.'
+    });
+  }
+
+  const cookies = parseCookies(req.headers.cookie);
+
+  if (!isValidAdminToken(cookies[adminCookieName])) {
+    return res.status(401).json({
+      success: false,
+      message: 'Admin login required.'
+    });
+  }
+
+  return next();
+}
 
 function escapeCsvValue(value) {
   const text = value === null || value === undefined ? '' : String(value);
@@ -204,7 +280,48 @@ app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-app.get('/api/sessions', async (req, res) => {
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+
+  if (!adminPassword) {
+    return res.status(503).json({
+      success: false,
+      message: 'Admin password is not configured.'
+    });
+  }
+
+  if (password !== adminPassword) {
+    return res.status(401).json({
+      success: false,
+      message: 'Incorrect password.'
+    });
+  }
+
+  const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `${adminCookieName}=${encodeURIComponent(createAdminToken())}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200${secureFlag}`
+  );
+
+  return res.json({
+    success: true,
+    message: 'Logged in.'
+  });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  res.setHeader(
+    'Set-Cookie',
+    `${adminCookieName}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+  );
+
+  return res.json({
+    success: true,
+    message: 'Logged out.'
+  });
+});
+
+app.get('/api/sessions', requireAdmin, async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
       .from('sessions')
@@ -236,7 +353,7 @@ app.get('/api/sessions', async (req, res) => {
   }
 });
 
-app.post('/api/sessions', async (req, res) => {
+app.post('/api/sessions', requireAdmin, async (req, res) => {
   try {
     const { title, maxPlayers } = req.body;
     const parsedMaxPlayers = Number(maxPlayers);
@@ -303,7 +420,7 @@ app.get('/api/session/:sessionId', async (req, res) => {
   }
 });
 
-app.get('/api/session/:sessionId/rsvps', async (req, res) => {
+app.get('/api/session/:sessionId/rsvps', requireAdmin, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { data, error } = await listSessionRsvps(sessionId);
@@ -334,7 +451,7 @@ app.get('/api/session/:sessionId/rsvps', async (req, res) => {
   }
 });
 
-app.get('/api/session/:sessionId/export.csv', async (req, res) => {
+app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { data, error } = await listSessionRsvps(sessionId);
