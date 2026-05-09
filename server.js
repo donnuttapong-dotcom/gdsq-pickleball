@@ -27,6 +27,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
 const sessionSelect = 'id, title, max_players, event_date, start_time, end_time, price_thb, location, address, skill_level, description, poster_url, created_at';
+const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 
 function parseCookies(cookieHeader = '') {
   return Object.fromEntries(
@@ -123,6 +124,79 @@ function serializeSession(session) {
   };
 }
 
+function serializeUser(user) {
+  return {
+    id: user.id,
+    lineUid: user.line_uid,
+    displayName: user.display_name,
+    phone: user.phone,
+    profileImageUrl: user.profile_image_url,
+    createdAt: user.created_at
+  };
+}
+
+async function upsertLineUser({ lineUid, displayName, profileImageUrl, phone }) {
+  const { data: existingUser, error: findUserError } = await supabase
+    .from('users')
+    .select(userSelect)
+    .eq('line_uid', lineUid)
+    .maybeSingle();
+
+  if (findUserError) {
+    throw findUserError;
+  }
+
+  if (existingUser) {
+    const updates = {};
+
+    if (displayName && displayName !== existingUser.display_name) {
+      updates.display_name = displayName;
+    }
+
+    if (profileImageUrl && profileImageUrl !== existingUser.profile_image_url) {
+      updates.profile_image_url = profileImageUrl;
+    }
+
+    if (phone !== undefined) {
+      updates.phone = phone || null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return existingUser;
+    }
+
+    const { data: updatedUser, error: updateUserError } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', existingUser.id)
+      .select(userSelect)
+      .single();
+
+    if (updateUserError) {
+      throw updateUserError;
+    }
+
+    return updatedUser;
+  }
+
+  const { data: newUser, error: createUserError } = await supabase
+    .from('users')
+    .insert({
+      line_uid: lineUid,
+      display_name: displayName || 'LINE User',
+      phone: phone || null,
+      profile_image_url: profileImageUrl || null
+    })
+    .select(userSelect)
+    .single();
+
+  if (createUserError) {
+    throw createUserError;
+  }
+
+  return newUser;
+}
+
 function parseSessionPayload(body) {
   const parsedMaxPlayers = Number(body.maxPlayers);
   const parsedPriceThb = body.priceThb === '' || body.priceThb === null || body.priceThb === undefined
@@ -216,7 +290,7 @@ async function listSessionRsvps(sessionId) {
   if (userIds.length > 0) {
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, line_uid, display_name')
+      .select(userSelect)
       .in('id', userIds);
 
     if (usersError) {
@@ -233,7 +307,9 @@ async function listSessionRsvps(sessionId) {
     user: usersById[rsvp.user_id] || {
       id: rsvp.user_id,
       line_uid: '',
-      display_name: 'Unknown user'
+      display_name: 'Unknown user',
+      phone: '',
+      profile_image_url: ''
     }
   }));
 
@@ -383,6 +459,177 @@ app.get('/api/public/sessions', async (req, res) => {
   }
 });
 
+app.get('/api/profile', async (req, res) => {
+  try {
+    const { lineUid } = req.query;
+
+    if (!lineUid) {
+      return res.status(400).json({
+        success: false,
+        message: 'lineUid is required.'
+      });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select(userSelect)
+      .eq('line_uid', lineUid)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return res.json({
+      success: true,
+      user: user ? serializeUser(user) : null
+    });
+  } catch (error) {
+    console.error('Profile load error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load profile.'
+    });
+  }
+});
+
+app.put('/api/profile', async (req, res) => {
+  try {
+    const { lineUid, displayName, phone, profileImageUrl } = req.body;
+
+    if (!lineUid) {
+      return res.status(400).json({
+        success: false,
+        message: 'lineUid is required.'
+      });
+    }
+
+    const user = await upsertLineUser({
+      lineUid,
+      displayName,
+      phone,
+      profileImageUrl
+    });
+
+    return res.json({
+      success: true,
+      user: serializeUser(user),
+      message: 'Profile saved.'
+    });
+  } catch (error) {
+    console.error('Profile save error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to save profile.'
+    });
+  }
+});
+
+app.get('/api/players', async (req, res) => {
+  try {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select(userSelect)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: rsvps, error: rsvpError } = await supabase
+      .from('rsvps')
+      .select('user_id, status');
+
+    if (rsvpError) {
+      throw rsvpError;
+    }
+
+    const statsByUserId = {};
+    for (const rsvp of rsvps || []) {
+      if (!statsByUserId[rsvp.user_id]) {
+        statsByUserId[rsvp.user_id] = { joinedCount: 0, waitlistCount: 0 };
+      }
+
+      if (rsvp.status === 'Joined') {
+        statsByUserId[rsvp.user_id].joinedCount += 1;
+      }
+
+      if (rsvp.status === 'Waitlist') {
+        statsByUserId[rsvp.user_id].waitlistCount += 1;
+      }
+    }
+
+    return res.json({
+      success: true,
+      players: (users || []).map((user) => ({
+        ...serializeUser(user),
+        joinedCount: statsByUserId[user.id]?.joinedCount || 0,
+        waitlistCount: statsByUserId[user.id]?.waitlistCount || 0
+      }))
+    });
+  } catch (error) {
+    console.error('Players list error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load players.'
+    });
+  }
+});
+
+app.get('/api/rankings', async (req, res) => {
+  try {
+    const { data: rsvps, error } = await supabase
+      .from('rsvps')
+      .select('user_id, status')
+      .eq('status', 'Joined');
+
+    if (error) {
+      throw error;
+    }
+
+    const joinedByUserId = {};
+    for (const rsvp of rsvps || []) {
+      joinedByUserId[rsvp.user_id] = (joinedByUserId[rsvp.user_id] || 0) + 1;
+    }
+
+    const userIds = Object.keys(joinedByUserId);
+    let users = [];
+
+    if (userIds.length > 0) {
+      const { data, error: usersError } = await supabase
+        .from('users')
+        .select(userSelect)
+        .in('id', userIds);
+
+      if (usersError) {
+        throw usersError;
+      }
+
+      users = data || [];
+    }
+
+    return res.json({
+      success: true,
+      rankings: users
+        .map((user) => ({
+          ...serializeUser(user),
+          joinedCount: joinedByUserId[user.id] || 0
+        }))
+        .sort((a, b) => b.joinedCount - a.joinedCount)
+    });
+  } catch (error) {
+    console.error('Rankings list error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load rankings.'
+    });
+  }
+});
+
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
 
@@ -429,6 +676,8 @@ app.get('/api/sessions', requireAdmin, async (req, res) => {
     const { data: sessions, error } = await supabase
       .from('sessions')
       .select(sessionSelect)
+      .order('event_date', { ascending: true, nullsFirst: false })
+      .order('start_time', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -539,6 +788,50 @@ app.patch('/api/sessions/:sessionId', requireAdmin, async (req, res) => {
   }
 });
 
+app.delete('/api/sessions/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { data: currentSession, error: sessionError } = await findSession(sessionId);
+
+    if (sessionError || !currentSession) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    const { error: rsvpDeleteError } = await supabase
+      .from('rsvps')
+      .delete()
+      .eq('session_id', currentSession.id);
+
+    if (rsvpDeleteError) {
+      throw rsvpDeleteError;
+    }
+
+    const { error: sessionDeleteError } = await supabase
+      .from('sessions')
+      .delete()
+      .eq('id', currentSession.id);
+
+    if (sessionDeleteError) {
+      throw sessionDeleteError;
+    }
+
+    return res.json({
+      success: true,
+      message: 'Session deleted.'
+    });
+  } catch (error) {
+    console.error('Delete session error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to delete session.'
+    });
+  }
+});
+
 app.get('/api/session/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -603,10 +896,11 @@ app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => 
     }
 
     const rows = [
-      ['Event', 'Display Name', 'LINE UID', 'Status', 'RSVP Time'],
+      ['Event', 'Display Name', 'Phone', 'LINE UID', 'Status', 'RSVP Time'],
       ...data.rows.map((rsvp) => [
         data.session.title,
         rsvp.user.display_name,
+        rsvp.user.phone,
         rsvp.user.line_uid,
         rsvp.status,
         rsvp.createdAt
@@ -627,7 +921,7 @@ app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => 
 
 app.post('/api/rsvp', async (req, res) => {
   try {
-    const { lineUid, sessionId, displayName } = req.body;
+    const { lineUid, sessionId, displayName, profileImageUrl, phone } = req.body;
 
     if (!lineUid || !sessionId) {
       return res.status(400).json({
@@ -636,34 +930,12 @@ app.post('/api/rsvp', async (req, res) => {
       });
     }
 
-    const { data: existingUser, error: findUserError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('line_uid', lineUid)
-      .maybeSingle();
-
-    if (findUserError) {
-      throw findUserError;
-    }
-
-    let user = existingUser;
-
-    if (!user) {
-      const { data: newUser, error: createUserError } = await supabase
-        .from('users')
-        .insert({
-          line_uid: lineUid,
-          display_name: displayName || 'LINE User'
-        })
-        .select('id')
-        .single();
-
-      if (createUserError) {
-        throw createUserError;
-      }
-
-      user = newUser;
-    }
+    const user = await upsertLineUser({
+      lineUid,
+      displayName,
+      phone,
+      profileImageUrl
+    });
 
     const { data: session, error: sessionError } = await findSession(sessionId);
 

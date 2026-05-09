@@ -17,7 +17,7 @@
     <div class="w-full max-w-md bg-white min-h-screen relative" :class="selectedSessionId ? 'pb-32' : 'pb-24'" x-data="eventApp()" x-init="init()">
         <header class="sticky top-0 z-40 bg-white/95 px-5 py-4 backdrop-blur">
             <div class="flex items-center justify-between">
-                <button class="text-2xl text-gray-900" @click="selectedSessionId ? showEventList() : null">
+                <button class="text-2xl text-gray-900" @click="selectedSessionId ? showEventList() : setTab('home')">
                     <i class="fa-solid" :class="selectedSessionId ? 'fa-arrow-left' : 'fa-bars'"></i>
                 </button>
                 <div class="text-center leading-none">
@@ -38,26 +38,26 @@
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
-                    <button class="flex flex-col items-center gap-2 text-gdsq">
+                    <button class="flex flex-col items-center gap-2 text-gdsq" @click="setTab('events')">
                         <i class="fa-regular fa-calendar text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('events')">Events</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2 text-gray-500">
+                    <button class="flex flex-col items-center gap-2 text-gray-500" @click="setTab('players')">
                         <i class="fa-solid fa-users text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('players')">Players</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2 text-gray-500">
+                    <button class="flex flex-col items-center gap-2 text-gray-500" @click="setTab('rankings')">
                         <i class="fa-solid fa-chart-simple text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('rankings')">Rankings</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2 text-gray-500">
+                    <button class="flex flex-col items-center gap-2 text-gray-500" @click="setTab('shop')">
                         <i class="fa-solid fa-store text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('shop')">Shop</span>
                     </button>
                 </div>
             </section>
 
-            <section id="events" class="mt-7 px-5">
+            <section id="events" class="mt-7 px-5" x-show="activeTab === 'home' || activeTab === 'events'">
                 <div class="mb-4 flex items-center justify-between">
                     <h1 class="text-xl font-black" x-text="t('upcomingEvents')">Upcoming Events</h1>
                     <button class="text-sm font-black text-gdsq" @click="loadSessions()" x-text="t('refresh')">Refresh</button>
@@ -109,12 +109,92 @@
                     <p class="mt-1 text-sm text-blue-100" x-text="t('communityText')">Be part of the GDSQ community!</p>
                 </div>
             </section>
+
+            <section class="mt-7 px-5" x-show="activeTab === 'players'" x-cloak>
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 class="text-xl font-black" x-text="t('players')">Players</h1>
+                    <button class="text-sm font-black text-gdsq" @click="loadPlayers()" x-text="t('refresh')">Refresh</button>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="player in players" :key="player.id">
+                        <article class="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
+                                <div class="min-w-0">
+                                    <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="player.phone || t('phoneNotSet')"></p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-lg font-black text-gdsq" x-text="player.joinedCount"></p>
+                                <p class="text-[10px] font-bold uppercase text-gray-500" x-text="t('joined')"></p>
+                            </div>
+                        </article>
+                    </template>
+                </div>
+                <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="players.length === 0" x-text="t('noPlayers')"></p>
+            </section>
+
+            <section class="mt-7 px-5" x-show="activeTab === 'rankings'" x-cloak>
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 class="text-xl font-black" x-text="t('rankings')">Rankings</h1>
+                    <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="(player, index) in rankings" :key="player.id">
+                        <article class="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gdsq text-lg font-black text-white" x-text="index + 1"></div>
+                            <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
+                                <p class="text-xs font-semibold text-gray-500"><span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span></p>
+                            </div>
+                        </article>
+                    </template>
+                </div>
+                <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankings.length === 0" x-text="t('noRankings')"></p>
+            </section>
+
+            <section class="mt-7 px-5" x-show="activeTab === 'shop'" x-cloak>
+                <h1 class="text-xl font-black" x-text="t('shop')">Shop</h1>
+                <div class="mt-4 space-y-3">
+                    <article class="rounded-2xl bg-white p-5 shadow-sm">
+                        <p class="text-lg font-black">Court Booking</p>
+                        <p class="mt-1 text-sm text-gray-500">Reserve a pickleball court with the GDSQ team.</p>
+                        <a class="mt-4 inline-flex rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" href="https://line.me/R/" target="_blank">Contact on LINE</a>
+                    </article>
+                    <article class="rounded-2xl bg-white p-5 shadow-sm">
+                        <p class="text-lg font-black">GDSQ Merch</p>
+                        <p class="mt-1 text-sm text-gray-500">Coming soon: shirts, paddles, and community drops.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="mt-7 px-5" x-show="activeTab === 'profile'" x-cloak>
+                <h1 class="text-xl font-black" x-text="t('profile')">Profile</h1>
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <div class="mb-4 flex items-center gap-3">
+                        <img class="h-16 w-16 rounded-full object-cover" :src="profileAvatar" alt="Profile">
+                        <div>
+                            <p class="font-black" x-text="profile.displayName || displayName || 'LINE User'"></p>
+                            <p class="text-xs font-semibold text-gray-500" x-text="lineUid ? t('lineLinked') : t('lineNotLinked')"></p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('displayName')" x-model="profile.displayName">
+                        <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('phone')" x-model="profile.phone">
+                        <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('profileImageUrl')" x-model="profile.profileImageUrl">
+                        <p class="text-xs font-semibold text-gray-500" x-text="t('profileImageHelp')"></p>
+                        <button class="w-full rounded-xl bg-gdsq px-5 py-3 font-black text-white disabled:opacity-50" @click="saveProfile()" :disabled="isLoading || !lineUid" x-text="t('saveProfile')">Save Profile</button>
+                    </div>
+                </div>
+            </section>
         </main>
 
         <main x-show="selectedSessionId" x-cloak>
             <section class="px-5">
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100">
-                    <img class="aspect-square w-full object-cover" x-show="posterUrl" :src="posterUrl" :alt="sessionTitle">
+                    <img class="aspect-square w-full object-cover" x-show="posterUrl" :src="imageUrl(posterUrl)" :alt="sessionTitle">
                     <div class="aspect-square w-full bg-gradient-to-br from-orange-50 via-white to-blue-50 p-8" x-show="!posterUrl">
                         <p class="text-center text-6xl font-black italic text-gdsqRed">GDSQ</p>
                         <p class="mt-6 text-center text-5xl font-black italic text-gdsqRed">PICKLEBALL</p>
@@ -124,6 +204,9 @@
                         <i class="fa-solid fa-users mr-1"></i><span x-text="joinedCount"></span> / <span x-text="maxPlayers"></span>
                     </div>
                 </div>
+                <button class="mt-3 w-full rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-black text-gdsq" @click="shareEvent()">
+                    <i class="fa-solid fa-share-nodes mr-2"></i><span x-text="t('shareToLine')">Share to LINE</span>
+                </button>
 
                 <div class="mt-6">
                     <h1 class="text-2xl font-black" x-text="sessionTitle">Weekend Social Play</h1>
@@ -197,11 +280,11 @@
 
         <nav class="fixed bottom-0 left-0 z-40 w-full border-t bg-white px-6 py-3" x-show="!selectedSessionId" x-cloak>
             <div class="mx-auto grid max-w-md grid-cols-5 items-end text-center text-xs font-bold text-gray-500">
-                <button class="text-gdsq"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
-                <button><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
-                <button class="-mt-8"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg">+</span>Create</button>
-                <button><i class="fa-solid fa-users mb-1 block text-xl"></i>Players</button>
-                <button><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
+                <button :class="activeTab === 'home' ? 'text-gdsq' : ''" @click="setTab('home')"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
+                <button :class="activeTab === 'events' ? 'text-gdsq' : ''" @click="setTab('events')"><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
+                <button class="-mt-8" @click="setTab('rankings')"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg"><i class="fa-solid fa-chart-simple"></i></span>Rank</button>
+                <button :class="activeTab === 'players' ? 'text-gdsq' : ''" @click="setTab('players')"><i class="fa-solid fa-users mb-1 block text-xl"></i>Players</button>
+                <button :class="activeTab === 'profile' ? 'text-gdsq' : ''" @click="setTab('profile')"><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
             </div>
         </nav>
     </div>
@@ -211,8 +294,16 @@
             return {
                 lineUid: null,
                 displayName: null,
+                activeTab: 'home',
                 sessions: [],
+                players: [],
+                rankings: [],
                 selectedSessionId: new URLSearchParams(window.location.search).get('sessionId') || '',
+                profile: {
+                    displayName: '',
+                    phone: '',
+                    profileImageUrl: ''
+                },
                 sessionTitle: '',
                 eventDate: null,
                 startTime: null,
@@ -232,6 +323,10 @@
                 language: localStorage.getItem('gdsqLanguage') || 'th',
                 statusMessage: '',
 
+                get profileAvatar() {
+                    return this.imageUrl(this.profile.profileImageUrl) || 'https://ui-avatars.com/api/?background=0044CC&color=fff&name=GDSQ';
+                },
+
                 translations: {
                     th: {
                         heroLine1: 'Good Game.',
@@ -241,6 +336,7 @@
                         players: 'Players',
                         rankings: 'Rankings',
                         shop: 'Shop',
+                        profile: 'Profile',
                         upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
                         refresh: 'รีเฟรช',
                         noEvents: 'ยังไม่มีกิจกรรม',
@@ -279,6 +375,23 @@
                         cancellingRsvp: 'กำลังยกเลิก RSVP...',
                         cancelFailed: 'ยกเลิก RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
                         lineFailed: 'เชื่อมต่อ LINE ไม่สำเร็จ'
+                        ,
+                        phoneNotSet: 'ยังไม่ได้ใส่เบอร์',
+                        noPlayers: 'ยังไม่มีผู้เล่น',
+                        noRankings: 'ยังไม่มี ranking',
+                        eventsJoined: 'กิจกรรมที่เข้าร่วม',
+                        displayName: 'ชื่อที่แสดง',
+                        phone: 'เบอร์โทร',
+                        profileImageUrl: 'ลิงก์รูปโปรไฟล์',
+                        profileImageHelp: 'ใช้รูปจาก LINE อัตโนมัติ หรือวางลิงก์รูปจาก Google Drive/เว็บฝากรูปได้',
+                        saveProfile: 'บันทึกโปรไฟล์',
+                        profileSaved: 'บันทึกโปรไฟล์แล้ว',
+                        profileSaveFailed: 'บันทึกโปรไฟล์ไม่สำเร็จ',
+                        lineLinked: 'เชื่อมกับ LINE แล้ว',
+                        lineNotLinked: 'ยังไม่ได้เชื่อม LINE',
+                        shareToLine: 'แชร์ไป LINE',
+                        shareText: 'ชวนมาเล่น Pickleball ด้วยกัน',
+                        copiedLink: 'คัดลอกลิงก์แล้ว'
                     },
                     en: {
                         heroLine1: 'Good Game.',
@@ -288,6 +401,7 @@
                         players: 'Players',
                         rankings: 'Rankings',
                         shop: 'Shop',
+                        profile: 'Profile',
                         upcomingEvents: 'Upcoming Events',
                         refresh: 'Refresh',
                         noEvents: 'No events yet',
@@ -325,7 +439,23 @@
                         rsvpFailed: 'Unable to confirm RSVP. Please try again.',
                         cancellingRsvp: 'Cancelling RSVP...',
                         cancelFailed: 'Unable to cancel RSVP. Please try again.',
-                        lineFailed: 'LINE connection failed'
+                        lineFailed: 'LINE connection failed',
+                        phoneNotSet: 'Phone not set',
+                        noPlayers: 'No players yet',
+                        noRankings: 'No rankings yet',
+                        eventsJoined: 'joined events',
+                        displayName: 'Display name',
+                        phone: 'Phone',
+                        profileImageUrl: 'Profile image URL',
+                        profileImageHelp: 'Use your LINE image automatically, or paste a Google Drive/image URL.',
+                        saveProfile: 'Save Profile',
+                        profileSaved: 'Profile saved',
+                        profileSaveFailed: 'Unable to save profile',
+                        lineLinked: 'Linked with LINE',
+                        lineNotLinked: 'LINE not linked',
+                        shareToLine: 'Share to LINE',
+                        shareText: 'Join this pickleball event with me',
+                        copiedLink: 'Link copied'
                     }
                 },
 
@@ -340,6 +470,28 @@
 
                 scrollToEvents() {
                     document.getElementById('events').scrollIntoView({ behavior: 'smooth' });
+                },
+
+                setTab(tab) {
+                    this.activeTab = tab;
+                    this.selectedSessionId = '';
+                    window.history.pushState({}, '', '/');
+
+                    if (tab === 'players') this.loadPlayers();
+                    if (tab === 'rankings') this.loadRankings();
+                    if (tab === 'profile') this.loadProfile();
+
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+
+                imageUrl(url) {
+                    if (!url) return '';
+                    const text = String(url).trim();
+                    const match = text.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
+                    if (match) {
+                        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1200`;
+                    }
+                    return text;
                 },
 
                 get eventDateText() {
@@ -382,9 +534,14 @@
                         const profile = await liff.getProfile();
                         this.lineUid = profile.userId;
                         this.displayName = profile.displayName;
+                        this.profile.displayName = profile.displayName || '';
+                        this.profile.profileImageUrl = profile.pictureUrl || '';
                         this.statusMessage = `${this.t('loggedIn')}: ${this.displayName}`;
+                        await this.saveProfile(true);
+                        await this.loadProfile();
                         await this.loadSessions();
                         if (this.selectedSessionId) await this.loadSession();
+                        this.startAutoRefresh();
                     } catch (error) {
                         console.error('LIFF initialization error:', error);
                         this.statusMessage = `${this.t('lineFailed')}: ${error.message || ''}`;
@@ -399,6 +556,65 @@
                     if (!response.ok) throw new Error(result.message || 'Failed to load sessions');
 
                     this.sessions = result.sessions || [];
+                },
+
+                async loadPlayers() {
+                    const response = await fetch('/api/players');
+                    const result = await response.json();
+                    if (response.ok) this.players = result.players || [];
+                },
+
+                async loadRankings() {
+                    const response = await fetch('/api/rankings');
+                    const result = await response.json();
+                    if (response.ok) this.rankings = result.rankings || [];
+                },
+
+                async loadProfile() {
+                    if (!this.lineUid) return;
+
+                    const response = await fetch(`/api/profile?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+
+                    if (response.ok && result.user) {
+                        this.profile.displayName = result.user.displayName || this.displayName || '';
+                        this.profile.phone = result.user.phone || '';
+                        this.profile.profileImageUrl = result.user.profileImageUrl || this.profile.profileImageUrl || '';
+                    }
+                },
+
+                async saveProfile(silent = false) {
+                    if (!this.lineUid) return;
+
+                    const response = await fetch('/api/profile', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            lineUid: this.lineUid,
+                            displayName: this.profile.displayName || this.displayName,
+                            phone: this.profile.phone,
+                            profileImageUrl: this.profile.profileImageUrl
+                        })
+                    });
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (!silent) this.statusMessage = result.message || this.t('profileSaveFailed');
+                        return;
+                    }
+
+                    this.displayName = result.user.displayName || this.displayName;
+                    if (!silent) this.statusMessage = this.t('profileSaved');
+                    await this.loadPlayers();
+                    await this.loadRankings();
+                },
+
+                startAutoRefresh() {
+                    if (this.refreshTimer) return;
+                    this.refreshTimer = setInterval(async () => {
+                        await this.loadSessions();
+                        if (this.selectedSessionId) await this.loadSession();
+                    }, 10000);
                 },
 
                 async loadSession() {
@@ -438,6 +654,31 @@
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 },
 
+                async shareEvent() {
+                    const url = `${window.location.origin}/?sessionId=${encodeURIComponent(this.selectedSessionId)}`;
+                    const text = `${this.t('shareText')}: ${this.sessionTitle}`;
+
+                    if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                        await liff.shareTargetPicker([{
+                            type: 'text',
+                            text: `${text}\n${url}`
+                        }]);
+                        return;
+                    }
+
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: this.sessionTitle,
+                            text,
+                            url
+                        });
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
                 showEventList() {
                     this.selectedSessionId = '';
                     this.statusMessage = this.lineUid ? `${this.t('loggedIn')}: ${this.displayName}` : '';
@@ -473,6 +714,10 @@
                     return 'bg-blue-50 text-gdsq';
                 },
 
+                playerAvatar(player) {
+                    return this.imageUrl(player.profileImageUrl) || `https://ui-avatars.com/api/?background=0044CC&color=fff&name=${encodeURIComponent(player.displayName || 'GDSQ')}`;
+                },
+
                 statusLabel(status) {
                     return status === 'Joined' ? this.t('confirmed') : this.t('waitlisted');
                 },
@@ -493,6 +738,8 @@
                             body: JSON.stringify({
                                 lineUid: this.lineUid,
                                 displayName: this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl,
                                 sessionId: this.selectedSessionId
                             })
                         });

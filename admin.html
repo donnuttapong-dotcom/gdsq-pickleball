@@ -237,9 +237,17 @@
                 >
                     <i class="fa-solid fa-floppy-disk mr-2"></i><span x-text="t('save')">Save</span>
                 </button>
+                <button
+                    class="rounded-lg bg-gdsqRed px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                    @click="deleteSession()"
+                    :disabled="isLoading"
+                >
+                    <i class="fa-solid fa-trash mr-2"></i><span x-text="t('deleteEvent')">Delete Event</span>
+                </button>
             </div>
+            <p class="mt-3 text-xs font-semibold text-gray-500" x-text="t('posterHelp')"></p>
             <div class="mt-4 overflow-hidden rounded-lg bg-gray-100" x-show="editSession.posterUrl" x-cloak>
-                <img class="max-h-72 w-full object-contain" :src="editSession.posterUrl" :alt="editSession.title">
+                <img class="max-h-72 w-full object-contain" :src="imageUrl(editSession.posterUrl)" :alt="editSession.title">
             </div>
         </div>
 
@@ -253,6 +261,7 @@
                         <div class="flex items-center justify-between px-4 py-3">
                             <div>
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
+                                <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
                             <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700" x-text="t('joined')">Joined</span>
@@ -271,6 +280,7 @@
                         <div class="flex items-center justify-between px-4 py-3">
                             <div>
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
+                                <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
                             <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-gdsqRed" x-text="t('waitlist')">Waitlist</span>
@@ -362,16 +372,21 @@
                         skillLevel: 'ระดับผู้เล่น เช่น Beginner / Intermediate',
                         description: 'รายละเอียดกิจกรรม',
                         posterUrl: 'ลิงก์รูปโปสเตอร์กิจกรรม',
+                        posterHelp: 'ใช้ลิงก์รูปจาก Google Drive ได้: อัปโหลดรูปใน Drive > Share > Anyone with the link > Copy link > วางช่องนี้',
                         create: 'สร้าง',
                         save: 'บันทึก',
+                        deleteEvent: 'ลบ Event',
+                        deleteConfirm: 'ยืนยันลบ Event นี้ไหม? รายชื่อ RSVP ของ Event นี้จะถูกลบด้วย',
                         noJoined: 'ยังไม่มีคน Joined',
                         noWaitlist: 'ยังไม่มี Waitlist',
                         created: 'สร้าง event แล้ว',
                         saved: 'บันทึกแล้ว',
+                        deleted: 'ลบ event แล้ว',
                         loadEventsFailed: 'โหลด event ไม่สำเร็จ',
                         loadRsvpsFailed: 'โหลด RSVP ไม่สำเร็จ',
                         createFailed: 'สร้าง event ไม่สำเร็จ',
-                        updateFailed: 'แก้ไข event ไม่สำเร็จ'
+                        updateFailed: 'แก้ไข event ไม่สำเร็จ',
+                        deleteFailed: 'ลบ event ไม่สำเร็จ'
                     },
                     en: {
                         adminLogin: 'Admin Login',
@@ -403,16 +418,21 @@
                         skillLevel: 'Skill level, e.g. Beginner / Intermediate',
                         description: 'Event description',
                         posterUrl: 'Event poster image URL',
+                        posterHelp: 'Google Drive links work: upload image to Drive > Share > Anyone with the link > Copy link > paste here.',
                         create: 'Create',
                         save: 'Save',
+                        deleteEvent: 'Delete Event',
+                        deleteConfirm: 'Delete this event? All RSVPs for this event will also be deleted.',
                         noJoined: 'No Joined players yet',
                         noWaitlist: 'No Waitlist yet',
                         created: 'Event created',
                         saved: 'Saved',
+                        deleted: 'Event deleted',
                         loadEventsFailed: 'Unable to load events',
                         loadRsvpsFailed: 'Unable to load RSVPs',
                         createFailed: 'Unable to create event',
-                        updateFailed: 'Unable to update event'
+                        updateFailed: 'Unable to update event',
+                        deleteFailed: 'Unable to delete event'
                     }
                 },
 
@@ -423,6 +443,16 @@
                 toggleLanguage() {
                     this.language = this.language === 'th' ? 'en' : 'th';
                     localStorage.setItem('gdsqLanguage', this.language);
+                },
+
+                imageUrl(url) {
+                    if (!url) return '';
+                    const text = String(url).trim();
+                    const match = text.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
+                    if (match) {
+                        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1200`;
+                    }
+                    return text;
                 },
 
                 get selectedSession() {
@@ -586,6 +616,40 @@
                         }
 
                         this.editMessage = this.t('saved');
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async deleteSession() {
+                    if (!this.selectedSessionId || !confirm(this.t('deleteConfirm'))) return;
+
+                    this.isLoading = true;
+                    this.editMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/sessions/${this.selectedSessionId}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('deleteFailed'));
+                        }
+
+                        this.editMessage = this.t('deleted');
+                        this.selectedSessionId = '';
+                        this.rsvps = [];
+                        this.summary = {
+                            joinedCount: 0,
+                            waitlistCount: 0,
+                            spotsLeft: 0,
+                            maxPlayers: 0
+                        };
                         await this.loadAll();
                     } catch (error) {
                         this.errorMessage = error.message;

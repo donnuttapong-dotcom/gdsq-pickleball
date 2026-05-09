@@ -9,6 +9,10 @@ add column if not exists skill_level text,
 add column if not exists description text,
 add column if not exists poster_url text;
 
+alter table users
+add column if not exists phone text,
+add column if not exists profile_image_url text;
+
 update sessions
 set
   event_date = coalesce(event_date, date '2026-05-24'),
