@@ -69,29 +69,34 @@
 
                 <div class="space-y-3">
                     <template x-for="session in sessions" :key="session.id">
-                        <article class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-                            <button class="grid w-full grid-cols-[88px_1fr] gap-4 text-left" @click="selectSession(session.id)">
-                                <div class="flex h-full min-h-[112px] flex-col items-center justify-center rounded-xl bg-gdsq text-white">
-                                    <span class="text-sm font-black uppercase" x-text="monthText(session.eventDate)">MAY</span>
-                                    <span class="text-4xl font-black leading-none" x-text="dayText(session.eventDate)">24</span>
-                                    <span class="text-sm font-black uppercase" x-text="weekdayText(session.eventDate)">SAT</span>
+                        <article class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                            <button class="block w-full text-left" @click="selectSession(session.id)">
+                                <div class="aspect-[16/9] bg-gray-100" x-show="session.posterUrl" x-cloak>
+                                    <img class="h-full w-full object-cover" :src="imageUrl(session.posterUrl)" :alt="session.title">
                                 </div>
-                                <div class="min-w-0">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="min-w-0">
-                                            <h2 class="truncate text-lg font-black" x-text="session.title"></h2>
-                                            <p class="mt-1 text-sm font-semibold text-gray-700" x-text="timeRange(session)"></p>
-                                            <p class="mt-2 truncate text-sm font-semibold text-gray-500">
-                                                <i class="fa-solid fa-location-dot mr-1"></i><span x-text="session.location || t('locationTba')"></span>
-                                            </p>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="text-sm font-black text-gray-700"><span x-text="session.joinedCount"></span> / <span x-text="session.maxPlayers"></span></p>
-                                        </div>
+                                <div class="grid w-full grid-cols-[88px_1fr] gap-4 p-4">
+                                    <div class="flex h-full min-h-[112px] flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                        <span class="text-sm font-black uppercase" x-text="monthText(session.eventDate)">MAY</span>
+                                        <span class="text-4xl font-black leading-none" x-text="dayText(session.eventDate)">24</span>
+                                        <span class="text-sm font-black uppercase" x-text="weekdayText(session.eventDate)">SAT</span>
                                     </div>
-                                    <div class="mt-3 flex items-center justify-between">
-                                        <span class="rounded-lg px-3 py-1 text-xs font-black" :class="skillClass(session.skillLevel)" x-text="session.skillLevel || t('socialPlay')"></span>
-                                        <span class="rounded-lg bg-gdsq px-5 py-2 text-sm font-black text-white" x-text="session.userStatus ? statusLabel(session.userStatus) : 'RSVP'">RSVP</span>
+                                    <div class="min-w-0">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <h2 class="truncate text-lg font-black" x-text="session.title"></h2>
+                                                <p class="mt-1 text-sm font-semibold text-gray-700" x-text="timeRange(session)"></p>
+                                                <p class="mt-2 truncate text-sm font-semibold text-gray-500">
+                                                    <i class="fa-solid fa-location-dot mr-1"></i><span x-text="session.location || t('locationTba')"></span>
+                                                </p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-sm font-black text-gray-700"><span x-text="session.joinedCount"></span> / <span x-text="session.maxPlayers"></span></p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 flex items-center justify-between">
+                                            <span class="rounded-lg px-3 py-1 text-xs font-black" :class="skillClass(session.skillLevel)" x-text="session.skillLevel || t('socialPlay')"></span>
+                                            <span class="rounded-lg bg-gdsq px-5 py-2 text-sm font-black text-white" x-text="session.userStatus ? statusLabel(session.userStatus) : 'RSVP'">RSVP</span>
+                                        </div>
                                     </div>
                                 </div>
                             </button>
