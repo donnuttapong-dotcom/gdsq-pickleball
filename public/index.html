@@ -16,8 +16,9 @@
     <div class="w-full max-w-md bg-white min-h-screen relative pb-28" x-data="eventDetails()" x-init="init()">
         <div class="px-5 mt-6 mb-8">
             <h1 class="text-2xl font-bold text-gray-900 mb-5" x-text="sessionTitle">Weekend Social Play</h1>
-            <p class="text-sm font-semibold text-gray-900">Sat, May 24, 2026 | 9:00 AM</p>
-            <p class="text-sm font-semibold text-gray-900">THB 250</p>
+            <p class="text-sm font-semibold text-gray-900" x-text="eventDateText">Sat, May 24, 2026 | 9:00 AM</p>
+            <p class="text-sm font-semibold text-gray-900" x-text="priceText">THB 250</p>
+            <p class="mt-2 text-sm font-semibold text-gray-700" x-show="location" x-text="location"></p>
 
             <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
                 <p x-text="statusMessage"></p>
@@ -74,6 +75,10 @@
                 displayName: null,
                 sessionId: new URLSearchParams(window.location.search).get('sessionId') || 1,
                 sessionTitle: 'Weekend Social Play',
+                eventDate: null,
+                startTime: null,
+                priceThb: null,
+                location: '',
                 maxPlayers: 0,
                 joinedCount: 0,
                 waitlistCount: 0,
@@ -81,6 +86,29 @@
                 userStatus: null,
                 isLoading: false,
                 statusMessage: 'กำลังโหลดข้อมูลกิจกรรม...',
+
+                get eventDateText() {
+                    if (!this.eventDate && !this.startTime) return 'Date and time TBA';
+
+                    const dateText = this.eventDate
+                        ? new Intl.DateTimeFormat('en-US', {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                        }).format(new Date(`${this.eventDate}T00:00:00`))
+                        : 'Date TBA';
+                    const timeText = this.startTime
+                        ? this.startTime.slice(0, 5)
+                        : 'Time TBA';
+
+                    return `${dateText} | ${timeText}`;
+                },
+
+                get priceText() {
+                    if (this.priceThb === null || this.priceThb === undefined) return 'Price TBA';
+                    return `THB ${this.priceThb}`;
+                },
 
                 async init() {
                     try {
@@ -94,16 +122,15 @@
                             return;
                         }
 
-                       await liff.init({
-    liffId: config.liffId,
-    withLoginOnExternalBrowser: true
-});
+                        await liff.init({
+                            liffId: config.liffId,
+                            withLoginOnExternalBrowser: true
+                        });
 
                         if (!liff.isLoggedIn()) {
-                           liff.login({
-    redirectUri: window.location.origin + window.location.pathname + window.location.search
-});
-
+                            liff.login({
+                                redirectUri: window.location.origin + window.location.pathname + window.location.search
+                            });
                             return;
                         }
 
@@ -131,6 +158,10 @@
                     }
 
                     this.sessionTitle = result.session.title;
+                    this.eventDate = result.session.eventDate;
+                    this.startTime = result.session.startTime;
+                    this.priceThb = result.session.priceThb;
+                    this.location = result.session.location || '';
                     this.maxPlayers = result.session.maxPlayers;
                     this.joinedCount = result.session.joinedCount;
                     this.waitlistCount = result.session.waitlistCount;

@@ -13,6 +13,35 @@
 </head>
 <body class="bg-gray-100 text-gray-900">
     <div class="mx-auto min-h-screen max-w-6xl px-4 py-6" x-data="adminDashboard()" x-init="init()">
+        <div class="flex min-h-screen items-center justify-center" x-show="!isAuthenticated">
+            <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
+                <p class="text-xs font-bold uppercase tracking-wide text-gdsq">GDSQ Pickleball</p>
+                <h1 class="mt-1 text-2xl font-black">Admin Login</h1>
+                <p class="mt-2 text-sm text-gray-500">ใส่รหัสผ่านเพื่อดูรายชื่อ RSVP และจัดการ event</p>
+
+                <form class="mt-5 space-y-3" @submit.prevent="login()">
+                    <input
+                        class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm"
+                        type="password"
+                        placeholder="Admin password"
+                        x-model="adminPassword"
+                        autocomplete="current-password"
+                    >
+                    <button
+                        class="w-full rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                        type="submit"
+                        :disabled="isLoading"
+                    >
+                        <span x-show="!isLoading">Login</span>
+                        <span x-show="isLoading">Checking...</span>
+                    </button>
+                </form>
+
+                <div class="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" x-show="errorMessage" x-text="errorMessage"></div>
+            </div>
+        </div>
+
+        <div x-show="isAuthenticated">
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="text-xs font-bold uppercase tracking-wide text-gdsq">GDSQ Pickleball</p>
@@ -26,6 +55,9 @@
                 <button class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800" @click="loadAll()">
                     <i class="fa-solid fa-rotate mr-2"></i>Refresh
                 </button>
+                <button class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50" @click="logout()">
+                    <i class="fa-solid fa-right-from-bracket mr-2"></i>Logout
+                </button>
             </div>
         </div>
 
@@ -38,7 +70,7 @@
                     @change="loadRsvps()"
                 >
                     <template x-for="session in sessions" :key="session.id">
-                        <option :value="session.id" x-text="`${session.index}. ${session.title}`"></option>
+                        <option :value="session.id" x-text="`${session.index}. ${session.title} (${formatEventDate(session)})`"></option>
                     </template>
                 </select>
             </div>
@@ -96,7 +128,7 @@
                 <h2 class="text-lg font-black">Create Event</h2>
                 <p class="text-xs font-semibold text-gray-500" x-text="formMessage"></p>
             </div>
-            <div class="grid gap-3 md:grid-cols-[1fr_140px_auto]">
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_150px_140px_120px]">
                 <input
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     type="text"
@@ -110,12 +142,57 @@
                     placeholder="Max players"
                     x-model="newSession.maxPlayers"
                 >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="date"
+                    x-model="newSession.eventDate"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="time"
+                    x-model="newSession.startTime"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="number"
+                    min="0"
+                    placeholder="Price THB"
+                    x-model="newSession.priceThb"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    type="text"
+                    placeholder="Location"
+                    x-model="newSession.location"
+                >
                 <button
                     class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
                     @click="createSession()"
                     :disabled="isLoading"
                 >
                     <i class="fa-solid fa-plus mr-2"></i>Create
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm" x-show="selectedSession">
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-lg font-black">Edit Selected Event</h2>
+                <p class="text-xs font-semibold text-gray-500" x-text="editMessage"></p>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_150px_140px_120px]">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" x-model="editSession.title">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" x-model="editSession.maxPlayers">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="date" x-model="editSession.eventDate">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.startTime">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" x-model="editSession.priceThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" placeholder="Location" x-model="editSession.location">
+                <button
+                    class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-black disabled:opacity-50"
+                    @click="updateSession()"
+                    :disabled="isLoading"
+                >
+                    <i class="fa-solid fa-floppy-disk mr-2"></i>Save
                 </button>
             </div>
         </div>
@@ -159,6 +236,7 @@
         </div>
 
         <div class="mt-5 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" x-show="errorMessage" x-text="errorMessage"></div>
+        </div>
     </div>
 
     <script>
@@ -175,11 +253,30 @@
                 },
                 newSession: {
                     title: '',
-                    maxPlayers: 24
+                    maxPlayers: 24,
+                    eventDate: '',
+                    startTime: '',
+                    priceThb: 250,
+                    location: ''
                 },
+                editSession: {
+                    title: '',
+                    maxPlayers: 24,
+                    eventDate: '',
+                    startTime: '',
+                    priceThb: 250,
+                    location: ''
+                },
+                adminPassword: '',
+                isAuthenticated: false,
                 formMessage: '',
+                editMessage: '',
                 errorMessage: '',
                 isLoading: false,
+
+                get selectedSession() {
+                    return this.sessions.find((session) => session.id === this.selectedSessionId);
+                },
 
                 get joinedRsvps() {
                     return this.rsvps.filter((rsvp) => rsvp.status === 'Joined');
@@ -191,6 +288,44 @@
 
                 async init() {
                     await this.loadAll();
+                },
+
+                async login() {
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch('/api/admin/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                password: this.adminPassword
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Login failed');
+                        }
+
+                        this.adminPassword = '';
+                        this.isAuthenticated = true;
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async logout() {
+                    await fetch('/api/admin/logout', { method: 'POST' });
+                    this.isAuthenticated = false;
+                    this.sessions = [];
+                    this.rsvps = [];
+                    this.errorMessage = '';
                 },
 
                 async loadAll() {
@@ -206,10 +341,15 @@
                     const result = await response.json();
 
                     if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
                         this.errorMessage = result.message || 'โหลด event ไม่สำเร็จ';
                         return;
                     }
 
+                    this.isAuthenticated = true;
                     this.sessions = result.sessions;
                     if (!this.selectedSessionId && this.sessions.length > 0) {
                         this.selectedSessionId = this.sessions[0].id;
@@ -230,6 +370,7 @@
 
                     this.rsvps = result.rsvps;
                     this.syncSummary();
+                    this.syncEditForm();
                 },
 
                 async createSession() {
@@ -254,7 +395,41 @@
                         this.formMessage = 'สร้าง event แล้ว';
                         this.newSession.title = '';
                         this.newSession.maxPlayers = 24;
+                        this.newSession.eventDate = '';
+                        this.newSession.startTime = '';
+                        this.newSession.priceThb = 250;
+                        this.newSession.location = '';
                         this.selectedSessionId = result.session.id;
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async updateSession() {
+                    if (!this.selectedSessionId) return;
+
+                    this.isLoading = true;
+                    this.editMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/sessions/${this.selectedSessionId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.editSession)
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'แก้ไข event ไม่สำเร็จ');
+                        }
+
+                        this.editMessage = 'บันทึกแล้ว';
                         await this.loadAll();
                     } catch (error) {
                         this.errorMessage = error.message;
@@ -273,6 +448,21 @@
                         spotsLeft: session.spotsLeft,
                         maxPlayers: session.maxPlayers
                     };
+                    this.syncEditForm();
+                },
+
+                syncEditForm() {
+                    const session = this.selectedSession;
+                    if (!session) return;
+
+                    this.editSession = {
+                        title: session.title,
+                        maxPlayers: session.maxPlayers,
+                        eventDate: session.eventDate || '',
+                        startTime: session.startTime ? session.startTime.slice(0, 5) : '',
+                        priceThb: session.priceThb ?? '',
+                        location: session.location || ''
+                    };
                 },
 
                 formatDate(value) {
@@ -281,6 +471,13 @@
                         dateStyle: 'medium',
                         timeStyle: 'short'
                     }).format(new Date(value));
+                },
+
+                formatEventDate(session) {
+                    if (!session.eventDate && !session.startTime) return 'TBA';
+                    const dateText = session.eventDate || 'Date TBA';
+                    const timeText = session.startTime ? session.startTime.slice(0, 5) : 'Time TBA';
+                    return `${dateText} ${timeText}`;
                 }
             };
         }

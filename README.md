@@ -22,6 +22,7 @@ cp .env.example .env
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 LINE_LIFF_ID=your_line_liff_id
+ADMIN_PASSWORD=your_admin_password
 ```
 
 6. ใน Supabase SQL Editor ให้รัน `setup.sql` เพื่อสร้าง session แรกสำหรับหน้าเว็บนี้

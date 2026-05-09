@@ -44,6 +44,7 @@ HOST=0.0.0.0
 SUPABASE_URL=https://sgmhfjlautezuaygfcae.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=secret key ของ Supabase
 LINE_LIFF_ID=LIFF ID ของ LINE
+ADMIN_PASSWORD=รหัสผ่านสำหรับหน้า Admin
 ```
 
 ห้ามใส่ `SUPABASE_SERVICE_ROLE_KEY` ในหน้าเว็บหรือส่งให้คนอื่น
