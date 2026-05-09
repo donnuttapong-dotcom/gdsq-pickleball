@@ -3,206 +3,510 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GDSQ Pickleball - Event Details</title>
+    <title>GDSQ Pickleball</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { theme: { extend: { colors: { gdsq: '#0044CC', gdsqRed: '#E32636' } } } }
+        tailwind.config = { theme: { extend: { colors: { gdsq: '#0044CC', gdsqRed: '#E32636', gdsqNavy: '#06245A' } } } }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>[x-cloak] { display: none !important; }</style>
 </head>
-<body class="bg-gray-100 flex justify-center">
-    <div class="w-full max-w-md bg-white min-h-screen relative pb-28" x-data="eventDetails()" x-init="init()">
-        <div class="px-5 mt-6 mb-8">
-            <h1 class="text-2xl font-bold text-gray-900 mb-5" x-text="sessionTitle">Weekend Social Play</h1>
-            <p class="text-sm font-semibold text-gray-900" x-text="eventDateText">Sat, May 24, 2026 | 9:00 AM</p>
-            <p class="text-sm font-semibold text-gray-900" x-text="priceText">THB 250</p>
-            <p class="mt-2 text-sm font-semibold text-gray-700" x-show="location" x-text="location"></p>
-
-            <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
-                <p x-text="statusMessage"></p>
-            </div>
-        </div>
-
-        <div class="fixed bottom-0 left-0 w-full bg-white border-t p-4 z-50 flex justify-between items-center">
-            <div class="pl-2">
-                <p class="text-[10px] font-bold text-gray-500 uppercase">Spots Left</p>
-                <p class="text-3xl font-black text-gdsq">
-                    <span x-text="spotsLeft">0</span>
-                    <span class="text-base text-gray-400">/ <span x-text="maxPlayers">0</span></span>
-                </p>
-                <p class="mt-1 text-[11px] font-semibold text-gray-500">
-                    <span x-text="joinedCount">0</span> joined
-                    <span x-show="waitlistCount > 0"> · <span x-text="waitlistCount"></span> waitlist</span>
-                </p>
-            </div>
-            <div class="flex items-center gap-2">
-                <button
-                    class="bg-gdsq text-white font-bold py-3.5 px-6 rounded-xl flex items-center gap-2 hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    x-show="!userStatus"
-                    @click="confirmRsvp()"
-                    :disabled="isLoading || !lineUid"
-                >
-                    <span x-show="!isLoading">Confirm RSVP</span>
-                    <span x-show="isLoading">Confirming...</span>
-                    <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
+<body class="bg-gray-100 flex justify-center text-gray-950">
+    <div class="w-full max-w-md bg-white min-h-screen relative" :class="selectedSessionId ? 'pb-32' : 'pb-24'" x-data="eventApp()" x-init="init()">
+        <header class="sticky top-0 z-40 bg-white/95 px-5 py-4 backdrop-blur">
+            <div class="flex items-center justify-between">
+                <button class="text-2xl text-gray-900" @click="selectedSessionId ? showEventList() : null">
+                    <i class="fa-solid" :class="selectedSessionId ? 'fa-arrow-left' : 'fa-bars'"></i>
                 </button>
+                <div class="text-center leading-none">
+                    <p class="text-3xl font-black italic tracking-tight text-gdsqNavy">GDSQ</p>
+                    <p class="-mt-1 text-xs font-black uppercase tracking-wide text-gdsqRed">Pickleball</p>
+                </div>
+                <button class="relative rounded-full border border-gray-200 px-3 py-2 text-xs font-black text-gray-700" @click="toggleLanguage()" x-text="language === 'th' ? 'EN' : 'ไทย'"></button>
+            </div>
+        </header>
 
-                <div x-show="userStatus" class="flex items-center gap-2">
-                    <div class="rounded-xl bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
-                        <i class="fa-solid fa-check mr-1" x-show="userStatus === 'Joined'"></i>
-                        <i class="fa-solid fa-clock mr-1" x-show="userStatus === 'Waitlist'"></i>
-                        <span x-text="userStatus === 'Joined' ? 'Confirmed' : 'Waitlisted'"></span>
-                    </div>
-                    <button
-                        class="rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        @click="cancelRsvp()"
-                        :disabled="isLoading || !lineUid"
-                    >
-                        <span x-show="!isLoading">Cancel</span>
-                        <span x-show="isLoading">Cancelling...</span>
+        <main x-show="!selectedSessionId" x-cloak>
+            <section class="px-5">
+                <div class="overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-blue-50 p-7 shadow-sm">
+                    <p class="text-4xl font-black italic tracking-tight text-gdsqRed">GDSQ</p>
+                    <p class="mt-4 text-2xl font-black uppercase leading-tight text-gdsqNavy" x-text="t('heroLine1')">Good Game.</p>
+                    <p class="text-2xl font-black uppercase leading-tight text-gdsqRed" x-text="t('heroLine2')">Good People.</p>
+                    <button class="mt-6 rounded-lg bg-gdsq px-5 py-3 text-sm font-black text-white shadow-sm" @click="scrollToEvents()" x-text="t('joinFun')">Join the Fun!</button>
+                </div>
+
+                <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
+                    <button class="flex flex-col items-center gap-2 text-gdsq">
+                        <i class="fa-regular fa-calendar text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('events')">Events</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2 text-gray-500">
+                        <i class="fa-solid fa-users text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('players')">Players</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2 text-gray-500">
+                        <i class="fa-solid fa-chart-simple text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('rankings')">Rankings</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2 text-gray-500">
+                        <i class="fa-solid fa-store text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('shop')">Shop</span>
                     </button>
                 </div>
+            </section>
+
+            <section id="events" class="mt-7 px-5">
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 class="text-xl font-black" x-text="t('upcomingEvents')">Upcoming Events</h1>
+                    <button class="text-sm font-black text-gdsq" @click="loadSessions()" x-text="t('refresh')">Refresh</button>
+                </div>
+
+                <div class="mb-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
+                    <p x-text="statusMessage"></p>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="session in sessions" :key="session.id">
+                        <article class="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                            <button class="grid w-full grid-cols-[88px_1fr] gap-4 text-left" @click="selectSession(session.id)">
+                                <div class="flex h-full min-h-[112px] flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                    <span class="text-sm font-black uppercase" x-text="monthText(session.eventDate)">MAY</span>
+                                    <span class="text-4xl font-black leading-none" x-text="dayText(session.eventDate)">24</span>
+                                    <span class="text-sm font-black uppercase" x-text="weekdayText(session.eventDate)">SAT</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <h2 class="truncate text-lg font-black" x-text="session.title"></h2>
+                                            <p class="mt-1 text-sm font-semibold text-gray-700" x-text="timeRange(session)"></p>
+                                            <p class="mt-2 truncate text-sm font-semibold text-gray-500">
+                                                <i class="fa-solid fa-location-dot mr-1"></i><span x-text="session.location || t('locationTba')"></span>
+                                            </p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm font-black text-gray-700"><span x-text="session.joinedCount"></span> / <span x-text="session.maxPlayers"></span></p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 flex items-center justify-between">
+                                        <span class="rounded-lg px-3 py-1 text-xs font-black" :class="skillClass(session.skillLevel)" x-text="session.skillLevel || t('socialPlay')"></span>
+                                        <span class="rounded-lg bg-gdsq px-5 py-2 text-sm font-black text-white" x-text="session.userStatus ? statusLabel(session.userStatus) : 'RSVP'">RSVP</span>
+                                    </div>
+                                </div>
+                            </button>
+                        </article>
+                    </template>
+                </div>
+
+                <div class="rounded-2xl bg-gray-50 px-5 py-10 text-center text-sm font-semibold text-gray-500" x-show="!isLoading && sessions.length === 0">
+                    <i class="fa-regular fa-calendar mb-3 block text-2xl"></i>
+                    <span x-text="t('noEvents')">ยังไม่มีกิจกรรม</span>
+                </div>
+
+                <div class="mt-5 rounded-2xl bg-gdsqNavy p-5 text-white">
+                    <p class="text-lg font-black uppercase" x-text="t('communityTitle')">Play. Connect. Improve.</p>
+                    <p class="mt-1 text-sm text-blue-100" x-text="t('communityText')">Be part of the GDSQ community!</p>
+                </div>
+            </section>
+        </main>
+
+        <main x-show="selectedSessionId" x-cloak>
+            <section class="px-5">
+                <div class="relative overflow-hidden rounded-2xl bg-gray-100">
+                    <img class="aspect-square w-full object-cover" x-show="posterUrl" :src="posterUrl" :alt="sessionTitle">
+                    <div class="aspect-square w-full bg-gradient-to-br from-orange-50 via-white to-blue-50 p-8" x-show="!posterUrl">
+                        <p class="text-center text-6xl font-black italic text-gdsqRed">GDSQ</p>
+                        <p class="mt-6 text-center text-5xl font-black italic text-gdsqRed">PICKLEBALL</p>
+                    </div>
+                    <div class="absolute left-4 top-4 rounded-lg bg-gdsq px-4 py-2 text-xs font-black uppercase text-white" x-text="skillLevel || t('socialPlay')">Social Play</div>
+                    <div class="absolute right-4 top-4 rounded-lg bg-white/95 px-4 py-2 text-sm font-black text-gray-800">
+                        <i class="fa-solid fa-users mr-1"></i><span x-text="joinedCount"></span> / <span x-text="maxPlayers"></span>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h1 class="text-2xl font-black" x-text="sessionTitle">Weekend Social Play</h1>
+                    <div class="mt-4 divide-y divide-gray-100 rounded-2xl bg-white shadow-sm">
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-regular fa-calendar mt-1 text-gray-500"></i>
+                            <p class="font-semibold" x-text="eventDateText"></p>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-regular fa-clock mt-1 text-gray-500"></i>
+                            <p class="font-semibold" x-text="timeRange({ startTime, endTime })"></p>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-location-dot mt-1 text-gray-500"></i>
+                            <div>
+                                <p class="font-semibold" x-text="location || t('locationTba')"></p>
+                                <p class="text-sm text-gray-500" x-show="address" x-text="address"></p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-tag mt-1 text-gray-500"></i>
+                            <p class="font-semibold"><span x-text="priceText"></span> <span class="ml-2 rounded-md bg-blue-50 px-2 py-1 text-xs font-black text-gdsq" x-text="t('perPerson')">Per Person</span></p>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-chart-simple mt-1 text-gray-500"></i>
+                            <div>
+                                <p class="font-semibold"><span x-text="t('skillLevel')">Skill Level</span> <span class="ml-2 rounded-md bg-blue-50 px-2 py-1 text-xs font-black text-gdsq" x-text="skillLevel || t('socialPlay')"></span></p>
+                            </div>
+                        </div>
+                        <div class="px-4 py-4">
+                            <h2 class="font-black" x-text="t('aboutEvent')">About This Event</h2>
+                            <p class="mt-2 text-sm leading-relaxed text-gray-700" x-text="description || t('defaultDescription')"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <p class="text-sm font-black" x-text="t('joinedPlayers')">Joined Players</p>
+                        <p class="mt-2 text-3xl font-black text-gdsq"><span x-text="joinedCount"></span>/<span x-text="maxPlayers"></span></p>
+                    </div>
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <p class="text-sm font-black" x-text="t('waitlist')">Waitlist</p>
+                        <p class="mt-2 text-3xl font-black text-gdsqRed" x-text="waitlistCount">0</p>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
+                    <p x-text="statusMessage"></p>
+                </div>
+            </section>
+
+            <section class="fixed bottom-0 left-0 w-full border-t bg-white p-4 z-50">
+                <div class="mx-auto flex max-w-md items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-bold text-gray-500" x-text="t('spotsLeft')">Spots Left</p>
+                        <p class="text-2xl font-black text-gdsq"><span x-text="spotsLeft">0</span> <span class="text-base text-gray-400">/ <span x-text="maxPlayers">0</span></span></p>
+                    </div>
+                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white disabled:opacity-50" x-show="!userStatus" @click="confirmRsvp()" :disabled="isLoading || !lineUid">
+                        <span x-show="!isLoading" x-text="t('confirmRsvp')">Confirm RSVP</span>
+                        <span x-show="isLoading" x-text="t('confirming')">Confirming...</span>
+                        <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
+                    </button>
+                    <button class="rounded-xl border border-gray-300 bg-white px-5 py-4 text-sm font-black text-gray-700" x-show="userStatus" @click="cancelRsvp()" :disabled="isLoading || !lineUid">
+                        <span x-text="userStatus ? statusLabel(userStatus) : ''"></span>
+                        <span class="ml-2 text-gray-400" x-text="t('cancel')">Cancel</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <nav class="fixed bottom-0 left-0 z-40 w-full border-t bg-white px-6 py-3" x-show="!selectedSessionId" x-cloak>
+            <div class="mx-auto grid max-w-md grid-cols-5 items-end text-center text-xs font-bold text-gray-500">
+                <button class="text-gdsq"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
+                <button><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
+                <button class="-mt-8"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg">+</span>Create</button>
+                <button><i class="fa-solid fa-users mb-1 block text-xl"></i>Players</button>
+                <button><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
             </div>
-        </div>
+        </nav>
     </div>
 
     <script>
-        function eventDetails() {
+        function eventApp() {
             return {
                 lineUid: null,
                 displayName: null,
-                sessionId: new URLSearchParams(window.location.search).get('sessionId') || 1,
-                sessionTitle: 'Weekend Social Play',
+                sessions: [],
+                selectedSessionId: new URLSearchParams(window.location.search).get('sessionId') || '',
+                sessionTitle: '',
                 eventDate: null,
                 startTime: null,
+                endTime: null,
                 priceThb: null,
                 location: '',
+                address: '',
+                skillLevel: '',
+                description: '',
+                posterUrl: '',
                 maxPlayers: 0,
                 joinedCount: 0,
                 waitlistCount: 0,
                 spotsLeft: 0,
                 userStatus: null,
                 isLoading: false,
-                statusMessage: 'กำลังโหลดข้อมูลกิจกรรม...',
+                language: localStorage.getItem('gdsqLanguage') || 'th',
+                statusMessage: '',
+
+                translations: {
+                    th: {
+                        heroLine1: 'Good Game.',
+                        heroLine2: 'Good People.',
+                        joinFun: 'Join the Fun!',
+                        events: 'Events',
+                        players: 'Players',
+                        rankings: 'Rankings',
+                        shop: 'Shop',
+                        upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
+                        refresh: 'รีเฟรช',
+                        noEvents: 'ยังไม่มีกิจกรรม',
+                        communityTitle: 'Play. Connect. Improve.',
+                        communityText: 'เป็นส่วนหนึ่งของ GDSQ community!',
+                        back: 'กลับ',
+                        viewDetails: 'ดูรายละเอียด',
+                        spotsLeft: 'ที่ว่าง',
+                        spots: 'ที่',
+                        full: 'เต็มแล้ว',
+                        joined: 'เข้าร่วมแล้ว',
+                        waitlist: 'Waitlist',
+                        joinedPlayers: 'Joined Players',
+                        confirmRsvp: 'Confirm RSVP',
+                        confirming: 'กำลังยืนยัน...',
+                        confirmed: 'Confirmed',
+                        waitlisted: 'Waitlisted',
+                        cancel: 'Cancel',
+                        cancelling: 'กำลังยกเลิก...',
+                        loadingEvent: 'กำลังโหลดข้อมูลกิจกรรม...',
+                        loadingEvents: 'กำลังโหลดรายการกิจกรรม...',
+                        dateTba: 'ยังไม่ระบุวันที่',
+                        timeTba: 'ยังไม่ระบุเวลา',
+                        priceTba: 'ยังไม่ระบุราคา',
+                        locationTba: 'ยังไม่ระบุสถานที่',
+                        socialPlay: 'Social Play',
+                        perPerson: 'Per Person',
+                        skillLevel: 'Skill Level',
+                        aboutEvent: 'About This Event',
+                        defaultDescription: 'Join us for a fun and friendly pickleball session. Good rallies, good people, and great vibes.',
+                        liffMissing: 'ยังไม่ได้ตั้งค่า LINE LIFF ID ในไฟล์ .env',
+                        loggedIn: 'เข้าสู่ระบบ LINE แล้ว',
+                        waitingLine: 'กรุณารอให้ LINE โหลดข้อมูลผู้ใช้ให้เสร็จก่อน',
+                        confirmingRsvp: 'กำลังยืนยัน RSVP...',
+                        rsvpFailed: 'ยืนยัน RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+                        cancellingRsvp: 'กำลังยกเลิก RSVP...',
+                        cancelFailed: 'ยกเลิก RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+                        lineFailed: 'เชื่อมต่อ LINE ไม่สำเร็จ'
+                    },
+                    en: {
+                        heroLine1: 'Good Game.',
+                        heroLine2: 'Good People.',
+                        joinFun: 'Join the Fun!',
+                        events: 'Events',
+                        players: 'Players',
+                        rankings: 'Rankings',
+                        shop: 'Shop',
+                        upcomingEvents: 'Upcoming Events',
+                        refresh: 'Refresh',
+                        noEvents: 'No events yet',
+                        communityTitle: 'Play. Connect. Improve.',
+                        communityText: 'Be part of the GDSQ community!',
+                        back: 'Back',
+                        viewDetails: 'View details',
+                        spotsLeft: 'Spots Left',
+                        spots: 'spots',
+                        full: 'Full',
+                        joined: 'joined',
+                        waitlist: 'Waitlist',
+                        joinedPlayers: 'Joined Players',
+                        confirmRsvp: 'Confirm RSVP',
+                        confirming: 'Confirming...',
+                        confirmed: 'Confirmed',
+                        waitlisted: 'Waitlisted',
+                        cancel: 'Cancel',
+                        cancelling: 'Cancelling...',
+                        loadingEvent: 'Loading event details...',
+                        loadingEvents: 'Loading events...',
+                        dateTba: 'Date TBA',
+                        timeTba: 'Time TBA',
+                        priceTba: 'Price TBA',
+                        locationTba: 'Location TBA',
+                        socialPlay: 'Social Play',
+                        perPerson: 'Per Person',
+                        skillLevel: 'Skill Level',
+                        aboutEvent: 'About This Event',
+                        defaultDescription: 'Join us for a fun and friendly pickleball session. Good rallies, good people, and great vibes.',
+                        liffMissing: 'LINE LIFF ID is not configured.',
+                        loggedIn: 'Logged in with LINE',
+                        waitingLine: 'Please wait while LINE loads your profile.',
+                        confirmingRsvp: 'Confirming RSVP...',
+                        rsvpFailed: 'Unable to confirm RSVP. Please try again.',
+                        cancellingRsvp: 'Cancelling RSVP...',
+                        cancelFailed: 'Unable to cancel RSVP. Please try again.',
+                        lineFailed: 'LINE connection failed'
+                    }
+                },
+
+                t(key) {
+                    return this.translations[this.language][key] || this.translations.en[key] || key;
+                },
+
+                toggleLanguage() {
+                    this.language = this.language === 'th' ? 'en' : 'th';
+                    localStorage.setItem('gdsqLanguage', this.language);
+                },
+
+                scrollToEvents() {
+                    document.getElementById('events').scrollIntoView({ behavior: 'smooth' });
+                },
 
                 get eventDateText() {
-                    if (!this.eventDate && !this.startTime) return 'Date and time TBA';
-
-                    const dateText = this.eventDate
-                        ? new Intl.DateTimeFormat('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric'
-                        }).format(new Date(`${this.eventDate}T00:00:00`))
-                        : 'Date TBA';
-                    const timeText = this.startTime
-                        ? this.startTime.slice(0, 5)
-                        : 'Time TBA';
-
-                    return `${dateText} | ${timeText}`;
+                    if (!this.eventDate) return this.t('dateTba');
+                    return new Intl.DateTimeFormat(this.language === 'th' ? 'th-TH' : 'en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }).format(new Date(`${this.eventDate}T00:00:00`));
                 },
 
                 get priceText() {
-                    if (this.priceThb === null || this.priceThb === undefined) return 'Price TBA';
+                    if (this.priceThb === null || this.priceThb === undefined) return this.t('priceTba');
                     return `THB ${this.priceThb}`;
                 },
 
                 async init() {
+                    this.statusMessage = this.selectedSessionId ? this.t('loadingEvent') : this.t('loadingEvents');
+
                     try {
-                        await this.loadSession();
+                        await this.loadSessions();
+                        if (this.selectedSessionId) await this.loadSession();
 
                         const configResponse = await fetch('/api/config');
                         const config = await configResponse.json();
 
                         if (!config.liffId) {
-                            this.statusMessage = 'ยังไม่ได้ตั้งค่า LINE LIFF ID ในไฟล์ .env';
+                            this.statusMessage = this.t('liffMissing');
                             return;
                         }
 
-                        await liff.init({
-                            liffId: config.liffId,
-                            withLoginOnExternalBrowser: true
-                        });
+                        await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: true });
 
                         if (!liff.isLoggedIn()) {
-                            liff.login({
-                                redirectUri: window.location.origin + window.location.pathname + window.location.search
-                            });
+                            liff.login({ redirectUri: window.location.origin + window.location.pathname + window.location.search });
                             return;
                         }
 
                         const profile = await liff.getProfile();
-
                         this.lineUid = profile.userId;
                         this.displayName = profile.displayName;
-                        this.statusMessage = `เข้าสู่ระบบ LINE แล้ว: ${this.displayName}`;
-                        await this.loadSession();
+                        this.statusMessage = `${this.t('loggedIn')}: ${this.displayName}`;
+                        await this.loadSessions();
+                        if (this.selectedSessionId) await this.loadSession();
                     } catch (error) {
                         console.error('LIFF initialization error:', error);
-                        this.statusMessage = `เชื่อมต่อ LINE ไม่สำเร็จ: ${error.message || 'กรุณาลองใหม่อีกครั้ง'}`;
+                        this.statusMessage = `${this.t('lineFailed')}: ${error.message || ''}`;
                     }
                 },
 
-                async loadSession() {
-                    const params = this.lineUid
-                        ? `?lineUid=${encodeURIComponent(this.lineUid)}`
-                        : '';
-                    const response = await fetch(`/api/session/${this.sessionId}${params}`);
+                async loadSessions() {
+                    const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
+                    const response = await fetch(`/api/public/sessions${params}`);
                     const result = await response.json();
 
-                    if (!response.ok) {
-                        throw new Error(result.message || 'Failed to load session');
-                    }
+                    if (!response.ok) throw new Error(result.message || 'Failed to load sessions');
 
-                    this.sessionTitle = result.session.title;
-                    this.eventDate = result.session.eventDate;
-                    this.startTime = result.session.startTime;
-                    this.priceThb = result.session.priceThb;
-                    this.location = result.session.location || '';
-                    this.maxPlayers = result.session.maxPlayers;
-                    this.joinedCount = result.session.joinedCount;
-                    this.waitlistCount = result.session.waitlistCount;
-                    this.spotsLeft = result.session.spotsLeft;
-                    this.userStatus = result.session.userStatus;
+                    this.sessions = result.sessions || [];
+                },
+
+                async loadSession() {
+                    const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
+                    const response = await fetch(`/api/session/${this.selectedSessionId}${params}`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load session');
+
+                    this.applySession(result.session);
+                },
+
+                applySession(session) {
+                    this.selectedSessionId = session.id;
+                    this.sessionTitle = session.title;
+                    this.eventDate = session.eventDate;
+                    this.startTime = session.startTime;
+                    this.endTime = session.endTime;
+                    this.priceThb = session.priceThb;
+                    this.location = session.location || '';
+                    this.address = session.address || '';
+                    this.skillLevel = session.skillLevel || '';
+                    this.description = session.description || '';
+                    this.posterUrl = session.posterUrl || '';
+                    this.maxPlayers = session.maxPlayers;
+                    this.joinedCount = session.joinedCount;
+                    this.waitlistCount = session.waitlistCount;
+                    this.spotsLeft = session.spotsLeft;
+                    this.userStatus = session.userStatus;
+                },
+
+                async selectSession(sessionId) {
+                    this.selectedSessionId = sessionId;
+                    window.history.pushState({}, '', `/?sessionId=${encodeURIComponent(sessionId)}`);
+                    this.statusMessage = this.t('loadingEvent');
+                    await this.loadSession();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+
+                showEventList() {
+                    this.selectedSessionId = '';
+                    this.statusMessage = this.lineUid ? `${this.t('loggedIn')}: ${this.displayName}` : '';
+                    window.history.pushState({}, '', '/');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                },
+
+                monthText(value) {
+                    if (!value) return 'TBA';
+                    return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(`${value}T00:00:00`));
+                },
+
+                dayText(value) {
+                    if (!value) return '--';
+                    return new Intl.DateTimeFormat('en-US', { day: '2-digit' }).format(new Date(`${value}T00:00:00`));
+                },
+
+                weekdayText(value) {
+                    if (!value) return '';
+                    return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date(`${value}T00:00:00`));
+                },
+
+                timeRange(session) {
+                    const start = session.startTime ? session.startTime.slice(0, 5) : this.t('timeTba');
+                    const end = session.endTime ? ` - ${session.endTime.slice(0, 5)}` : '';
+                    return `${start}${end}`;
+                },
+
+                skillClass(level) {
+                    const text = String(level || '').toLowerCase();
+                    if (text.includes('beginner')) return 'bg-green-50 text-green-700';
+                    if (text.includes('advanced') || text.includes('competitive')) return 'bg-red-50 text-gdsqRed';
+                    return 'bg-blue-50 text-gdsq';
+                },
+
+                statusLabel(status) {
+                    return status === 'Joined' ? this.t('confirmed') : this.t('waitlisted');
                 },
 
                 async confirmRsvp() {
                     if (!this.lineUid) {
-                        this.statusMessage = 'กรุณารอให้ LINE โหลดข้อมูลผู้ใช้ให้เสร็จก่อน';
+                        this.statusMessage = this.t('waitingLine');
                         return;
                     }
 
                     this.isLoading = true;
-                    this.statusMessage = 'กำลังยืนยัน RSVP...';
+                    this.statusMessage = this.t('confirmingRsvp');
 
                     try {
                         const response = await fetch('/api/rsvp', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 lineUid: this.lineUid,
                                 displayName: this.displayName,
-                                sessionId: this.sessionId
+                                sessionId: this.selectedSessionId
                             })
                         });
-
                         const result = await response.json();
 
-                        if (!response.ok) {
-                            throw new Error(result.message || 'Failed to confirm RSVP');
-                        }
+                        if (!response.ok) throw new Error(result.message || 'Failed to confirm RSVP');
 
                         this.statusMessage = result.message;
                         this.userStatus = result.status;
+                        await this.loadSessions();
                         await this.loadSession();
                     } catch (error) {
                         console.error('RSVP error:', error);
-                        this.statusMessage = 'ยืนยัน RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                        this.statusMessage = this.t('rsvpFailed');
                     } finally {
                         this.isLoading = false;
                     }
@@ -210,37 +514,30 @@
 
                 async cancelRsvp() {
                     if (!this.lineUid) {
-                        this.statusMessage = 'กรุณารอให้ LINE โหลดข้อมูลผู้ใช้ให้เสร็จก่อน';
+                        this.statusMessage = this.t('waitingLine');
                         return;
                     }
 
                     this.isLoading = true;
-                    this.statusMessage = 'กำลังยกเลิก RSVP...';
+                    this.statusMessage = this.t('cancellingRsvp');
 
                     try {
                         const response = await fetch('/api/rsvp', {
                             method: 'DELETE',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                lineUid: this.lineUid,
-                                sessionId: this.sessionId
-                            })
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ lineUid: this.lineUid, sessionId: this.selectedSessionId })
                         });
-
                         const result = await response.json();
 
-                        if (!response.ok) {
-                            throw new Error(result.message || 'Failed to cancel RSVP');
-                        }
+                        if (!response.ok) throw new Error(result.message || 'Failed to cancel RSVP');
 
                         this.userStatus = null;
                         this.statusMessage = result.message;
+                        await this.loadSessions();
                         await this.loadSession();
                     } catch (error) {
                         console.error('Cancel RSVP error:', error);
-                        this.statusMessage = 'ยกเลิก RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                        this.statusMessage = this.t('cancelFailed');
                     } finally {
                         this.isLoading = false;
                     }

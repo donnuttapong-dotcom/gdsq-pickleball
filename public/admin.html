@@ -163,6 +163,11 @@
                 >
                 <input
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="time"
+                    x-model="newSession.endTime"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     type="number"
                     min="0"
                     :placeholder="t('priceThb')"
@@ -176,10 +181,28 @@
                 >
                 <input
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    type="text"
+                    :placeholder="t('address')"
+                    x-model="newSession.address"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="text"
+                    :placeholder="t('skillLevel')"
+                    x-model="newSession.skillLevel"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
                     type="url"
                     :placeholder="t('posterUrl')"
                     x-model="newSession.posterUrl"
                 >
+                <textarea
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    rows="3"
+                    :placeholder="t('description')"
+                    x-model="newSession.description"
+                ></textarea>
                 <button
                     class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
                     @click="createSession()"
@@ -200,9 +223,13 @@
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" x-model="editSession.maxPlayers">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="date" x-model="editSession.eventDate">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.startTime">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.endTime">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" x-model="editSession.priceThb">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('location')" x-model="editSession.location">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('address')" x-model="editSession.address">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('skillLevel')" x-model="editSession.skillLevel">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('posterUrl')" x-model="editSession.posterUrl">
+                <textarea class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" rows="3" :placeholder="t('description')" x-model="editSession.description"></textarea>
                 <button
                     class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-black disabled:opacity-50"
                     @click="updateSession()"
@@ -275,8 +302,12 @@
                     maxPlayers: 24,
                     eventDate: '',
                     startTime: '',
+                    endTime: '',
                     priceThb: 250,
                     location: '',
+                    address: '',
+                    skillLevel: '',
+                    description: '',
                     posterUrl: ''
                 },
                 editSession: {
@@ -284,8 +315,12 @@
                     maxPlayers: 24,
                     eventDate: '',
                     startTime: '',
+                    endTime: '',
                     priceThb: 250,
                     location: '',
+                    address: '',
+                    skillLevel: '',
+                    description: '',
                     posterUrl: ''
                 },
                 adminPassword: '',
@@ -323,6 +358,9 @@
                         maxPlayers: 'จำนวนผู้เล่นสูงสุด',
                         priceThb: 'ราคา THB',
                         location: 'สถานที่',
+                        address: 'ที่อยู่',
+                        skillLevel: 'ระดับผู้เล่น เช่น Beginner / Intermediate',
+                        description: 'รายละเอียดกิจกรรม',
                         posterUrl: 'ลิงก์รูปโปสเตอร์กิจกรรม',
                         create: 'สร้าง',
                         save: 'บันทึก',
@@ -361,6 +399,9 @@
                         maxPlayers: 'Max players',
                         priceThb: 'Price THB',
                         location: 'Location',
+                        address: 'Address',
+                        skillLevel: 'Skill level, e.g. Beginner / Intermediate',
+                        description: 'Event description',
                         posterUrl: 'Event poster image URL',
                         create: 'Create',
                         save: 'Save',
@@ -507,8 +548,12 @@
                         this.newSession.maxPlayers = 24;
                         this.newSession.eventDate = '';
                         this.newSession.startTime = '';
+                        this.newSession.endTime = '';
                         this.newSession.priceThb = 250;
                         this.newSession.location = '';
+                        this.newSession.address = '';
+                        this.newSession.skillLevel = '';
+                        this.newSession.description = '';
                         this.newSession.posterUrl = '';
                         this.selectedSessionId = result.session.id;
                         await this.loadAll();
@@ -571,8 +616,12 @@
                         maxPlayers: session.maxPlayers,
                         eventDate: session.eventDate || '',
                         startTime: session.startTime ? session.startTime.slice(0, 5) : '',
+                        endTime: session.endTime ? session.endTime.slice(0, 5) : '',
                         priceThb: session.priceThb ?? '',
                         location: session.location || '',
+                        address: session.address || '',
+                        skillLevel: session.skillLevel || '',
+                        description: session.description || '',
                         posterUrl: session.posterUrl || ''
                     };
                 },

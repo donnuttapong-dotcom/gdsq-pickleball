@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
-const sessionSelect = 'id, title, max_players, event_date, start_time, price_thb, location, poster_url, created_at';
+const sessionSelect = 'id, title, max_players, event_date, start_time, end_time, price_thb, location, address, skill_level, description, poster_url, created_at';
 
 function parseCookies(cookieHeader = '') {
   return Object.fromEntries(
@@ -112,8 +112,12 @@ function serializeSession(session) {
     maxPlayers: session.max_players,
     eventDate: session.event_date,
     startTime: session.start_time,
+    endTime: session.end_time,
     priceThb: session.price_thb,
     location: session.location,
+    address: session.address,
+    skillLevel: session.skill_level,
+    description: session.description,
     posterUrl: session.poster_url,
     createdAt: session.created_at
   };
@@ -145,8 +149,12 @@ function parseSessionPayload(body) {
       max_players: parsedMaxPlayers,
       event_date: body.eventDate || null,
       start_time: body.startTime || null,
+      end_time: body.endTime || null,
       price_thb: parsedPriceThb,
       location: body.location || null,
+      address: body.address || null,
+      skill_level: body.skillLevel || null,
+      description: body.description || null,
       poster_url: body.posterUrl || null
     },
     error: null
@@ -309,6 +317,31 @@ async function getSessionSummary(sessionId, lineUid) {
   };
 }
 
+async function listPublicSessions(lineUid) {
+  const { data: sessions, error } = await supabase
+    .from('sessions')
+    .select(sessionSelect)
+    .order('event_date', { ascending: true, nullsFirst: false })
+    .order('start_time', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { data: null, error };
+  }
+
+  const summaries = await Promise.all(
+    (sessions || []).map((session, index) => getSessionSummary(session.id, lineUid).then((summary) => ({
+      index: index + 1,
+      ...summary.data
+    })))
+  );
+
+  return {
+    data: summaries,
+    error: null
+  };
+}
+
 app.get('/api/config', (req, res) => {
   res.json({
     liffId: process.env.LINE_LIFF_ID || ''
@@ -325,6 +358,29 @@ app.get('/health', (req, res) => {
 
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/api/public/sessions', async (req, res) => {
+  try {
+    const { lineUid } = req.query;
+    const { data, error } = await listPublicSessions(lineUid);
+
+    if (error) {
+      throw error;
+    }
+
+    return res.json({
+      success: true,
+      sessions: data
+    });
+  } catch (error) {
+    console.error('Public sessions list error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load sessions.'
+    });
+  }
 });
 
 app.post('/api/admin/login', (req, res) => {
