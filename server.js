@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
-const sessionSelect = 'id, title, max_players, event_date, start_time, end_time, price_thb, location, address, skill_level, description, poster_url, created_at';
+const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, location, address, skill_level, description, poster_url, created_at';
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 
 function parseCookies(cookieHeader = '') {
@@ -111,6 +111,7 @@ function serializeSession(session) {
     id: session.id,
     title: session.title,
     maxPlayers: session.max_players,
+    courtCount: session.court_count || 1,
     eventDate: session.event_date,
     startTime: session.start_time,
     endTime: session.end_time,
@@ -202,6 +203,9 @@ function parseSessionPayload(body) {
   const parsedPriceThb = body.priceThb === '' || body.priceThb === null || body.priceThb === undefined
     ? null
     : Number(body.priceThb);
+  const parsedCourtCount = body.courtCount === '' || body.courtCount === null || body.courtCount === undefined
+    ? 1
+    : Number(body.courtCount);
 
   if (!body.title || !Number.isInteger(parsedMaxPlayers) || parsedMaxPlayers <= 0) {
     return {
@@ -217,10 +221,18 @@ function parseSessionPayload(body) {
     };
   }
 
+  if (!Number.isInteger(parsedCourtCount) || parsedCourtCount <= 0) {
+    return {
+      data: null,
+      error: 'courtCount must be a positive number.'
+    };
+  }
+
   return {
     data: {
       title: body.title,
       max_players: parsedMaxPlayers,
+      court_count: parsedCourtCount,
       event_date: body.eventDate || null,
       start_time: body.startTime || null,
       end_time: body.endTime || null,
@@ -300,24 +312,100 @@ async function listSessionRsvps(sessionId) {
     usersById = Object.fromEntries((users || []).map((user) => [user.id, user]));
   }
 
-  const rows = (rsvps || []).map((rsvp) => ({
-    id: rsvp.id,
-    status: rsvp.status,
-    createdAt: rsvp.created_at,
-    user: usersById[rsvp.user_id] || {
+  const parentRsvpIds = (rsvps || []).map((rsvp) => rsvp.id);
+  let guestsByRsvpId = {};
+
+  if (parentRsvpIds.length > 0) {
+    const { data: guests, error: guestsError } = await supabase
+      .from('rsvp_guests')
+      .select('id, rsvp_id, display_name, status, created_at')
+      .in('rsvp_id', parentRsvpIds)
+      .order('created_at', { ascending: true });
+
+    if (guestsError) {
+      return { data: null, error: guestsError };
+    }
+
+    for (const guest of guests || []) {
+      if (!guestsByRsvpId[guest.rsvp_id]) {
+        guestsByRsvpId[guest.rsvp_id] = [];
+      }
+      guestsByRsvpId[guest.rsvp_id].push(guest);
+    }
+  }
+
+  const rows = [];
+
+  for (const rsvp of rsvps || []) {
+    const owner = usersById[rsvp.user_id] || {
       id: rsvp.user_id,
       line_uid: '',
       display_name: 'Unknown user',
       phone: '',
       profile_image_url: ''
+    };
+
+    rows.push({
+    id: rsvp.id,
+    kind: 'member',
+    parentRsvpId: rsvp.id,
+    status: rsvp.status,
+    createdAt: rsvp.created_at,
+    addedBy: null,
+    user: owner
+    });
+
+    for (const guest of guestsByRsvpId[rsvp.id] || []) {
+      rows.push({
+        id: guest.id,
+        kind: 'guest',
+        parentRsvpId: rsvp.id,
+        status: guest.status,
+        createdAt: guest.created_at,
+        addedBy: owner,
+        user: {
+          id: guest.id,
+          line_uid: '',
+          display_name: guest.display_name,
+          phone: '',
+          profile_image_url: ''
+        }
+      });
     }
-  }));
+  }
 
   return {
     data: {
       session,
       rows
     },
+    error: null
+  };
+}
+
+async function countSessionSeats(sessionId, status) {
+  const { count: memberCount, error: memberCountError } = await supabase
+    .from('rsvps')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+    .eq('status', status);
+
+  if (memberCountError) {
+    return { count: 0, error: memberCountError };
+  }
+
+  const { count: guestCount, error: guestCountError } = await supabase
+    .from('rsvp_guests')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+    .eq('status', status);
+
+  if (guestCountError) {
+    return { count: 0, error: guestCountError };
+  }
+
+  return {
+    count: (memberCount || 0) + (guestCount || 0),
     error: null
   };
 }
@@ -332,21 +420,13 @@ async function getSessionSummary(sessionId, lineUid) {
     };
   }
 
-  const { count: joinedCount, error: joinedCountError } = await supabase
-    .from('rsvps')
-    .select('id', { count: 'exact', head: true })
-    .eq('session_id', session.id)
-    .eq('status', 'Joined');
+  const { count: joinedCount, error: joinedCountError } = await countSessionSeats(session.id, 'Joined');
 
   if (joinedCountError) {
     return { data: null, error: joinedCountError };
   }
 
-  const { count: waitlistCount, error: waitlistCountError } = await supabase
-    .from('rsvps')
-    .select('id', { count: 'exact', head: true })
-    .eq('session_id', session.id)
-    .eq('status', 'Waitlist');
+  const { count: waitlistCount, error: waitlistCountError } = await countSessionSeats(session.id, 'Waitlist');
 
   if (waitlistCountError) {
     return { data: null, error: waitlistCountError };
@@ -800,6 +880,15 @@ app.delete('/api/sessions/:sessionId', requireAdmin, async (req, res) => {
       });
     }
 
+    const { error: guestDeleteError } = await supabase
+      .from('rsvp_guests')
+      .delete()
+      .eq('session_id', currentSession.id);
+
+    if (guestDeleteError) {
+      throw guestDeleteError;
+    }
+
     const { error: rsvpDeleteError } = await supabase
       .from('rsvps')
       .delete()
@@ -903,6 +992,10 @@ app.get('/api/public/session/:sessionId/players', async (req, res) => {
       session: serializeSession(data.session),
       players: data.rows.map((rsvp) => ({
         id: rsvp.id,
+        kind: rsvp.kind,
+        addedBy: rsvp.addedBy ? {
+          displayName: rsvp.addedBy.display_name
+        } : null,
         status: rsvp.status,
         createdAt: rsvp.createdAt,
         user: {
@@ -931,10 +1024,12 @@ app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => 
     }
 
     const rows = [
-      ['Event', 'Display Name', 'Phone', 'LINE UID', 'Status', 'RSVP Time'],
+      ['Event', 'Type', 'Display Name', 'Added By', 'Phone', 'LINE UID', 'Status', 'RSVP Time'],
       ...data.rows.map((rsvp) => [
         data.session.title,
+        rsvp.kind === 'guest' ? 'Guest' : 'Member',
         rsvp.user.display_name,
+        rsvp.addedBy?.display_name || '',
         rsvp.user.phone,
         rsvp.user.line_uid,
         rsvp.status,
@@ -957,6 +1052,9 @@ app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => 
 app.post('/api/rsvp', async (req, res) => {
   try {
     const { lineUid, sessionId, displayName, profileImageUrl, phone } = req.body;
+    const guestNames = Array.isArray(req.body.guestNames)
+      ? req.body.guestNames.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 10)
+      : [];
 
     if (!lineUid || !sessionId) {
       return res.status(400).json({
@@ -1002,35 +1100,70 @@ app.post('/api/rsvp', async (req, res) => {
       });
     }
 
-    const { count: joinedCount, error: countError } = await supabase
-      .from('rsvps')
-      .select('id', { count: 'exact', head: true })
-      .eq('session_id', session.id)
-      .eq('status', 'Joined');
+    const { count: joinedCount, error: countError } = await countSessionSeats(session.id, 'Joined');
 
     if (countError) {
       throw countError;
     }
 
-    const status = joinedCount < session.max_players ? 'Joined' : 'Waitlist';
+    let joinedSeats = joinedCount || 0;
+    const nextStatus = () => {
+      if (joinedSeats < session.max_players) {
+        joinedSeats += 1;
+        return 'Joined';
+      }
 
-    const { error: rsvpError } = await supabase
+      return 'Waitlist';
+    };
+    const status = nextStatus();
+
+    const { data: createdRsvp, error: rsvpError } = await supabase
       .from('rsvps')
       .insert({
         session_id: session.id,
         user_id: user.id,
         status
-      });
+      })
+      .select('id, status')
+      .single();
 
     if (rsvpError) {
       throw rsvpError;
     }
 
+    const guestRows = guestNames.map((guestName) => ({
+      rsvp_id: createdRsvp.id,
+      session_id: session.id,
+      added_by_user_id: user.id,
+      display_name: guestName,
+      status: nextStatus()
+    }));
+
+    if (guestRows.length > 0) {
+      const { error: guestError } = await supabase
+        .from('rsvp_guests')
+        .insert(guestRows);
+
+      if (guestError) {
+        throw guestError;
+      }
+    }
+
+    const joinedGuests = guestRows.filter((guest) => guest.status === 'Joined').length;
+    const waitlistGuests = guestRows.filter((guest) => guest.status === 'Waitlist').length;
+    const totalJoined = (status === 'Joined' ? 1 : 0) + joinedGuests;
+    const totalWaitlist = (status === 'Waitlist' ? 1 : 0) + waitlistGuests;
+
     return res.status(201).json({
       success: true,
       status,
+      guestCount: guestRows.length,
+      totalJoined,
+      totalWaitlist,
       message: status === 'Joined'
-        ? 'You are confirmed!'
+        ? (guestRows.length > 0
+          ? `Confirmed ${totalJoined} spot${totalJoined === 1 ? '' : 's'}${totalWaitlist > 0 ? `, ${totalWaitlist} on waitlist` : ''}.`
+          : 'You are confirmed!')
         : 'You are on the waitlist.'
     });
   } catch (error) {
@@ -1080,28 +1213,45 @@ app.delete('/api/rsvp', async (req, res) => {
       });
     }
 
-    const { data: deletedRsvp, error: deleteError } = await supabase
+    const { data: existingRsvp, error: existingRsvpError } = await supabase
       .from('rsvps')
-      .delete()
+      .select('id, status')
       .eq('session_id', session.id)
       .eq('user_id', user.id)
-      .select('id, status')
       .maybeSingle();
 
-    if (deleteError) {
-      throw deleteError;
+    if (existingRsvpError) {
+      throw existingRsvpError;
     }
 
-    if (!deletedRsvp) {
+    if (!existingRsvp) {
       return res.status(404).json({
         success: false,
         message: 'RSVP not found.'
       });
     }
 
+    const { error: guestDeleteError } = await supabase
+      .from('rsvp_guests')
+      .delete()
+      .eq('rsvp_id', existingRsvp.id);
+
+    if (guestDeleteError) {
+      throw guestDeleteError;
+    }
+
+    const { error: deleteError } = await supabase
+      .from('rsvps')
+      .delete()
+      .eq('id', existingRsvp.id);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
     return res.json({
       success: true,
-      previousStatus: deletedRsvp.status,
+      previousStatus: existingRsvp.status,
       message: 'Your RSVP has been cancelled.'
     });
   } catch (error) {

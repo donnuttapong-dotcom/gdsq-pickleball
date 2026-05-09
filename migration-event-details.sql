@@ -1,5 +1,6 @@
 alter table sessions
 add column if not exists event_date date,
+add column if not exists court_count integer not null default 1 check (court_count > 0),
 add column if not exists start_time time,
 add column if not exists end_time time,
 add column if not exists price_thb integer check (price_thb is null or price_thb >= 0),

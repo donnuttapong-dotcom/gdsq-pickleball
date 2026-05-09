@@ -113,7 +113,7 @@
             </div>
         </div>
 
-        <div class="mb-5 grid gap-3 sm:grid-cols-4">
+        <div class="mb-5 grid gap-3 sm:grid-cols-5">
             <div class="rounded-lg bg-white p-4 shadow-sm">
                 <p class="text-xs font-bold uppercase text-gray-500" x-text="t('joined')">Joined</p>
                 <p class="mt-1 text-3xl font-black text-gdsq" x-text="summary.joinedCount">0</p>
@@ -130,6 +130,10 @@
                 <p class="text-xs font-bold uppercase text-gray-500" x-text="t('capacity')">Capacity</p>
                 <p class="mt-1 text-3xl font-black" x-text="summary.maxPlayers">0</p>
             </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('courts')">Courts</p>
+                <p class="mt-1 text-3xl font-black" x-text="summary.courtCount">1</p>
+            </div>
         </div>
 
         <div class="mb-5 rounded-lg bg-white p-4 shadow-sm">
@@ -137,7 +141,7 @@
                 <h2 class="text-lg font-black" x-text="t('createEvent')">Create Event</h2>
                 <p class="text-xs font-semibold text-gray-500" x-text="formMessage"></p>
             </div>
-            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_150px_140px_120px]">
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_120px_120px_140px_120px]">
                 <input
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     type="text"
@@ -150,6 +154,13 @@
                     min="1"
                     :placeholder="t('maxPlayers')"
                     x-model="newSession.maxPlayers"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="number"
+                    min="1"
+                    :placeholder="t('courtCount')"
+                    x-model="newSession.courtCount"
                 >
                 <input
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -218,9 +229,10 @@
                 <h2 class="text-lg font-black" x-text="t('editSelectedEvent')">Edit Selected Event</h2>
                 <p class="text-xs font-semibold text-gray-500" x-text="editMessage"></p>
             </div>
-            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_150px_140px_120px]">
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_120px_120px_140px_120px]">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" x-model="editSession.title">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" x-model="editSession.maxPlayers">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" :placeholder="t('courtCount')" x-model="editSession.courtCount">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="date" x-model="editSession.eventDate">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.startTime">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.endTime">
@@ -261,6 +273,7 @@
                         <div class="flex items-center justify-between px-4 py-3">
                             <div>
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
+                                <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
                                 <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
@@ -280,6 +293,7 @@
                         <div class="flex items-center justify-between px-4 py-3">
                             <div>
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
+                                <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
                                 <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
@@ -305,11 +319,13 @@
                     joinedCount: 0,
                     waitlistCount: 0,
                     spotsLeft: 0,
-                    maxPlayers: 0
+                    maxPlayers: 0,
+                    courtCount: 1
                 },
                 newSession: {
                     title: '',
                     maxPlayers: 24,
+                    courtCount: 1,
                     eventDate: '',
                     startTime: '',
                     endTime: '',
@@ -323,6 +339,7 @@
                 editSession: {
                     title: '',
                     maxPlayers: 24,
+                    courtCount: 1,
                     eventDate: '',
                     startTime: '',
                     endTime: '',
@@ -362,10 +379,12 @@
                         waitlist: 'Waitlist',
                         spotsLeft: 'ที่ว่าง',
                         capacity: 'จำนวนรับ',
+                        courts: 'Courts',
                         createEvent: 'สร้าง Event',
                         editSelectedEvent: 'แก้ไข Event ที่เลือก',
                         eventTitle: 'ชื่อ event',
                         maxPlayers: 'จำนวนผู้เล่นสูงสุด',
+                        courtCount: 'จำนวน Court',
                         priceThb: 'ราคา THB',
                         location: 'สถานที่',
                         address: 'ที่อยู่',
@@ -377,6 +396,7 @@
                         save: 'บันทึก',
                         deleteEvent: 'ลบ Event',
                         deleteConfirm: 'ยืนยันลบ Event นี้ไหม? รายชื่อ RSVP ของ Event นี้จะถูกลบด้วย',
+                        guestAddedBy: 'เพิ่มโดย',
                         noJoined: 'ยังไม่มีคน Joined',
                         noWaitlist: 'ยังไม่มี Waitlist',
                         created: 'สร้าง event แล้ว',
@@ -408,10 +428,12 @@
                         waitlist: 'Waitlist',
                         spotsLeft: 'Spots Left',
                         capacity: 'Capacity',
+                        courts: 'Courts',
                         createEvent: 'Create Event',
                         editSelectedEvent: 'Edit Selected Event',
                         eventTitle: 'Event title',
                         maxPlayers: 'Max players',
+                        courtCount: 'Court count',
                         priceThb: 'Price THB',
                         location: 'Location',
                         address: 'Address',
@@ -423,6 +445,7 @@
                         save: 'Save',
                         deleteEvent: 'Delete Event',
                         deleteConfirm: 'Delete this event? All RSVPs for this event will also be deleted.',
+                        guestAddedBy: 'Added by',
                         noJoined: 'No Joined players yet',
                         noWaitlist: 'No Waitlist yet',
                         created: 'Event created',
@@ -576,6 +599,7 @@
                         this.formMessage = this.t('created');
                         this.newSession.title = '';
                         this.newSession.maxPlayers = 24;
+                        this.newSession.courtCount = 1;
                         this.newSession.eventDate = '';
                         this.newSession.startTime = '';
                         this.newSession.endTime = '';
@@ -648,7 +672,8 @@
                             joinedCount: 0,
                             waitlistCount: 0,
                             spotsLeft: 0,
-                            maxPlayers: 0
+                            maxPlayers: 0,
+                            courtCount: 1
                         };
                         await this.loadAll();
                     } catch (error) {
@@ -666,7 +691,8 @@
                         joinedCount: session.joinedCount,
                         waitlistCount: session.waitlistCount,
                         spotsLeft: session.spotsLeft,
-                        maxPlayers: session.maxPlayers
+                        maxPlayers: session.maxPlayers,
+                        courtCount: session.courtCount || 1
                     };
                     this.syncEditForm();
                 },
@@ -678,6 +704,7 @@
                     this.editSession = {
                         title: session.title,
                         maxPlayers: session.maxPlayers,
+                        courtCount: session.courtCount || 1,
                         eventDate: session.eventDate || '',
                         startTime: session.startTime ? session.startTime.slice(0, 5) : '',
                         endTime: session.endTime ? session.endTime.slice(0, 5) : '',
