@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
+const sessionSelect = 'id, title, max_players, event_date, start_time, price_thb, location, created_at';
 
 function parseCookies(cookieHeader = '') {
   return Object.fromEntries(
@@ -104,13 +105,59 @@ function escapeCsvValue(value) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function serializeSession(session) {
+  return {
+    id: session.id,
+    title: session.title,
+    maxPlayers: session.max_players,
+    eventDate: session.event_date,
+    startTime: session.start_time,
+    priceThb: session.price_thb,
+    location: session.location,
+    createdAt: session.created_at
+  };
+}
+
+function parseSessionPayload(body) {
+  const parsedMaxPlayers = Number(body.maxPlayers);
+  const parsedPriceThb = body.priceThb === '' || body.priceThb === null || body.priceThb === undefined
+    ? null
+    : Number(body.priceThb);
+
+  if (!body.title || !Number.isInteger(parsedMaxPlayers) || parsedMaxPlayers <= 0) {
+    return {
+      data: null,
+      error: 'title and a positive maxPlayers value are required.'
+    };
+  }
+
+  if (parsedPriceThb !== null && (!Number.isInteger(parsedPriceThb) || parsedPriceThb < 0)) {
+    return {
+      data: null,
+      error: 'priceThb must be zero or a positive number.'
+    };
+  }
+
+  return {
+    data: {
+      title: body.title,
+      max_players: parsedMaxPlayers,
+      event_date: body.eventDate || null,
+      start_time: body.startTime || null,
+      price_thb: parsedPriceThb,
+      location: body.location || null
+    },
+    error: null
+  };
+}
+
 async function findSession(sessionId) {
   const sessionIdText = String(sessionId);
 
   if (uuidPattern.test(sessionIdText)) {
     return supabase
       .from('sessions')
-      .select('id, title, max_players, created_at')
+      .select(sessionSelect)
       .eq('id', sessionIdText)
       .single();
   }
@@ -124,7 +171,7 @@ async function findSession(sessionId) {
 
     return supabase
       .from('sessions')
-      .select('id, title, max_players, created_at')
+      .select(sessionSelect)
       .order('created_at', { ascending: true })
       .range(rowIndex, rowIndex)
       .maybeSingle();
@@ -250,9 +297,7 @@ async function getSessionSummary(sessionId, lineUid) {
 
   return {
     data: {
-      id: session.id,
-      title: session.title,
-      maxPlayers: session.max_players,
+      ...serializeSession(session),
       joinedCount: joinedCount || 0,
       waitlistCount: waitlistCount || 0,
       spotsLeft: Math.max(session.max_players - (joinedCount || 0), 0),
@@ -325,7 +370,7 @@ app.get('/api/sessions', requireAdmin, async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
       .from('sessions')
-      .select('id, title, max_players, created_at')
+      .select(sessionSelect)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -355,23 +400,19 @@ app.get('/api/sessions', requireAdmin, async (req, res) => {
 
 app.post('/api/sessions', requireAdmin, async (req, res) => {
   try {
-    const { title, maxPlayers } = req.body;
-    const parsedMaxPlayers = Number(maxPlayers);
+    const { data: sessionPayload, error: payloadError } = parseSessionPayload(req.body);
 
-    if (!title || !Number.isInteger(parsedMaxPlayers) || parsedMaxPlayers <= 0) {
+    if (payloadError) {
       return res.status(400).json({
         success: false,
-        message: 'title and a positive maxPlayers value are required.'
+        message: payloadError
       });
     }
 
     const { data: session, error } = await supabase
       .from('sessions')
-      .insert({
-        title,
-        max_players: parsedMaxPlayers
-      })
-      .select('id, title, max_players, created_at')
+      .insert(sessionPayload)
+      .select(sessionSelect)
       .single();
 
     if (error) {
@@ -380,7 +421,7 @@ app.post('/api/sessions', requireAdmin, async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      session,
+      session: serializeSession(session),
       message: 'Session created.'
     });
   } catch (error) {
@@ -389,6 +430,53 @@ app.post('/api/sessions', requireAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to create session.'
+    });
+  }
+});
+
+app.patch('/api/sessions/:sessionId', requireAdmin, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { data: currentSession, error: sessionError } = await findSession(sessionId);
+
+    if (sessionError || !currentSession) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    const { data: sessionPayload, error: payloadError } = parseSessionPayload(req.body);
+
+    if (payloadError) {
+      return res.status(400).json({
+        success: false,
+        message: payloadError
+      });
+    }
+
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .update(sessionPayload)
+      .eq('id', currentSession.id)
+      .select(sessionSelect)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return res.json({
+      success: true,
+      session: serializeSession(session),
+      message: 'Session updated.'
+    });
+  } catch (error) {
+    console.error('Update session error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to update session.'
     });
   }
 });
@@ -434,11 +522,7 @@ app.get('/api/session/:sessionId/rsvps', requireAdmin, async (req, res) => {
 
     return res.json({
       success: true,
-      session: {
-        id: data.session.id,
-        title: data.session.title,
-        maxPlayers: data.session.max_players
-      },
+      session: serializeSession(data.session),
       rsvps: data.rows
     });
   } catch (error) {
