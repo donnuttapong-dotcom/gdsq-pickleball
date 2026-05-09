@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
-const sessionSelect = 'id, title, max_players, event_date, start_time, price_thb, location, created_at';
+const sessionSelect = 'id, title, max_players, event_date, start_time, price_thb, location, poster_url, created_at';
 
 function parseCookies(cookieHeader = '') {
   return Object.fromEntries(
@@ -114,6 +114,7 @@ function serializeSession(session) {
     startTime: session.start_time,
     priceThb: session.price_thb,
     location: session.location,
+    posterUrl: session.poster_url,
     createdAt: session.created_at
   };
 }
@@ -145,7 +146,8 @@ function parseSessionPayload(body) {
       event_date: body.eventDate || null,
       start_time: body.startTime || null,
       price_thb: parsedPriceThb,
-      location: body.location || null
+      location: body.location || null,
+      poster_url: body.posterUrl || null
     },
     error: null
   };
