@@ -8,7 +8,9 @@ add column if not exists location text,
 add column if not exists address text,
 add column if not exists skill_level text,
 add column if not exists description text,
-add column if not exists poster_url text;
+add column if not exists poster_url text,
+add column if not exists created_by_user_id uuid references users(id) on delete set null,
+add column if not exists status text not null default 'Published' check (status in ('Published', 'Closed', 'Cancelled'));
 
 alter table users
 add column if not exists phone text,

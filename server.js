@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
-const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, location, address, skill_level, description, poster_url, created_at';
+const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, location, address, skill_level, description, poster_url, created_by_user_id, status, created_at';
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 
 function parseCookies(cookieHeader = '') {
@@ -121,6 +121,8 @@ function serializeSession(session) {
     skillLevel: session.skill_level,
     description: session.description,
     posterUrl: session.poster_url,
+    createdByUserId: session.created_by_user_id,
+    status: session.status || 'Published',
     createdAt: session.created_at
   };
 }
@@ -241,7 +243,8 @@ function parseSessionPayload(body) {
       address: body.address || null,
       skill_level: body.skillLevel || null,
       description: body.description || null,
-      poster_url: body.posterUrl || null
+      poster_url: body.posterUrl || null,
+      status: body.status || 'Published'
     },
     error: null
   };
@@ -433,6 +436,7 @@ async function getSessionSummary(sessionId, lineUid) {
   }
 
   let userStatus = null;
+  let host = null;
 
   if (lineUid) {
     const { data: user, error: userError } = await supabase
@@ -461,9 +465,24 @@ async function getSessionSummary(sessionId, lineUid) {
     }
   }
 
+  if (session.created_by_user_id) {
+    const { data: hostUser, error: hostError } = await supabase
+      .from('users')
+      .select(userSelect)
+      .eq('id', session.created_by_user_id)
+      .maybeSingle();
+
+    if (hostError) {
+      return { data: null, error: hostError };
+    }
+
+    host = hostUser ? serializeUser(hostUser) : null;
+  }
+
   return {
     data: {
       ...serializeSession(session),
+      host,
       joinedCount: joinedCount || 0,
       waitlistCount: waitlistCount || 0,
       spotsLeft: Math.max(session.max_players - (joinedCount || 0), 0),
@@ -477,6 +496,7 @@ async function listPublicSessions(lineUid) {
   const { data: sessions, error } = await supabase
     .from('sessions')
     .select(sessionSelect)
+    .neq('status', 'Cancelled')
     .order('event_date', { ascending: true, nullsFirst: false })
     .order('start_time', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: true });
@@ -603,6 +623,65 @@ app.put('/api/profile', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to save profile.'
+    });
+  }
+});
+
+app.post('/api/public/sessions', async (req, res) => {
+  try {
+    const { lineUid, displayName, profileImageUrl, phone } = req.body;
+
+    if (!lineUid) {
+      return res.status(400).json({
+        success: false,
+        message: 'lineUid is required.'
+      });
+    }
+
+    const user = await upsertLineUser({
+      lineUid,
+      displayName,
+      phone,
+      profileImageUrl
+    });
+
+    const { data: sessionPayload, error: payloadError } = parseSessionPayload(req.body);
+
+    if (payloadError) {
+      return res.status(400).json({
+        success: false,
+        message: payloadError
+      });
+    }
+
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .insert({
+        ...sessionPayload,
+        created_by_user_id: user.id,
+        status: 'Published'
+      })
+      .select(sessionSelect)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return res.status(201).json({
+      success: true,
+      session: {
+        ...serializeSession(session),
+        host: serializeUser(user)
+      },
+      message: 'Event published.'
+    });
+  } catch (error) {
+    console.error('Public create session error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to publish event.'
     });
   }
 });

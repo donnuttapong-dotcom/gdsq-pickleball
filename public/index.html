@@ -91,6 +91,7 @@
                                                 <p class="mt-1 text-xs font-black text-gdsq">
                                                     <i class="fa-solid fa-table-tennis-paddle-ball mr-1"></i><span x-text="courtText(session)"></span>
                                                 </p>
+                                                <p class="mt-1 truncate text-xs font-semibold text-gray-400" x-show="session.host" x-text="`${t('hostedBy')} ${session.host.displayName}`"></p>
                                             </div>
                                             <div class="text-right">
                                                 <p class="text-sm font-black text-gray-700"><span x-text="session.joinedCount"></span> / <span x-text="session.maxPlayers"></span></p>
@@ -163,6 +164,59 @@
                 <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankings.length === 0" x-text="t('noRankings')"></p>
             </section>
 
+            <section class="mt-7 px-5" x-show="activeTab === 'create'" x-cloak>
+                <h1 class="text-xl font-black" x-text="t('createEvent')">Create Event</h1>
+                <p class="mt-1 text-sm font-semibold text-gray-500" x-text="t('createEventHelp')">Publish a community event instantly.</p>
+
+                <div class="mt-4 space-y-4">
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('eventInfo')">Event info</h2>
+                        <div class="mt-3 space-y-3">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.title" :placeholder="t('eventTitle')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.skillLevel" :placeholder="t('skillLevel')">
+                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="3" x-model="createEventForm.description" :placeholder="t('description')"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('dateTime')">Date & time</h2>
+                        <div class="mt-3 grid grid-cols-2 gap-3">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm col-span-2" type="date" x-model="createEventForm.eventDate">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="createEventForm.startTime">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="createEventForm.endTime">
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('placeAndSpots')">Place & spots</h2>
+                        <div class="mt-3 space-y-3">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.location" :placeholder="t('location')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.address" :placeholder="t('address')">
+                            <div class="grid grid-cols-3 gap-3">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="createEventForm.maxPlayers" :placeholder="t('maxPlayers')">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="createEventForm.courtCount" :placeholder="t('courtCount')">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="createEventForm.priceThb" :placeholder="t('priceThb')">
+                            </div>
+                            <p class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-gdsq" x-text="playersPerCourtText(createEventForm)"></p>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('poster')">Poster</h2>
+                        <input class="mt-3 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" type="url" x-model="createEventForm.posterUrl" :placeholder="t('posterUrl')">
+                        <div class="mt-3 overflow-hidden rounded-xl bg-gray-100" x-show="createEventForm.posterUrl">
+                            <img class="max-h-64 w-full object-cover" :src="imageUrl(createEventForm.posterUrl)" alt="">
+                        </div>
+                    </div>
+
+                    <button class="w-full rounded-xl bg-gdsq px-5 py-4 text-base font-black text-white disabled:opacity-50" @click="publishEvent()" :disabled="isLoading || !lineUid">
+                        <span x-show="!isLoading" x-text="t('publishEvent')">Publish Event</span>
+                        <span x-show="isLoading" x-text="t('publishing')">Publishing...</span>
+                    </button>
+                    <div class="rounded-xl p-3 text-sm font-semibold" x-show="createMessage" :class="createMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="createMessage"></div>
+                </div>
+            </section>
+
             <section class="mt-7 px-5" x-show="activeTab === 'shop'" x-cloak>
                 <h1 class="text-xl font-black" x-text="t('shop')">Shop</h1>
                 <div class="mt-4 space-y-3">
@@ -222,6 +276,7 @@
 
                 <div class="mt-6">
                     <h1 class="text-2xl font-black" x-text="sessionTitle">Weekend Social Play</h1>
+                    <p class="mt-1 text-sm font-bold text-gray-500" x-show="sessionHost" x-text="`${t('hostedBy')} ${sessionHost.displayName}`"></p>
                     <div class="mt-4 divide-y divide-gray-100 rounded-2xl bg-white shadow-sm">
                         <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
                             <i class="fa-regular fa-calendar mt-1 text-gray-500"></i>
@@ -380,7 +435,7 @@
             <div class="mx-auto grid max-w-md grid-cols-5 items-end text-center text-xs font-bold text-gray-500">
                 <button :class="activeTab === 'home' ? 'text-gdsq' : ''" @click="setTab('home')"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
                 <button :class="activeTab === 'events' ? 'text-gdsq' : ''" @click="setTab('events')"><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
-                <button class="-mt-8" @click="setTab('rankings')"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg"><i class="fa-solid fa-chart-simple"></i></span>Rank</button>
+                <button class="-mt-8" @click="setTab('create')"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg"><i class="fa-solid fa-plus"></i></span>Create</button>
                 <button :class="activeTab === 'players' ? 'text-gdsq' : ''" @click="setTab('players')"><i class="fa-solid fa-users mb-1 block text-xl"></i>Players</button>
                 <button :class="activeTab === 'profile' ? 'text-gdsq' : ''" @click="setTab('profile')"><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
             </div>
@@ -404,6 +459,22 @@
                     phone: '',
                     profileImageUrl: ''
                 },
+                createEventForm: {
+                    title: '',
+                    skillLevel: 'Social Play',
+                    description: '',
+                    eventDate: '',
+                    startTime: '',
+                    endTime: '',
+                    location: '',
+                    address: '',
+                    maxPlayers: 16,
+                    courtCount: 2,
+                    priceThb: 250,
+                    posterUrl: ''
+                },
+                createMessage: '',
+                createMessageType: 'success',
                 profileMessage: '',
                 profileMessageType: 'success',
                 sessionTitle: '',
@@ -416,6 +487,7 @@
                 skillLevel: '',
                 description: '',
                 posterUrl: '',
+                sessionHost: null,
                 courtCount: 1,
                 maxPlayers: 0,
                 joinedCount: 0,
@@ -456,6 +528,25 @@
                         rankings: 'Rankings',
                         shop: 'Shop',
                         profile: 'Profile',
+                        createEvent: 'สร้างกิจกรรม',
+                        createEventHelp: 'สร้างกิจกรรมแล้วขึ้นหน้าแอพทันที',
+                        eventInfo: 'ข้อมูลกิจกรรม',
+                        eventTitle: 'ชื่อกิจกรรม',
+                        description: 'รายละเอียดกิจกรรม',
+                        dateTime: 'วันและเวลา',
+                        placeAndSpots: 'สถานที่และจำนวน',
+                        location: 'ชื่อสนาม / สถานที่',
+                        address: 'ที่อยู่ หรือ Google Map link',
+                        maxPlayers: 'จำนวนคน',
+                        courtCount: 'Court',
+                        priceThb: 'ราคา',
+                        poster: 'รูปโปสเตอร์',
+                        posterUrl: 'ลิงก์รูปโปสเตอร์',
+                        hostedBy: 'จัดโดย',
+                        publishEvent: 'Publish Event',
+                        publishing: 'กำลังสร้าง...',
+                        eventPublished: 'สร้างกิจกรรมแล้ว',
+                        eventPublishFailed: 'สร้างกิจกรรมไม่สำเร็จ',
                         upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
                         refresh: 'รีเฟรช',
                         noEvents: 'ยังไม่มีกิจกรรม',
@@ -536,6 +627,25 @@
                         rankings: 'Rankings',
                         shop: 'Shop',
                         profile: 'Profile',
+                        createEvent: 'Create Event',
+                        createEventHelp: 'Publish a community event instantly.',
+                        eventInfo: 'Event info',
+                        eventTitle: 'Event title',
+                        description: 'Event description',
+                        dateTime: 'Date & time',
+                        placeAndSpots: 'Place & spots',
+                        location: 'Venue / location',
+                        address: 'Address or Google Map link',
+                        maxPlayers: 'Players',
+                        courtCount: 'Courts',
+                        priceThb: 'Price',
+                        poster: 'Poster',
+                        posterUrl: 'Poster image URL',
+                        hostedBy: 'Hosted by',
+                        publishEvent: 'Publish Event',
+                        publishing: 'Publishing...',
+                        eventPublished: 'Event published',
+                        eventPublishFailed: 'Unable to publish event',
                         upcomingEvents: 'Upcoming Events',
                         refresh: 'Refresh',
                         noEvents: 'No events yet',
@@ -630,6 +740,10 @@
                     if (tab === 'players') this.loadPlayers();
                     if (tab === 'rankings') this.loadRankings();
                     if (tab === 'profile') this.loadProfile();
+                    if (tab === 'create' && !this.lineUid) {
+                        this.createMessageType = 'error';
+                        this.createMessage = this.t('lineLoginRequired');
+                    }
 
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 },
@@ -718,6 +832,64 @@
                     const response = await fetch('/api/rankings');
                     const result = await response.json();
                     if (response.ok) this.rankings = result.rankings || [];
+                },
+
+                resetCreateEventForm() {
+                    this.createEventForm = {
+                        title: '',
+                        skillLevel: 'Social Play',
+                        description: '',
+                        eventDate: '',
+                        startTime: '',
+                        endTime: '',
+                        location: '',
+                        address: '',
+                        maxPlayers: 16,
+                        courtCount: 2,
+                        priceThb: 250,
+                        posterUrl: ''
+                    };
+                },
+
+                async publishEvent() {
+                    if (!this.lineUid) {
+                        this.createMessageType = 'error';
+                        this.createMessage = this.t('lineLoginRequired');
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.createMessage = '';
+                    this.createMessageType = 'success';
+
+                    try {
+                        const response = await fetch('/api/public/sessions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...this.createEventForm,
+                                lineUid: this.lineUid,
+                                displayName: this.profile.displayName || this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('eventPublishFailed'));
+                        }
+
+                        this.createMessage = this.t('eventPublished');
+                        this.resetCreateEventForm();
+                        await this.loadSessions();
+                        await this.selectSession(result.session.id);
+                    } catch (error) {
+                        this.createMessageType = 'error';
+                        this.createMessage = error.message || this.t('eventPublishFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
                 },
 
                 async loadProfile() {
@@ -832,6 +1004,7 @@
                     this.skillLevel = session.skillLevel || '';
                     this.description = session.description || '';
                     this.posterUrl = session.posterUrl || '';
+                    this.sessionHost = session.host || null;
                     this.courtCount = session.courtCount || 1;
                     this.maxPlayers = session.maxPlayers;
                     this.joinedCount = session.joinedCount;
