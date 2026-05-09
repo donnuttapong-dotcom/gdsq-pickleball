@@ -886,6 +886,41 @@ app.get('/api/session/:sessionId/rsvps', requireAdmin, async (req, res) => {
   }
 });
 
+app.get('/api/public/session/:sessionId/players', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { data, error } = await listSessionRsvps(sessionId);
+
+    if (error || !data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      session: serializeSession(data.session),
+      players: data.rows.map((rsvp) => ({
+        id: rsvp.id,
+        status: rsvp.status,
+        createdAt: rsvp.createdAt,
+        user: {
+          displayName: rsvp.user.display_name,
+          profileImageUrl: rsvp.user.profile_image_url
+        }
+      }))
+    });
+  } catch (error) {
+    console.error('Public players list error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load players.'
+    });
+  }
+});
+
 app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => {
   try {
     const { sessionId } = req.params;

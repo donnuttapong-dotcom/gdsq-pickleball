@@ -190,7 +190,11 @@
                         <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('phone')" x-model="profile.phone">
                         <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('profileImageUrl')" x-model="profile.profileImageUrl">
                         <p class="text-xs font-semibold text-gray-500" x-text="t('profileImageHelp')"></p>
-                        <button class="w-full rounded-xl bg-gdsq px-5 py-3 font-black text-white disabled:opacity-50" @click="saveProfile()" :disabled="isLoading || !lineUid" x-text="t('saveProfile')">Save Profile</button>
+                        <button class="w-full rounded-xl bg-gdsq px-5 py-3 font-black text-white disabled:opacity-50" @click="saveProfile()" :disabled="isLoading">
+                            <span x-show="!isLoading" x-text="t('saveProfile')">Save Profile</span>
+                            <span x-show="isLoading" x-text="t('saving')">Saving...</span>
+                        </button>
+                        <div class="rounded-xl p-3 text-sm font-semibold" x-show="profileMessage" :class="profileMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="profileMessage"></div>
                     </div>
                 </div>
             </section>
@@ -259,6 +263,37 @@
                     </div>
                 </div>
 
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-black" x-text="t('joinedPlayers')">Joined Players</h2>
+                        <span class="text-sm font-black text-gdsq"><span x-text="joinedPlayers.length"></span>/<span x-text="maxPlayers"></span></span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-4 gap-4 text-center" x-show="joinedPlayers.length > 0">
+                        <template x-for="player in joinedPlayers" :key="player.id">
+                            <div class="min-w-0">
+                                <img class="mx-auto h-14 w-14 rounded-full border-2 border-gdsq object-cover" :src="rsvpAvatar(player)" alt="">
+                                <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="mt-4 rounded-xl bg-gray-50 py-5 text-center text-sm font-bold text-gray-500" x-show="joinedPlayers.length === 0" x-text="t('noJoinedPlayers')">No joined players yet</p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="waitlistPlayers.length > 0">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-black" x-text="t('waitlist')">Waitlist</h2>
+                        <span class="text-sm font-black text-gdsqRed" x-text="waitlistPlayers.length">0</span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-4 gap-4 text-center">
+                        <template x-for="player in waitlistPlayers" :key="player.id">
+                            <div class="min-w-0">
+                                <img class="mx-auto h-14 w-14 rounded-full object-cover" :src="rsvpAvatar(player)" alt="">
+                                <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
                     <p x-text="statusMessage"></p>
                 </div>
@@ -303,12 +338,15 @@
                 sessions: [],
                 players: [],
                 rankings: [],
+                sessionPlayers: [],
                 selectedSessionId: new URLSearchParams(window.location.search).get('sessionId') || '',
                 profile: {
                     displayName: '',
                     phone: '',
                     profileImageUrl: ''
                 },
+                profileMessage: '',
+                profileMessageType: 'success',
                 sessionTitle: '',
                 eventDate: null,
                 startTime: null,
@@ -330,6 +368,14 @@
 
                 get profileAvatar() {
                     return this.imageUrl(this.profile.profileImageUrl) || 'https://ui-avatars.com/api/?background=0044CC&color=fff&name=GDSQ';
+                },
+
+                get joinedPlayers() {
+                    return this.sessionPlayers.filter((player) => player.status === 'Joined');
+                },
+
+                get waitlistPlayers() {
+                    return this.sessionPlayers.filter((player) => player.status === 'Waitlist');
                 },
 
                 translations: {
@@ -355,6 +401,7 @@
                         joined: 'เข้าร่วมแล้ว',
                         waitlist: 'Waitlist',
                         joinedPlayers: 'Joined Players',
+                        noJoinedPlayers: 'ยังไม่มีผู้เข้าร่วม',
                         confirmRsvp: 'Confirm RSVP',
                         confirming: 'กำลังยืนยัน...',
                         confirmed: 'Confirmed',
@@ -390,8 +437,10 @@
                         profileImageUrl: 'ลิงก์รูปโปรไฟล์',
                         profileImageHelp: 'ใช้รูปจาก LINE อัตโนมัติ หรือวางลิงก์รูปจาก Google Drive/เว็บฝากรูปได้',
                         saveProfile: 'บันทึกโปรไฟล์',
+                        saving: 'กำลังบันทึก...',
                         profileSaved: 'บันทึกโปรไฟล์แล้ว',
                         profileSaveFailed: 'บันทึกโปรไฟล์ไม่สำเร็จ',
+                        lineLoginRequired: 'กรุณาเชื่อมต่อ LINE ก่อนบันทึกโปรไฟล์',
                         lineLinked: 'เชื่อมกับ LINE แล้ว',
                         lineNotLinked: 'ยังไม่ได้เชื่อม LINE',
                         shareToLine: 'แชร์ไป LINE',
@@ -420,6 +469,7 @@
                         joined: 'joined',
                         waitlist: 'Waitlist',
                         joinedPlayers: 'Joined Players',
+                        noJoinedPlayers: 'No joined players yet',
                         confirmRsvp: 'Confirm RSVP',
                         confirming: 'Confirming...',
                         confirmed: 'Confirmed',
@@ -454,8 +504,10 @@
                         profileImageUrl: 'Profile image URL',
                         profileImageHelp: 'Use your LINE image automatically, or paste a Google Drive/image URL.',
                         saveProfile: 'Save Profile',
+                        saving: 'Saving...',
                         profileSaved: 'Profile saved',
                         profileSaveFailed: 'Unable to save profile',
+                        lineLoginRequired: 'Please connect LINE before saving your profile',
                         lineLinked: 'Linked with LINE',
                         lineNotLinked: 'LINE not linked',
                         shareToLine: 'Share to LINE',
@@ -589,29 +641,57 @@
                 },
 
                 async saveProfile(silent = false) {
-                    if (!this.lineUid) return;
+                    if (!this.lineUid) {
+                        if (!silent) {
+                            this.profileMessageType = 'error';
+                            this.profileMessage = this.t('lineLoginRequired');
 
-                    const response = await fetch('/api/profile', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            lineUid: this.lineUid,
-                            displayName: this.profile.displayName || this.displayName,
-                            phone: this.profile.phone,
-                            profileImageUrl: this.profile.profileImageUrl
-                        })
-                    });
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        if (!silent) this.statusMessage = result.message || this.t('profileSaveFailed');
+                            if (window.liff && !liff.isLoggedIn()) {
+                                liff.login({ redirectUri: window.location.href });
+                            }
+                        }
                         return;
                     }
 
-                    this.displayName = result.user.displayName || this.displayName;
-                    if (!silent) this.statusMessage = this.t('profileSaved');
-                    await this.loadPlayers();
-                    await this.loadRankings();
+                    if (!silent) {
+                        this.isLoading = true;
+                        this.profileMessage = '';
+                    }
+
+                    try {
+                        const response = await fetch('/api/profile', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                displayName: this.profile.displayName || this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('profileSaveFailed'));
+                        }
+
+                        this.displayName = result.user.displayName || this.displayName;
+                        if (!silent) {
+                            this.profileMessageType = 'success';
+                            this.profileMessage = this.t('profileSaved');
+                        }
+                        await this.loadPlayers();
+                        await this.loadRankings();
+                    } catch (error) {
+                        if (!silent) {
+                            this.profileMessageType = 'error';
+                            this.profileMessage = error.message || this.t('profileSaveFailed');
+                        }
+                    } finally {
+                        if (!silent) {
+                            this.isLoading = false;
+                        }
+                    }
                 },
 
                 startAutoRefresh() {
@@ -630,6 +710,21 @@
                     if (!response.ok) throw new Error(result.message || 'Failed to load session');
 
                     this.applySession(result.session);
+                    await this.loadSessionPlayers();
+                },
+
+                async loadSessionPlayers() {
+                    if (!this.selectedSessionId) {
+                        this.sessionPlayers = [];
+                        return;
+                    }
+
+                    const response = await fetch(`/api/public/session/${this.selectedSessionId}/players`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load players');
+
+                    this.sessionPlayers = result.players || [];
                 },
 
                 applySession(session) {
@@ -686,6 +781,7 @@
 
                 showEventList() {
                     this.selectedSessionId = '';
+                    this.sessionPlayers = [];
                     this.statusMessage = this.lineUid ? `${this.t('loggedIn')}: ${this.displayName}` : '';
                     window.history.pushState({}, '', '/');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -721,6 +817,11 @@
 
                 playerAvatar(player) {
                     return this.imageUrl(player.profileImageUrl) || `https://ui-avatars.com/api/?background=0044CC&color=fff&name=${encodeURIComponent(player.displayName || 'GDSQ')}`;
+                },
+
+                rsvpAvatar(player) {
+                    const user = player.user || {};
+                    return this.imageUrl(user.profileImageUrl) || `https://ui-avatars.com/api/?background=0044CC&color=fff&name=${encodeURIComponent(user.displayName || 'GDSQ')}`;
                 },
 
                 statusLabel(status) {
