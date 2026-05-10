@@ -209,6 +209,17 @@
                         </div>
                     </div>
 
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('paymentSettings')">Payment settings</h2>
+                        <div class="mt-3 space-y-3">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentQrUrl" :placeholder="t('paymentQrUrl')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentBankName" :placeholder="t('paymentBankName')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentAccountName" :placeholder="t('paymentAccountName')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentAccountNumber" :placeholder="t('paymentAccountNumber')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentPromptPayId" :placeholder="t('paymentPromptPayId')">
+                        </div>
+                    </div>
+
                     <button class="w-full rounded-xl bg-gdsq px-5 py-4 text-base font-black text-white disabled:opacity-50" @click="publishEvent()" :disabled="isLoading || !lineUid">
                         <span x-show="!isLoading" x-text="t('publishEvent')">Publish Event</span>
                         <span x-show="isLoading" x-text="t('publishing')">Publishing...</span>
@@ -384,6 +395,7 @@
                                 <img class="mx-auto h-14 w-14 rounded-full border-2 border-gdsq object-cover" :src="rsvpAvatar(player)" alt="">
                                 <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
                                 <p class="truncate text-[10px] font-semibold text-gray-400" x-show="player.kind === 'guest'" x-text="`${t('addedBy')} ${player.addedBy?.displayName || ''}`"></p>
+                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" :class="paymentStatusClass(player.paymentStatus)" x-text="paymentStatusLabel(player.paymentStatus)"></span>
                             </div>
                         </template>
                     </div>
@@ -401,6 +413,7 @@
                                 <img class="mx-auto h-14 w-14 rounded-full object-cover" :src="rsvpAvatar(player)" alt="">
                                 <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
                                 <p class="truncate text-[10px] font-semibold text-gray-400" x-show="player.kind === 'guest'" x-text="`${t('addedBy')} ${player.addedBy?.displayName || ''}`"></p>
+                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" :class="paymentStatusClass(player.paymentStatus)" x-text="paymentStatusLabel(player.paymentStatus)"></span>
                             </div>
                         </template>
                     </div>
@@ -408,6 +421,61 @@
 
                 <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
                     <p x-text="statusMessage"></p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="userStatus">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-black" x-text="t('payment')">Payment</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500"><span x-text="t('amountDue')"></span>: <span class="font-black text-gray-900" x-text="moneyText(payment.amountDue)"></span></p>
+                        </div>
+                        <span class="rounded-full px-3 py-1 text-xs font-black" :class="paymentStatusClass(payment.status)" x-text="paymentStatusLabel(payment.status)">Pending</span>
+                    </div>
+
+                    <button class="mt-4 w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" x-show="payment.status !== 'Paid'" @click="showPaymentPanel = !showPaymentPanel">
+                        <i class="fa-solid fa-qrcode mr-2"></i><span x-text="showPaymentPanel ? t('hidePayment') : t('payNow')">Pay Now</span>
+                    </button>
+
+                    <div class="mt-4 space-y-4" x-show="showPaymentPanel || payment.status === 'Submitted' || payment.status === 'Paid'" x-cloak>
+                        <div class="overflow-hidden rounded-xl bg-gray-50 p-3 text-center" x-show="paymentSettings.paymentQrUrl">
+                            <img class="mx-auto max-h-64 rounded-lg object-contain" :src="imageUrl(paymentSettings.paymentQrUrl)" alt="Payment QR">
+                        </div>
+
+                        <div class="divide-y divide-gray-100 rounded-xl border border-gray-100 text-sm">
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500" x-text="t('bank')">Bank</span><span class="text-right font-black" x-text="paymentSettings.paymentBankName || '-'"></span></div>
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500" x-text="t('accountName')">Account</span><span class="text-right font-black" x-text="paymentSettings.paymentAccountName || '-'"></span></div>
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500" x-text="t('accountNumber')">Number</span><span class="text-right font-black" x-text="paymentSettings.paymentAccountNumber || '-'"></span></div>
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500">PromptPay</span><span class="text-right font-black" x-text="paymentSettings.paymentPromptPayId || '-'"></span></div>
+                        </div>
+
+                        <div class="rounded-xl bg-blue-50 px-3 py-3 text-center">
+                            <p class="text-xs font-black text-gdsq" x-text="t('amountDue')">Amount due</p>
+                            <p class="text-2xl font-black text-gdsq" x-text="moneyText(payment.amountDue)">THB 0</p>
+                        </div>
+
+                        <div class="space-y-3" x-show="payment.status !== 'Paid'">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="paymentForm.amountPaid" :placeholder="t('amountPaid')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="paymentForm.payerName" :placeholder="t('payerName')">
+                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="paymentForm.note" :placeholder="t('paymentNote')"></textarea>
+                            <label class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gdsq bg-blue-50 px-4 py-6 text-center text-gdsq">
+                                <i class="fa-solid fa-cloud-arrow-up mb-2 text-2xl"></i>
+                                <span class="text-sm font-black" x-text="paymentForm.fileName || t('chooseSlip')">Choose slip</span>
+                                <span class="mt-1 text-xs font-semibold text-blue-700" x-text="t('slipUploadHelp')">Stored securely in Supabase Storage</span>
+                                <input class="hidden" type="file" accept="image/*" @change="handleSlipFile($event)">
+                            </label>
+                            <div class="overflow-hidden rounded-xl bg-gray-100" x-show="paymentForm.previewUrl">
+                                <img class="max-h-72 w-full object-contain" :src="paymentForm.previewUrl" alt="Slip preview">
+                            </div>
+                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="submitPayment()" :disabled="isLoading || !paymentForm.slipBase64">
+                                <span x-show="!isLoading" x-text="t('submitPayment')">Submit Payment</span>
+                                <span x-show="isLoading" x-text="t('uploadingSlip')">Uploading...</span>
+                            </button>
+                        </div>
+
+                        <a class="block rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-black text-gdsq" x-show="payment.slipUrl" :href="payment.slipUrl" target="_blank">
+                            <i class="fa-solid fa-receipt mr-2"></i><span x-text="t('viewSlip')">View Slip</span>
+                        </a>
+                    </div>
                 </div>
             </section>
 
@@ -471,10 +539,38 @@
                     maxPlayers: 16,
                     courtCount: 2,
                     priceThb: 250,
-                    posterUrl: ''
+                    posterUrl: '',
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
                 },
                 createMessage: '',
                 createMessageType: 'success',
+                payment: {
+                    status: 'Pending',
+                    amountDue: 0,
+                    amountPaid: null,
+                    slipUrl: ''
+                },
+                paymentSettings: {
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
+                },
+                paymentForm: {
+                    amountPaid: '',
+                    payerName: '',
+                    note: '',
+                    fileName: '',
+                    fileType: '',
+                    slipBase64: '',
+                    previewUrl: ''
+                },
+                showPaymentPanel: false,
                 profileMessage: '',
                 profileMessageType: 'success',
                 sessionTitle: '',
@@ -488,6 +584,11 @@
                 description: '',
                 posterUrl: '',
                 sessionHost: null,
+                paymentQrUrl: '',
+                paymentBankName: '',
+                paymentAccountName: '',
+                paymentAccountNumber: '',
+                paymentPromptPayId: '',
                 courtCount: 1,
                 maxPlayers: 0,
                 joinedCount: 0,
@@ -542,6 +643,12 @@
                         priceThb: 'ราคา',
                         poster: 'รูปโปสเตอร์',
                         posterUrl: 'ลิงก์รูปโปสเตอร์',
+                        paymentSettings: 'ตั้งค่าการชำระเงิน',
+                        paymentQrUrl: 'ลิงก์รูป QR ชำระเงิน',
+                        paymentBankName: 'ชื่อธนาคาร',
+                        paymentAccountName: 'ชื่อบัญชี',
+                        paymentAccountNumber: 'เลขบัญชี',
+                        paymentPromptPayId: 'PromptPay ID',
                         hostedBy: 'จัดโดย',
                         publishEvent: 'Publish Event',
                         publishing: 'กำลังสร้าง...',
@@ -617,6 +724,27 @@
                         shareToLine: 'แชร์ไป LINE',
                         shareText: 'ชวนมาเล่น Pickleball ด้วยกัน',
                         copiedLink: 'คัดลอกลิงก์แล้ว'
+                        ,
+                        payment: 'การชำระเงิน',
+                        amountDue: 'ยอดที่ต้องชำระ',
+                        amountPaid: 'ยอดที่โอน',
+                        payerName: 'ชื่อผู้โอน',
+                        paymentNote: 'หมายเหตุ',
+                        payNow: 'ชำระเงิน',
+                        hidePayment: 'ซ่อนการชำระเงิน',
+                        bank: 'ธนาคาร',
+                        accountName: 'ชื่อบัญชี',
+                        accountNumber: 'เลขบัญชี',
+                        chooseSlip: 'เลือกรูปสลิป',
+                        slipUploadHelp: 'สลิปจะถูกเก็บใน Supabase Storage',
+                        submitPayment: 'แจ้งชำระเงินแล้ว',
+                        uploadingSlip: 'กำลังอัปโหลด...',
+                        viewSlip: 'ดูสลิป',
+                        paymentPending: 'รอชำระเงิน',
+                        paymentSubmitted: 'แจ้งชำระแล้ว',
+                        paymentPaid: 'ชำระแล้ว',
+                        paymentSubmitFailed: 'แจ้งชำระเงินไม่สำเร็จ',
+                        paymentSubmittedMessage: 'ส่งสลิปแล้ว รอ Admin ตรวจ'
                     },
                     en: {
                         heroLine1: 'Good Game.',
@@ -641,6 +769,12 @@
                         priceThb: 'Price',
                         poster: 'Poster',
                         posterUrl: 'Poster image URL',
+                        paymentSettings: 'Payment settings',
+                        paymentQrUrl: 'Payment QR image URL',
+                        paymentBankName: 'Bank name',
+                        paymentAccountName: 'Account name',
+                        paymentAccountNumber: 'Account number',
+                        paymentPromptPayId: 'PromptPay ID',
                         hostedBy: 'Hosted by',
                         publishEvent: 'Publish Event',
                         publishing: 'Publishing...',
@@ -715,6 +849,27 @@
                         shareToLine: 'Share to LINE',
                         shareText: 'Join this pickleball event with me',
                         copiedLink: 'Link copied'
+                        ,
+                        payment: 'Payment',
+                        amountDue: 'Amount due',
+                        amountPaid: 'Amount paid',
+                        payerName: 'Payer name',
+                        paymentNote: 'Note',
+                        payNow: 'Pay Now',
+                        hidePayment: 'Hide payment',
+                        bank: 'Bank',
+                        accountName: 'Account name',
+                        accountNumber: 'Account number',
+                        chooseSlip: 'Choose slip image',
+                        slipUploadHelp: 'Stored in Supabase Storage',
+                        submitPayment: 'Submit Payment',
+                        uploadingSlip: 'Uploading...',
+                        viewSlip: 'View Slip',
+                        paymentPending: 'Pending',
+                        paymentSubmitted: 'Submitted',
+                        paymentPaid: 'Paid',
+                        paymentSubmitFailed: 'Unable to submit payment',
+                        paymentSubmittedMessage: 'Slip submitted. Waiting for admin review.'
                     }
                 },
 
@@ -847,7 +1002,12 @@
                         maxPlayers: 16,
                         courtCount: 2,
                         priceThb: 250,
-                        posterUrl: ''
+                        posterUrl: '',
+                        paymentQrUrl: '',
+                        paymentBankName: '',
+                        paymentAccountName: '',
+                        paymentAccountNumber: '',
+                        paymentPromptPayId: ''
                     };
                 },
 
@@ -1005,12 +1165,25 @@
                     this.description = session.description || '';
                     this.posterUrl = session.posterUrl || '';
                     this.sessionHost = session.host || null;
+                    this.paymentSettings = {
+                        paymentQrUrl: session.paymentQrUrl || '',
+                        paymentBankName: session.paymentBankName || '',
+                        paymentAccountName: session.paymentAccountName || '',
+                        paymentAccountNumber: session.paymentAccountNumber || '',
+                        paymentPromptPayId: session.paymentPromptPayId || ''
+                    };
+                    this.paymentQrUrl = session.paymentQrUrl || '';
+                    this.paymentBankName = session.paymentBankName || '';
+                    this.paymentAccountName = session.paymentAccountName || '';
+                    this.paymentAccountNumber = session.paymentAccountNumber || '';
+                    this.paymentPromptPayId = session.paymentPromptPayId || '';
                     this.courtCount = session.courtCount || 1;
                     this.maxPlayers = session.maxPlayers;
                     this.joinedCount = session.joinedCount;
                     this.waitlistCount = session.waitlistCount;
                     this.spotsLeft = session.spotsLeft;
                     this.userStatus = session.userStatus;
+                    if (this.userStatus && this.lineUid) this.loadPayment();
                 },
 
                 async selectSession(sessionId) {
@@ -1096,6 +1269,23 @@
                     return `${Math.ceil(maxPlayers / courtCount)} ${this.t('playersPerCourt')}`;
                 },
 
+                moneyText(value) {
+                    const amount = Number(value || 0);
+                    return `THB ${amount.toLocaleString()}`;
+                },
+
+                paymentStatusLabel(status) {
+                    if (status === 'Paid') return this.t('paymentPaid');
+                    if (status === 'Submitted') return this.t('paymentSubmitted');
+                    return this.t('paymentPending');
+                },
+
+                paymentStatusClass(status) {
+                    if (status === 'Paid') return 'bg-green-50 text-green-700';
+                    if (status === 'Submitted') return 'bg-blue-50 text-gdsq';
+                    return 'bg-yellow-50 text-yellow-700';
+                },
+
                 skillClass(level) {
                     const text = String(level || '').toLowerCase();
                     if (text.includes('beginner')) return 'bg-green-50 text-green-700';
@@ -1114,6 +1304,88 @@
 
                 statusLabel(status) {
                     return status === 'Joined' ? this.t('confirmed') : this.t('waitlisted');
+                },
+
+                resetPaymentForm() {
+                    this.paymentForm = {
+                        amountPaid: '',
+                        payerName: this.profile.displayName || this.displayName || '',
+                        note: '',
+                        fileName: '',
+                        fileType: '',
+                        slipBase64: '',
+                        previewUrl: ''
+                    };
+                },
+
+                async loadPayment() {
+                    if (!this.lineUid || !this.selectedSessionId) return;
+                    const response = await fetch(`/api/payment?lineUid=${encodeURIComponent(this.lineUid)}&sessionId=${encodeURIComponent(this.selectedSessionId)}`);
+                    const result = await response.json();
+                    if (!response.ok || !result.payment) return;
+
+                    this.payment = {
+                        status: result.payment.status || 'Pending',
+                        amountDue: result.payment.amountDue || 0,
+                        amountPaid: result.payment.amountPaid || null,
+                        slipUrl: result.payment.slipUrl || ''
+                    };
+                    if (!this.paymentForm.amountPaid) {
+                        this.paymentForm.amountPaid = this.payment.amountDue || '';
+                    }
+                    if (!this.paymentForm.payerName) {
+                        this.paymentForm.payerName = this.profile.displayName || this.displayName || '';
+                    }
+                },
+
+                handleSlipFile(event) {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        this.paymentForm.fileName = file.name;
+                        this.paymentForm.fileType = file.type || 'image/jpeg';
+                        this.paymentForm.slipBase64 = reader.result;
+                        this.paymentForm.previewUrl = reader.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                async submitPayment() {
+                    if (!this.lineUid || !this.selectedSessionId || !this.paymentForm.slipBase64) return;
+
+                    this.isLoading = true;
+                    this.statusMessage = '';
+
+                    try {
+                        const response = await fetch('/api/payment/submit', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                sessionId: this.selectedSessionId,
+                                amountPaid: this.paymentForm.amountPaid,
+                                payerName: this.paymentForm.payerName,
+                                note: this.paymentForm.note,
+                                slipFileName: this.paymentForm.fileName,
+                                slipMimeType: this.paymentForm.fileType,
+                                slipBase64: this.paymentForm.slipBase64
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) throw new Error(result.message || this.t('paymentSubmitFailed'));
+
+                        this.statusMessage = this.t('paymentSubmittedMessage');
+                        this.resetPaymentForm();
+                        await this.loadPayment();
+                        await this.loadSessionPlayers();
+                    } catch (error) {
+                        this.statusMessage = error.message || this.t('paymentSubmitFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
                 },
 
                 async confirmRsvp() {
@@ -1145,8 +1417,10 @@
                         this.statusMessage = result.message;
                         this.userStatus = result.status;
                         this.guestNames = [];
+                        this.resetPaymentForm();
                         await this.loadSessions();
                         await this.loadSession();
+                        await this.loadPayment();
                     } catch (error) {
                         console.error('RSVP error:', error);
                         this.statusMessage = this.t('rsvpFailed');
@@ -1175,6 +1449,14 @@
                         if (!response.ok) throw new Error(result.message || 'Failed to cancel RSVP');
 
                         this.userStatus = null;
+                        this.payment = {
+                            status: 'Pending',
+                            amountDue: 0,
+                            amountPaid: null,
+                            slipUrl: ''
+                        };
+                        this.showPaymentPanel = false;
+                        this.resetPaymentForm();
                         this.statusMessage = result.message;
                         await this.loadSessions();
                         await this.loadSession();

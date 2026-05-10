@@ -208,6 +208,11 @@
                     :placeholder="t('posterUrl')"
                     x-model="newSession.posterUrl"
                 >
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="newSession.paymentQrUrl">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="newSession.paymentBankName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="newSession.paymentAccountName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountNumber')" x-model="newSession.paymentAccountNumber">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentPromptPayId')" x-model="newSession.paymentPromptPayId">
                 <textarea
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
                     rows="3"
@@ -241,6 +246,11 @@
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('address')" x-model="editSession.address">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('skillLevel')" x-model="editSession.skillLevel">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('posterUrl')" x-model="editSession.posterUrl">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="editSession.paymentQrUrl">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="editSession.paymentBankName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="editSession.paymentAccountName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountNumber')" x-model="editSession.paymentAccountNumber">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentPromptPayId')" x-model="editSession.paymentPromptPayId">
                 <textarea class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" rows="3" :placeholder="t('description')" x-model="editSession.description"></textarea>
                 <button
                     class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-black disabled:opacity-50"
@@ -275,9 +285,14 @@
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
                                 <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
                                 <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`${t('payment')}: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
-                            <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700" x-text="t('joined')">Joined</span>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700" x-text="t('joined')">Joined</span>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                            </div>
                         </div>
                     </template>
                     <p class="px-4 py-6 text-center text-sm text-gray-500" x-show="joinedRsvps.length === 0" x-text="t('noJoined')">ยังไม่มีคน Joined</p>
@@ -295,9 +310,14 @@
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
                                 <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
                                 <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`${t('payment')}: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
-                            <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-gdsqRed" x-text="t('waitlist')">Waitlist</span>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-gdsqRed" x-text="t('waitlist')">Waitlist</span>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                            </div>
                         </div>
                     </template>
                     <p class="px-4 py-6 text-center text-sm text-gray-500" x-show="waitlistRsvps.length === 0" x-text="t('noWaitlist')">ยังไม่มี Waitlist</p>
@@ -334,7 +354,12 @@
                     address: '',
                     skillLevel: '',
                     description: '',
-                    posterUrl: ''
+                    posterUrl: '',
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
                 },
                 editSession: {
                     title: '',
@@ -348,7 +373,12 @@
                     address: '',
                     skillLevel: '',
                     description: '',
-                    posterUrl: ''
+                    posterUrl: '',
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
                 },
                 adminPassword: '',
                 isAuthenticated: false,
@@ -391,7 +421,18 @@
                         skillLevel: 'ระดับผู้เล่น เช่น Beginner / Intermediate',
                         description: 'รายละเอียดกิจกรรม',
                         posterUrl: 'ลิงก์รูปโปสเตอร์กิจกรรม',
+                        paymentQrUrl: 'ลิงก์รูป QR ชำระเงิน',
+                        paymentBankName: 'ชื่อธนาคาร',
+                        paymentAccountName: 'ชื่อบัญชี',
+                        paymentAccountNumber: 'เลขบัญชี',
+                        paymentPromptPayId: 'PromptPay ID',
                         posterHelp: 'ใช้ลิงก์รูปจาก Google Drive ได้: อัปโหลดรูปใน Drive > Share > Anyone with the link > Copy link > วางช่องนี้',
+                        payment: 'ชำระเงิน',
+                        paymentPending: 'รอชำระ',
+                        paymentSubmitted: 'แจ้งแล้ว',
+                        paymentPaid: 'ชำระแล้ว',
+                        viewSlip: 'ดูสลิป',
+                        markPaid: 'Mark Paid',
                         create: 'สร้าง',
                         save: 'บันทึก',
                         deleteEvent: 'ลบ Event',
@@ -440,7 +481,18 @@
                         skillLevel: 'Skill level, e.g. Beginner / Intermediate',
                         description: 'Event description',
                         posterUrl: 'Event poster image URL',
+                        paymentQrUrl: 'Payment QR image URL',
+                        paymentBankName: 'Bank name',
+                        paymentAccountName: 'Account name',
+                        paymentAccountNumber: 'Account number',
+                        paymentPromptPayId: 'PromptPay ID',
                         posterHelp: 'Google Drive links work: upload image to Drive > Share > Anyone with the link > Copy link > paste here.',
+                        payment: 'Payment',
+                        paymentPending: 'Pending',
+                        paymentSubmitted: 'Submitted',
+                        paymentPaid: 'Paid',
+                        viewSlip: 'View Slip',
+                        markPaid: 'Mark Paid',
                         create: 'Create',
                         save: 'Save',
                         deleteEvent: 'Delete Event',
@@ -609,6 +661,11 @@
                         this.newSession.skillLevel = '';
                         this.newSession.description = '';
                         this.newSession.posterUrl = '';
+                        this.newSession.paymentQrUrl = '';
+                        this.newSession.paymentBankName = '';
+                        this.newSession.paymentAccountName = '';
+                        this.newSession.paymentAccountNumber = '';
+                        this.newSession.paymentPromptPayId = '';
                         this.selectedSessionId = result.session.id;
                         await this.loadAll();
                     } catch (error) {
@@ -713,8 +770,55 @@
                         address: session.address || '',
                         skillLevel: session.skillLevel || '',
                         description: session.description || '',
-                        posterUrl: session.posterUrl || ''
+                        posterUrl: session.posterUrl || '',
+                        paymentQrUrl: session.paymentQrUrl || '',
+                        paymentBankName: session.paymentBankName || '',
+                        paymentAccountName: session.paymentAccountName || '',
+                        paymentAccountNumber: session.paymentAccountNumber || '',
+                        paymentPromptPayId: session.paymentPromptPayId || ''
                     };
+                },
+
+                moneyText(value) {
+                    return `THB ${Number(value || 0).toLocaleString()}`;
+                },
+
+                paymentStatusLabel(status) {
+                    if (status === 'Paid') return this.t('paymentPaid');
+                    if (status === 'Submitted') return this.t('paymentSubmitted');
+                    return this.t('paymentPending');
+                },
+
+                paymentStatusClass(status) {
+                    if (status === 'Paid') return 'text-green-700';
+                    if (status === 'Submitted') return 'text-gdsq';
+                    return 'text-yellow-700';
+                },
+
+                async markPaid(rsvp) {
+                    if (!this.selectedSessionId || !rsvp?.parentRsvpId) return;
+
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 'Paid' })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update payment');
+                        }
+
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
                 },
 
                 formatDate(value) {
