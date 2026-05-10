@@ -29,11 +29,13 @@
 
         <main x-show="!selectedSessionId" x-cloak>
             <section class="px-5">
-                <div class="overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-blue-50 p-7 shadow-sm">
-                    <img class="mx-auto h-36 w-full object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
-                    <p class="mt-4 text-2xl font-black uppercase leading-tight text-gdsqNavy" x-text="t('heroLine1')">Good Game.</p>
-                    <p class="text-2xl font-black uppercase leading-tight text-gdsqRed" x-text="t('heroLine2')">Good People.</p>
-                    <button class="mt-6 rounded-lg bg-gdsq px-5 py-3 text-sm font-black text-white shadow-sm" @click="scrollToEvents()" x-text="t('joinFun')">Join the Fun!</button>
+                <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
+                    <img class="aspect-square w-full object-cover" src="/assets/gdsq-home-banner.png" alt="GDSQ Pickleball Club">
+                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent p-5">
+                        <p class="text-2xl font-black uppercase leading-tight text-white" x-text="t('heroLine1')">Good Game.</p>
+                        <p class="text-2xl font-black uppercase leading-tight text-white" x-text="t('heroLine2')">Good People.</p>
+                        <button class="mt-4 rounded-lg bg-gdsq px-5 py-3 text-sm font-black text-white shadow-sm" @click="scrollToEvents()" x-text="t('joinFun')">Join the Fun!</button>
+                    </div>
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
@@ -195,6 +197,10 @@
                     <img class="mx-auto h-24 w-24 rounded-full border-4 border-blue-50 object-cover" :src="playerAvatar(selectedPlayer)" alt="">
                     <h1 class="mt-3 text-2xl font-black" x-text="selectedPlayer.displayName || 'Player'">Player</h1>
                     <p class="mt-1 text-sm font-semibold text-gray-500" x-text="selectedPlayer.ratingAverage ? `${selectedPlayer.ratingAverage}/5 · ${selectedPlayer.voteCount} ${t('votes')}` : t('noVotesYet')"></p>
+                    <button class="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" @click="shareProfile()">
+                        <i class="fa-solid fa-share-nodes"></i>
+                        <span x-text="t('shareProfile')">Share Profile</span>
+                    </button>
                     <div class="mt-5 grid grid-cols-3 gap-3">
                         <div class="rounded-xl bg-blue-50 p-3">
                             <p class="text-2xl font-black text-gdsq" x-text="selectedPlayer.joinedCount || 0"></p>
@@ -209,9 +215,12 @@
                             <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('hosted')"></p>
                         </div>
                     </div>
-                    <div class="mt-4 flex flex-wrap justify-center gap-2" x-show="(selectedPlayer.badges || []).length > 0">
+                    <div class="mt-4 grid grid-cols-2 gap-2" x-show="(selectedPlayer.badges || []).length > 0">
                         <template x-for="badge in selectedPlayer.badges" :key="badge.key">
-                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-gdsq" x-text="badge.label"></span>
+                            <span class="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black" :class="badgeClass(badge.key)">
+                                <i class="fa-solid" :class="badgeIcon(badge.key)"></i>
+                                <span x-text="badge.label"></span>
+                            </span>
                         </template>
                     </div>
                 </div>
@@ -231,6 +240,40 @@
                             </div>
                         </template>
                     </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('upcomingEvents')">Upcoming Events</h2>
+                    <div class="mt-3 space-y-3" x-show="(selectedPlayer.upcoming || []).length > 0">
+                        <template x-for="session in selectedPlayer.upcoming" :key="session.id">
+                            <button class="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-3 text-left" @click="selectSession(session.id)">
+                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                    <span class="text-[10px] font-black uppercase" x-text="monthText(session.eventDate)"></span>
+                                    <span class="text-xl font-black leading-none" x-text="dayText(session.eventDate)"></span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="`${timeRange(session)} · ${session.location || t('locationTba')}`"></p>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-gray-300"></i>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(selectedPlayer.upcoming || []).length" x-text="t('noUpcomingForPlayer')">ยังไม่มีกิจกรรมที่กำลังจะถึง</p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('playedTogether')">เล่นด้วยกันบ่อย</h2>
+                    <div class="mt-3 grid grid-cols-2 gap-3" x-show="(selectedPlayer.playedTogether || []).length > 0">
+                        <template x-for="player in selectedPlayer.playedTogether" :key="player.id">
+                            <button class="rounded-xl border border-gray-100 p-3 text-center" @click="openPlayerProfile(player.id)">
+                                <img class="mx-auto h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" alt="">
+                                <p class="mt-2 truncate text-xs font-black" x-text="player.displayName || 'Player'"></p>
+                                <p class="text-[10px] font-semibold text-gray-500"><span x-text="player.sharedEventCount"></span> <span x-text="t('eventsTogether')"></span></p>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(selectedPlayer.playedTogether || []).length" x-text="t('noPlayedTogether')">ยังไม่มีข้อมูลคนที่เล่นด้วยกัน</p>
                 </div>
 
                 <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
@@ -791,6 +834,8 @@
                     voteCount: 0,
                     hostedCount: 0,
                     badges: [],
+                    upcoming: [],
+                    playedTogether: [],
                     history: []
                 },
                 previousTab: 'players',
@@ -1052,6 +1097,11 @@
                         hosted: 'จัดงาน',
                         scoreBreakdown: 'คะแนนแยกหัวข้อ',
                         noVotesYet: 'ยังไม่มีคะแนนโหวต',
+                        shareProfile: 'แชร์โปรไฟล์',
+                        noUpcomingForPlayer: 'ยังไม่มีกิจกรรมที่กำลังจะถึง',
+                        playedTogether: 'เล่นด้วยกันบ่อย',
+                        eventsTogether: 'กิจกรรมร่วมกัน',
+                        noPlayedTogether: 'ยังไม่มีข้อมูลคนที่เล่นด้วยกัน',
                         thisWeek: 'สัปดาห์นี้',
                         thisMonth: 'เดือนนี้',
                         allTime: 'ทั้งหมด',
@@ -1210,6 +1260,11 @@
                         hosted: 'Hosted',
                         scoreBreakdown: 'Score breakdown',
                         noVotesYet: 'No votes yet',
+                        shareProfile: 'Share Profile',
+                        noUpcomingForPlayer: 'No upcoming events',
+                        playedTogether: 'Played together',
+                        eventsTogether: 'events together',
+                        noPlayedTogether: 'No played-together data yet',
                         thisWeek: 'This Week',
                         thisMonth: 'This Month',
                         allTime: 'All Time',
@@ -1428,6 +1483,48 @@
                         { label: this.t('voteSkill'), value: this.selectedPlayer.skillAverage },
                         { label: this.t('voteVibes'), value: this.selectedPlayer.vibesAverage }
                     ];
+                },
+
+                badgeIcon(key) {
+                    const icons = {
+                        mvp: 'fa-trophy',
+                        fairPlay: 'fa-handshake',
+                        teamPlayer: 'fa-users',
+                        goodVibes: 'fa-face-smile',
+                        regular: 'fa-calendar-check',
+                        host: 'fa-bullhorn'
+                    };
+                    return icons[key] || 'fa-star';
+                },
+
+                badgeClass(key) {
+                    const classes = {
+                        mvp: 'bg-yellow-50 text-yellow-700',
+                        fairPlay: 'bg-green-50 text-green-700',
+                        teamPlayer: 'bg-blue-50 text-gdsq',
+                        goodVibes: 'bg-pink-50 text-pink-700',
+                        regular: 'bg-purple-50 text-purple-700',
+                        host: 'bg-red-50 text-gdsqRed'
+                    };
+                    return classes[key] || 'bg-gray-100 text-gray-700';
+                },
+
+                async shareProfile() {
+                    if (!this.selectedPlayer?.id) return;
+                    const url = `${window.location.origin}/?playerId=${encodeURIComponent(this.selectedPlayer.id)}&v=${Date.now()}`;
+                    const text = `${this.t('shareProfile')}: ${this.selectedPlayer.displayName || 'GDSQ Player'}`;
+
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: this.selectedPlayer.displayName || 'GDSQ Player',
+                            text,
+                            url
+                        });
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
                 },
 
                 myScoreRows() {

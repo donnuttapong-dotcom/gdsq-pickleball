@@ -1371,6 +1371,53 @@ app.get('/api/players/:playerId', async (req, res) => {
         }))
     );
 
+    const upcoming = history
+      .filter((session) => !session.isEnded)
+      .sort((a, b) => {
+        const aTime = `${a.eventDate || '9999-12-31'}T${a.startTime || '00:00:00'}`;
+        const bTime = `${b.eventDate || '9999-12-31'}T${b.startTime || '00:00:00'}`;
+        return aTime.localeCompare(bTime);
+      })
+      .slice(0, 5);
+
+    let playedTogether = [];
+    if (sessionIds.length > 0) {
+      const { data: sharedRsvps, error: sharedRsvpError } = await supabase
+        .from('rsvps')
+        .select('session_id, user_id')
+        .in('session_id', sessionIds)
+        .eq('status', 'Joined')
+        .neq('user_id', user.id);
+
+      if (sharedRsvpError) throw sharedRsvpError;
+
+      const sharedByUserId = {};
+      for (const rsvp of sharedRsvps || []) {
+        if (!sharedByUserId[rsvp.user_id]) {
+          sharedByUserId[rsvp.user_id] = new Set();
+        }
+        sharedByUserId[rsvp.user_id].add(rsvp.session_id);
+      }
+
+      const sharedUserIds = Object.keys(sharedByUserId);
+      if (sharedUserIds.length > 0) {
+        const { data: sharedUsers, error: sharedUsersError } = await supabase
+          .from('users')
+          .select(userSelect)
+          .in('id', sharedUserIds);
+
+        if (sharedUsersError) throw sharedUsersError;
+
+        playedTogether = (sharedUsers || [])
+          .map((sharedUser) => ({
+            ...serializeUser(sharedUser),
+            sharedEventCount: sharedByUserId[sharedUser.id]?.size || 0
+          }))
+          .sort((a, b) => b.sharedEventCount - a.sharedEventCount || a.displayName.localeCompare(b.displayName))
+          .slice(0, 8);
+      }
+    }
+
     return res.json({
       success: true,
       player: {
@@ -1385,6 +1432,8 @@ app.get('/api/players/:playerId', async (req, res) => {
           hostedCount: hostedCount || 0,
           rating
         }),
+        upcoming,
+        playedTogether,
         history
       }
     });
