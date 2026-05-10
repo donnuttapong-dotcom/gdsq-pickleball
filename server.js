@@ -1167,6 +1167,141 @@ app.get('/api/rankings', async (req, res) => {
   }
 });
 
+app.get('/api/players/:playerId', async (req, res) => {
+  try {
+    const { playerId } = req.params;
+
+    if (!uuidPattern.test(playerId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid player id.'
+      });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select(userSelect)
+      .eq('id', playerId)
+      .maybeSingle();
+
+    if (userError) throw userError;
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Player not found.'
+      });
+    }
+
+    const { data: rsvps, error: rsvpError } = await supabase
+      .from('rsvps')
+      .select('session_id, status, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (rsvpError) throw rsvpError;
+
+    const joinedRsvps = (rsvps || []).filter((rsvp) => rsvp.status === 'Joined');
+    const waitlistRsvps = (rsvps || []).filter((rsvp) => rsvp.status === 'Waitlist');
+    const sessionIds = [...new Set(joinedRsvps.map((rsvp) => rsvp.session_id))];
+    let attendedSessions = [];
+
+    if (sessionIds.length > 0) {
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('sessions')
+        .select(sessionSelect)
+        .in('id', sessionIds);
+
+      if (sessionsError) throw sessionsError;
+      attendedSessions = sessions || [];
+    }
+
+    const { count: hostedCount, error: hostedError } = await supabase
+      .from('sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('created_by_user_id', user.id)
+      .neq('status', 'Cancelled');
+
+    if (hostedError) throw hostedError;
+
+    const rating = {
+      voteCount: 0,
+      ratingAverage: null,
+      mvpAverage: null,
+      sportsmanshipAverage: null,
+      teamworkAverage: null,
+      skillAverage: null,
+      vibesAverage: null
+    };
+
+    const { data: votes, error: votesError } = await supabase
+      .from('event_player_votes')
+      .select('mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score')
+      .eq('voted_user_id', user.id);
+
+    if (votesError && votesError.code !== '42P01') throw votesError;
+
+    if (!votesError && votes && votes.length > 0) {
+      const totals = votes.reduce((sum, vote) => ({
+        total: sum.total + voteAverage(vote),
+        mvp: sum.mvp + vote.mvp_score,
+        sportsmanship: sum.sportsmanship + vote.sportsmanship_score,
+        teamwork: sum.teamwork + vote.teamwork_score,
+        skill: sum.skill + vote.skill_score,
+        vibes: sum.vibes + vote.vibes_score
+      }), {
+        total: 0,
+        mvp: 0,
+        sportsmanship: 0,
+        teamwork: 0,
+        skill: 0,
+        vibes: 0
+      });
+
+      rating.voteCount = votes.length;
+      rating.ratingAverage = Number((totals.total / votes.length).toFixed(2));
+      rating.mvpAverage = Number((totals.mvp / votes.length).toFixed(2));
+      rating.sportsmanshipAverage = Number((totals.sportsmanship / votes.length).toFixed(2));
+      rating.teamworkAverage = Number((totals.teamwork / votes.length).toFixed(2));
+      rating.skillAverage = Number((totals.skill / votes.length).toFixed(2));
+      rating.vibesAverage = Number((totals.vibes / votes.length).toFixed(2));
+    }
+
+    const history = await Promise.all(
+      attendedSessions
+        .sort((a, b) => {
+          const aTime = `${a.event_date || '9999-12-31'}T${a.start_time || '00:00:00'}`;
+          const bTime = `${b.event_date || '9999-12-31'}T${b.start_time || '00:00:00'}`;
+          return bTime.localeCompare(aTime);
+        })
+        .slice(0, 10)
+        .map(async (session) => ({
+          ...(await getSessionSummary(session.id)).data,
+          isEnded: isSessionEnded(session)
+        }))
+    );
+
+    return res.json({
+      success: true,
+      player: {
+        ...serializeUser(user),
+        phone: null,
+        joinedCount: joinedRsvps.length,
+        waitlistCount: waitlistRsvps.length,
+        hostedCount: hostedCount || 0,
+        ...rating,
+        history
+      }
+    });
+  } catch (error) {
+    console.error('Player profile error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load player profile.'
+    });
+  }
+});
+
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
 
@@ -1485,6 +1620,7 @@ app.get('/api/public/session/:sessionId/players', async (req, res) => {
         paymentAmountPaid: rsvp.paymentAmountPaid,
         createdAt: rsvp.createdAt,
         user: {
+          id: rsvp.kind === 'member' ? rsvp.user.id : null,
           displayName: rsvp.user.display_name,
           profileImageUrl: rsvp.user.profile_image_url
         }
