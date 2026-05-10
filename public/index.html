@@ -17,11 +17,12 @@
     <div class="w-full max-w-md bg-white min-h-screen relative" :class="selectedSessionId ? 'pb-32' : 'pb-24'" x-data="eventApp()" x-init="init()">
         <header class="sticky top-0 z-40 bg-white/95 px-5 py-4 backdrop-blur">
             <div class="flex items-center justify-between">
-                <button class="text-2xl text-gray-900" @click="handleBack()">
-                    <i class="fa-solid" :class="selectedSessionId || activeTab === 'playerDetail' ? 'fa-arrow-left' : 'fa-bars'"></i>
+                <button class="text-2xl text-gray-900" @click="selectedSessionId ? showEventList() : setTab('home')">
+                    <i class="fa-solid" :class="selectedSessionId ? 'fa-arrow-left' : 'fa-bars'"></i>
                 </button>
-                <div class="flex items-center justify-center">
-                    <img class="h-14 w-24 object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
+                <div class="text-center leading-none">
+                    <p class="text-3xl font-black italic tracking-tight text-gdsqNavy">GDSQ</p>
+                    <p class="-mt-1 text-xs font-black uppercase tracking-wide text-gdsqRed">Pickleball</p>
                 </div>
                 <button class="relative rounded-full border border-gray-200 px-3 py-2 text-xs font-black text-gray-700" @click="toggleLanguage()" x-text="language === 'th' ? 'EN' : 'ไทย'"></button>
             </div>
@@ -30,7 +31,7 @@
         <main x-show="!selectedSessionId" x-cloak>
             <section class="px-5">
                 <div class="overflow-hidden rounded-2xl bg-gradient-to-br from-orange-50 via-white to-blue-50 p-7 shadow-sm">
-                    <img class="mx-auto h-36 w-full object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
+                    <p class="text-4xl font-black italic tracking-tight text-gdsqRed">GDSQ</p>
                     <p class="mt-4 text-2xl font-black uppercase leading-tight text-gdsqNavy" x-text="t('heroLine1')">Good Game.</p>
                     <p class="text-2xl font-black uppercase leading-tight text-gdsqRed" x-text="t('heroLine2')">Good People.</p>
                     <button class="mt-6 rounded-lg bg-gdsq px-5 py-3 text-sm font-black text-white shadow-sm" @click="scrollToEvents()" x-text="t('joinFun')">Join the Fun!</button>
@@ -125,7 +126,7 @@
                 </div>
                 <div class="space-y-3">
                     <template x-for="player in players" :key="player.id">
-                        <button class="flex w-full items-center justify-between rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
+                        <article class="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm">
                             <div class="flex min-w-0 items-center gap-3">
                                 <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
                                 <div class="min-w-0">
@@ -137,7 +138,7 @@
                                 <p class="text-lg font-black text-gdsq" x-text="player.joinedCount"></p>
                                 <p class="text-[10px] font-bold uppercase text-gray-500" x-text="t('joined')"></p>
                             </div>
-                        </button>
+                        </article>
                     </template>
                 </div>
                 <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="players.length === 0" x-text="t('noPlayers')"></p>
@@ -148,99 +149,19 @@
                     <h1 class="text-xl font-black" x-text="t('rankings')">Rankings</h1>
                     <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
                 </div>
-                <div class="mb-4 space-y-3">
-                    <div class="grid grid-cols-3 gap-2 rounded-xl bg-gray-100 p-1">
-                        <template x-for="period in rankingPeriods" :key="period">
-                            <button class="rounded-lg px-3 py-2 text-xs font-black" :class="rankingPeriod === period ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
-                        </template>
-                    </div>
-                    <div class="flex gap-2 overflow-x-auto pb-1">
-                        <template x-for="category in rankingCategories" :key="category">
-                            <button class="shrink-0 rounded-full px-3 py-2 text-xs font-black" :class="rankingCategory === category ? 'bg-gdsq text-white' : 'bg-gray-100 text-gray-600'" @click="rankingCategory = category; loadRankings()" x-text="rankingCategoryLabel(category)"></button>
-                        </template>
-                    </div>
-                </div>
                 <div class="space-y-3">
                     <template x-for="(player, index) in rankings" :key="player.id">
-                        <button class="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
+                        <article class="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
                             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gdsq text-lg font-black text-white" x-text="index + 1"></div>
                             <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
                             <div class="min-w-0 flex-1">
                                 <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
-                                <p class="text-xs font-semibold text-gray-500">
-                                    <span x-text="player.categoryAverage ? `${player.categoryAverage}/5 · ` : ''"></span>
-                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votes')"></span> ·
-                                    <span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span>
-                                </p>
+                                <p class="text-xs font-semibold text-gray-500"><span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span></p>
                             </div>
-                            <i class="fa-solid fa-chevron-right text-gray-300"></i>
-                        </button>
+                        </article>
                     </template>
                 </div>
                 <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankings.length === 0" x-text="t('noRankings')"></p>
-            </section>
-
-            <section class="mt-7 px-5" x-show="activeTab === 'playerDetail'" x-cloak>
-                <div class="rounded-2xl bg-white p-5 text-center shadow-sm">
-                    <img class="mx-auto h-24 w-24 rounded-full border-4 border-blue-50 object-cover" :src="playerAvatar(selectedPlayer)" alt="">
-                    <h1 class="mt-3 text-2xl font-black" x-text="selectedPlayer.displayName || 'Player'">Player</h1>
-                    <p class="mt-1 text-sm font-semibold text-gray-500" x-text="selectedPlayer.ratingAverage ? `${selectedPlayer.ratingAverage}/5 · ${selectedPlayer.voteCount} ${t('votes')}` : t('noVotesYet')"></p>
-                    <div class="mt-5 grid grid-cols-3 gap-3">
-                        <div class="rounded-xl bg-blue-50 p-3">
-                            <p class="text-2xl font-black text-gdsq" x-text="selectedPlayer.joinedCount || 0"></p>
-                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('joined')"></p>
-                        </div>
-                        <div class="rounded-xl bg-red-50 p-3">
-                            <p class="text-2xl font-black text-gdsqRed" x-text="selectedPlayer.voteCount || 0"></p>
-                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('votes')"></p>
-                        </div>
-                        <div class="rounded-xl bg-gray-50 p-3">
-                            <p class="text-2xl font-black text-gray-900" x-text="selectedPlayer.hostedCount || 0"></p>
-                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('hosted')"></p>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex flex-wrap justify-center gap-2" x-show="(selectedPlayer.badges || []).length > 0">
-                        <template x-for="badge in selectedPlayer.badges" :key="badge.key">
-                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-gdsq" x-text="badge.label"></span>
-                        </template>
-                    </div>
-                </div>
-
-                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-                    <h2 class="font-black" x-text="t('scoreBreakdown')">คะแนนแยกหัวข้อ</h2>
-                    <div class="mt-3 space-y-3">
-                        <template x-for="item in playerScoreRows()" :key="item.label">
-                            <div>
-                                <div class="mb-1 flex items-center justify-between text-sm">
-                                    <span class="font-black" x-text="item.label"></span>
-                                    <span class="font-black text-gdsq" x-text="item.value ? `${item.value}/5` : '-'"></span>
-                                </div>
-                                <div class="h-2 overflow-hidden rounded-full bg-gray-100">
-                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.value ? (item.value / 5) * 100 : 0}%`"></div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-                    <h2 class="font-black" x-text="t('eventHistory')">ประวัติกิจกรรม</h2>
-                    <div class="mt-3 space-y-3" x-show="(selectedPlayer.history || []).length > 0">
-                        <template x-for="session in selectedPlayer.history" :key="session.id">
-                            <button class="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-3 text-left" @click="selectSession(session.id)">
-                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gdsq text-white">
-                                    <span class="text-[10px] font-black uppercase" x-text="monthText(session.eventDate)"></span>
-                                    <span class="text-xl font-black leading-none" x-text="dayText(session.eventDate)"></span>
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
-                                    <p class="text-xs font-semibold text-gray-500" x-text="`${timeRange(session)} · ${session.location || t('locationTba')}`"></p>
-                                </div>
-                            </button>
-                        </template>
-                    </div>
-                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(selectedPlayer.history || []).length" x-text="t('noHistory')"></p>
-                </div>
             </section>
 
             <section class="mt-7 px-5" x-show="activeTab === 'create'" x-cloak>
@@ -344,45 +265,6 @@
                         <div class="rounded-xl p-3 text-sm font-semibold" x-show="profileMessage" :class="profileMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="profileMessage"></div>
                     </div>
                 </div>
-
-                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <h2 class="font-black" x-text="t('pendingVotes')">รอโหวต</h2>
-                        <button class="text-xs font-black text-gdsq" @click="loadProfileHistory()" x-text="t('refresh')">Refresh</button>
-                    </div>
-                    <div class="mt-3 space-y-3" x-show="pendingVotes.length > 0">
-                        <template x-for="session in pendingVotes" :key="session.id">
-                            <button class="flex w-full items-center justify-between rounded-xl bg-blue-50 p-3 text-left" @click="selectSession(session.id)">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
-                                    <p class="text-xs font-semibold text-gray-500" x-text="`${dateShort(session.eventDate)} · ${timeRange(session)}`"></p>
-                                </div>
-                                <span class="rounded-lg bg-gdsq px-3 py-2 text-xs font-black text-white" x-text="t('voteNow')">โหวต</span>
-                            </button>
-                        </template>
-                    </div>
-                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="pendingVotes.length === 0" x-text="t('noPendingVotes')">ยังไม่มีกิจกรรมที่รอโหวต</p>
-                </div>
-
-                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
-                    <h2 class="font-black" x-text="t('eventHistory')">ประวัติกิจกรรม</h2>
-                    <div class="mt-3 space-y-3" x-show="profileHistory.length > 0">
-                        <template x-for="session in profileHistory" :key="session.id">
-                            <button class="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-3 text-left" @click="selectSession(session.id)">
-                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gdsq text-white">
-                                    <span class="text-[10px] font-black uppercase" x-text="monthText(session.eventDate)"></span>
-                                    <span class="text-xl font-black leading-none" x-text="dayText(session.eventDate)"></span>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
-                                    <p class="text-xs font-semibold text-gray-500" x-text="session.isEnded ? t('endedEvent') : t('upcomingEvent')"></p>
-                                </div>
-                                <span class="rounded-full px-2 py-1 text-[10px] font-black" :class="session.votePending ? 'bg-blue-50 text-gdsq' : 'bg-gray-100 text-gray-500'" x-text="session.votePending ? t('voteNow') : statusLabel(session.rsvpStatus || 'Joined')"></span>
-                            </button>
-                        </template>
-                    </div>
-                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="profileHistory.length === 0" x-text="t('noHistory')">ยังไม่มีประวัติ</p>
-                </div>
             </section>
         </main>
 
@@ -391,7 +273,8 @@
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100">
                     <img class="aspect-square w-full object-cover" x-show="posterUrl" :src="imageUrl(posterUrl)" :alt="sessionTitle">
                     <div class="aspect-square w-full bg-gradient-to-br from-orange-50 via-white to-blue-50 p-8" x-show="!posterUrl">
-                        <img class="h-full w-full object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
+                        <p class="text-center text-6xl font-black italic text-gdsqRed">GDSQ</p>
+                        <p class="mt-6 text-center text-5xl font-black italic text-gdsqRed">PICKLEBALL</p>
                     </div>
                     <div class="absolute left-4 top-4 rounded-lg bg-gdsq px-4 py-2 text-xs font-black uppercase text-white" x-text="skillLevel || t('socialPlay')">Social Play</div>
                     <div class="absolute right-4 top-4 rounded-lg bg-white/95 px-4 py-2 text-sm font-black text-gray-800">
@@ -456,7 +339,7 @@
                     </div>
                 </div>
 
-                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="!userStatus && !eventEnded">
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="!userStatus">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <h2 class="text-base font-black" x-text="t('rsvpGroupTitle')">Join with friends</h2>
@@ -509,9 +392,7 @@
                     <div class="mt-4 grid grid-cols-4 gap-4 text-center" x-show="joinedPlayers.length > 0">
                         <template x-for="player in joinedPlayers" :key="player.id">
                             <div class="min-w-0">
-                                <button class="mx-auto block" @click="player.user.id && openPlayerProfile(player.user.id)">
-                                    <img class="h-14 w-14 rounded-full border-2 border-gdsq object-cover" :src="rsvpAvatar(player)" alt="">
-                                </button>
+                                <img class="mx-auto h-14 w-14 rounded-full border-2 border-gdsq object-cover" :src="rsvpAvatar(player)" alt="">
                                 <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
                                 <p class="truncate text-[10px] font-semibold text-gray-400" x-show="player.kind === 'guest'" x-text="`${t('addedBy')} ${player.addedBy?.displayName || ''}`"></p>
                                 <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" :class="paymentStatusClass(player.paymentStatus)" x-text="paymentStatusLabel(player.paymentStatus)"></span>
@@ -529,63 +410,10 @@
                     <div class="mt-4 grid grid-cols-4 gap-4 text-center">
                         <template x-for="player in waitlistPlayers" :key="player.id">
                             <div class="min-w-0">
-                                <button class="mx-auto block" @click="player.user.id && openPlayerProfile(player.user.id)">
-                                    <img class="h-14 w-14 rounded-full object-cover" :src="rsvpAvatar(player)" alt="">
-                                </button>
+                                <img class="mx-auto h-14 w-14 rounded-full object-cover" :src="rsvpAvatar(player)" alt="">
                                 <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
                                 <p class="truncate text-[10px] font-semibold text-gray-400" x-show="player.kind === 'guest'" x-text="`${t('addedBy')} ${player.addedBy?.displayName || ''}`"></p>
                                 <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" :class="paymentStatusClass(player.paymentStatus)" x-text="paymentStatusLabel(player.paymentStatus)"></span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div id="vote-panel" class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="eventEnded" x-cloak>
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <h2 class="text-base font-black" x-text="t('eventEnded')">กิจกรรมจบแล้ว</h2>
-                            <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('voteHelp')">ให้คะแนนเพื่อนร่วมกิจกรรมเพื่อทำ Ranking</p>
-                        </div>
-                        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-600" x-text="votePlayers.length + ' ' + t('players')"></span>
-                    </div>
-
-                    <div class="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-gdsq" x-show="!canVote" x-text="t('voteOnlyJoined')"></div>
-
-                    <div class="mt-4 space-y-3" x-show="canVote">
-                        <select class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-black" x-model="selectedVoteUserId" @change="applySelectedVote()">
-                            <option value="" x-text="t('choosePlayerToVote')">เลือกผู้เล่นที่จะโหวต</option>
-                            <template x-for="player in votePlayers.filter((item) => !item.isSelf)" :key="player.id">
-                                <option :value="player.id" x-text="player.displayName"></option>
-                            </template>
-                        </select>
-
-                        <div class="space-y-3" x-show="selectedVoteUserId">
-                            <template x-for="field in voteFields" :key="field.key">
-                                <div class="rounded-xl border border-gray-100 p-3">
-                                    <div class="mb-2 flex items-center justify-between gap-3">
-                                        <p class="text-sm font-black" x-text="t(field.labelKey)"></p>
-                                        <p class="text-sm font-black text-gdsq"><span x-text="voteForm[field.key]"></span>/5</p>
-                                    </div>
-                                    <input class="w-full accent-gdsq" type="range" min="1" max="5" step="1" x-model.number="voteForm[field.key]">
-                                </div>
-                            </template>
-                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="voteForm.note" :placeholder="t('voteNote')"></textarea>
-                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="submitVote()" :disabled="isLoading">
-                                <span x-show="!isLoading" x-text="t('submitVote')">ส่งคะแนน</span>
-                                <span x-show="isLoading" x-text="t('saving')">กำลังบันทึก...</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 space-y-2" x-show="voteSummary.length > 0">
-                        <h3 class="text-sm font-black" x-text="t('voteResults')">ผลโหวต</h3>
-                        <template x-for="summary in sortedVoteSummary()" :key="summary.votedUserId">
-                            <div class="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-black" x-text="votePlayerName(summary.votedUserId)"></p>
-                                    <p class="text-xs font-semibold text-gray-500"><span x-text="summary.voteCount"></span> <span x-text="t('votes')"></span></p>
-                                </div>
-                                <p class="text-lg font-black text-gdsq"><span x-text="summary.totalAverage"></span>/5</p>
                             </div>
                         </template>
                     </div>
@@ -658,16 +486,12 @@
                         <p class="text-2xl font-black text-gdsq"><span x-text="spotsLeft">0</span> <span class="text-base text-gray-400">/ <span x-text="maxPlayers">0</span></span></p>
                         <p class="text-[11px] font-bold text-gray-500" x-show="!userStatus && totalRsvpSpots > 1">+ <span x-text="totalRsvpSpots - 1"></span> <span x-text="t('friends')">friends</span></p>
                     </div>
-                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white disabled:opacity-50" x-show="!userStatus && !eventEnded" @click="confirmRsvp()" :disabled="isLoading || !lineUid">
+                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white disabled:opacity-50" x-show="!userStatus" @click="confirmRsvp()" :disabled="isLoading || !lineUid">
                         <span x-show="!isLoading" x-text="totalRsvpSpots > 1 ? `${t('confirmRsvp')} (${totalRsvpSpots})` : t('confirmRsvp')">Confirm RSVP</span>
                         <span x-show="isLoading" x-text="t('confirming')">Confirming...</span>
                         <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
                     </button>
-                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white" x-show="eventEnded" @click="loadVotes(); document.getElementById('vote-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
-                        <span x-text="t('voteNow')">โหวต</span>
-                        <i class="fa-solid fa-star"></i>
-                    </button>
-                    <button class="rounded-xl border border-gray-300 bg-white px-5 py-4 text-sm font-black text-gray-700" x-show="userStatus && !eventEnded" @click="cancelRsvp()" :disabled="isLoading || !lineUid">
+                    <button class="rounded-xl border border-gray-300 bg-white px-5 py-4 text-sm font-black text-gray-700" x-show="userStatus" @click="cancelRsvp()" :disabled="isLoading || !lineUid">
                         <span x-text="userStatus ? statusLabel(userStatus) : ''"></span>
                         <span class="ml-2 text-gray-400" x-text="t('cancel')">Cancel</span>
                     </button>
@@ -704,61 +528,18 @@
             }
         }
 
-        function initialPlayerId() {
-            return new URLSearchParams(window.location.search).get('playerId') || '';
-        }
-
         function eventApp() {
-            const initialPlayerProfileId = initialPlayerId();
             return {
                 lineUid: null,
                 liffId: '',
                 displayName: null,
-                activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
+                activeTab: 'home',
                 sessions: [],
                 players: [],
                 rankings: [],
-                rankingPeriod: 'month',
-                rankingCategory: 'overall',
-                rankingPeriods: ['week', 'month', 'all'],
-                rankingCategories: ['overall', 'mvp', 'sportsmanship', 'teamwork', 'skill', 'vibes'],
-                profileHistory: [],
-                pendingVotes: [],
-                selectedPlayer: {
-                    id: '',
-                    displayName: '',
-                    profileImageUrl: '',
-                    joinedCount: 0,
-                    voteCount: 0,
-                    hostedCount: 0,
-                    badges: [],
-                    history: []
-                },
-                previousTab: 'players',
                 sessionPlayers: [],
-                votePlayers: [],
-                voteSummary: [],
-                myVotes: [],
-                canVote: false,
-                selectedVoteUserId: '',
-                voteFields: [
-                    { key: 'mvpScore', labelKey: 'voteMvp' },
-                    { key: 'sportsmanshipScore', labelKey: 'voteSportsmanship' },
-                    { key: 'teamworkScore', labelKey: 'voteTeamwork' },
-                    { key: 'skillScore', labelKey: 'voteSkill' },
-                    { key: 'vibesScore', labelKey: 'voteVibes' }
-                ],
-                voteForm: {
-                    mvpScore: 5,
-                    sportsmanshipScore: 5,
-                    teamworkScore: 5,
-                    skillScore: 5,
-                    vibesScore: 5,
-                    note: ''
-                },
                 guestNames: [],
                 selectedSessionId: initialSessionId(),
-                initialPlayerProfileId,
                 profile: {
                     displayName: '',
                     phone: '',
@@ -827,7 +608,6 @@
                 paymentAccountNumber: '',
                 paymentPromptPayId: '',
                 courtCount: 1,
-                eventEnded: false,
                 maxPlayers: 0,
                 joinedCount: 0,
                 waitlistCount: 0,
@@ -982,36 +762,7 @@
                         paymentSubmitted: 'แจ้งชำระแล้ว',
                         paymentPaid: 'ชำระแล้ว',
                         paymentSubmitFailed: 'แจ้งชำระเงินไม่สำเร็จ',
-                        paymentSubmittedMessage: 'ส่งสลิปแล้ว รอ Admin ตรวจ',
-                        pendingVotes: 'กิจกรรมที่รอโหวต',
-                        voteNow: 'ให้คะแนน',
-                        noPendingVotes: 'ยังไม่มีกิจกรรมที่รอโหวต',
-                        eventHistory: 'ประวัติกิจกรรม',
-                        noHistory: 'ยังไม่มีประวัติกิจกรรม',
-                        hosted: 'จัดงาน',
-                        scoreBreakdown: 'คะแนนแยกหัวข้อ',
-                        noVotesYet: 'ยังไม่มีคะแนนโหวต',
-                        thisWeek: 'สัปดาห์นี้',
-                        thisMonth: 'เดือนนี้',
-                        allTime: 'ทั้งหมด',
-                        overall: 'รวม',
-                        endedEvent: 'จบแล้ว',
-                        upcomingEvent: 'กำลังจะมาถึง',
-                        eventEnded: 'กิจกรรมจบแล้ว',
-                        voteHelp: 'ให้คะแนนเพื่อนร่วมกิจกรรมเพื่อทำ Ranking',
-                        voteOnlyJoined: 'โหวตได้เฉพาะผู้เล่นที่เข้าร่วมกิจกรรมนี้ และหลังจบกิจกรรมเท่านั้น',
-                        choosePlayerToVote: 'เลือกผู้เล่นที่จะโหวต',
-                        voteMvp: 'MVP / ผู้เล่นยอดเยี่ยม',
-                        voteSportsmanship: 'น้ำใจนักกีฬา',
-                        voteTeamwork: 'เล่นเป็นทีม',
-                        voteSkill: 'ฝีมือ',
-                        voteVibes: 'Good Vibes',
-                        voteNote: 'คอมเมนต์สั้นๆ (ไม่บังคับ)',
-                        submitVote: 'ส่งคะแนน',
-                        voteSaved: 'บันทึกคะแนนแล้ว',
-                        voteFailed: 'บันทึกคะแนนไม่สำเร็จ',
-                        voteResults: 'ผลโหวต',
-                        votes: 'โหวต'
+                        paymentSubmittedMessage: 'ส่งสลิปแล้ว รอ Admin ตรวจ'
                     },
                     en: {
                         heroLine1: 'Good Game.',
@@ -1136,36 +887,7 @@
                         paymentSubmitted: 'Submitted',
                         paymentPaid: 'Paid',
                         paymentSubmitFailed: 'Unable to submit payment',
-                        paymentSubmittedMessage: 'Slip submitted. Waiting for admin review.',
-                        pendingVotes: 'Pending Votes',
-                        voteNow: 'Vote',
-                        noPendingVotes: 'No pending votes',
-                        eventHistory: 'Event History',
-                        noHistory: 'No event history yet',
-                        hosted: 'Hosted',
-                        scoreBreakdown: 'Score breakdown',
-                        noVotesYet: 'No votes yet',
-                        thisWeek: 'This Week',
-                        thisMonth: 'This Month',
-                        allTime: 'All Time',
-                        overall: 'Overall',
-                        endedEvent: 'Ended',
-                        upcomingEvent: 'Upcoming',
-                        eventEnded: 'Event ended',
-                        voteHelp: 'Rate players from this event for rankings.',
-                        voteOnlyJoined: 'Only joined players can vote after the event ends.',
-                        choosePlayerToVote: 'Choose a player to vote',
-                        voteMvp: 'MVP / Best Player',
-                        voteSportsmanship: 'Sportsmanship',
-                        voteTeamwork: 'Team Player',
-                        voteSkill: 'Skill',
-                        voteVibes: 'Good Vibes',
-                        voteNote: 'Short note (optional)',
-                        submitVote: 'Submit Vote',
-                        voteSaved: 'Vote saved',
-                        voteFailed: 'Unable to save vote',
-                        voteResults: 'Vote Results',
-                        votes: 'votes'
+                        paymentSubmittedMessage: 'Slip submitted. Waiting for admin review.'
                     }
                 },
 
@@ -1182,20 +904,6 @@
                     document.getElementById('events').scrollIntoView({ behavior: 'smooth' });
                 },
 
-                handleBack() {
-                    if (this.selectedSessionId) {
-                        this.showEventList();
-                        return;
-                    }
-
-                    if (this.activeTab === 'playerDetail') {
-                        this.setTab(this.previousTab || 'players');
-                        return;
-                    }
-
-                    this.setTab('home');
-                },
-
                 setTab(tab) {
                     this.activeTab = tab;
                     this.selectedSessionId = '';
@@ -1204,10 +912,7 @@
 
                     if (tab === 'players') this.loadPlayers();
                     if (tab === 'rankings') this.loadRankings();
-                    if (tab === 'profile') {
-                        this.loadProfile();
-                        this.loadProfileHistory();
-                    }
+                    if (tab === 'profile') this.loadProfile();
                     if (tab === 'create' && !this.lineUid) {
                         this.createMessageType = 'error';
                         this.createMessage = this.t('lineLoginRequired');
@@ -1247,7 +952,6 @@
                     try {
                         await this.loadSessions();
                         if (this.selectedSessionId) await this.loadSession();
-                        if (this.initialPlayerProfileId) await this.openPlayerProfile(this.initialPlayerProfileId);
 
                         const configResponse = await fetch('/api/config');
                         const config = await configResponse.json();
@@ -1273,7 +977,6 @@
                         this.statusMessage = `${this.t('loggedIn')}: ${this.displayName}`;
                         await this.saveProfile(true);
                         await this.loadProfile();
-                        await this.loadProfileHistory();
                         await this.loadSessions();
                         if (this.selectedSessionId) await this.loadSession();
                         this.startAutoRefresh();
@@ -1300,74 +1003,9 @@
                 },
 
                 async loadRankings() {
-                    const params = new URLSearchParams({
-                        period: this.rankingPeriod,
-                        category: this.rankingCategory
-                    });
-                    const response = await fetch(`/api/rankings?${params.toString()}`);
+                    const response = await fetch('/api/rankings');
                     const result = await response.json();
                     if (response.ok) this.rankings = result.rankings || [];
-                },
-
-                rankingPeriodLabel(period) {
-                    if (period === 'week') return this.t('thisWeek');
-                    if (period === 'month') return this.t('thisMonth');
-                    return this.t('allTime');
-                },
-
-                rankingCategoryLabel(category) {
-                    const labels = {
-                        overall: this.t('overall'),
-                        mvp: 'MVP',
-                        sportsmanship: this.t('voteSportsmanship'),
-                        teamwork: this.t('voteTeamwork'),
-                        skill: this.t('voteSkill'),
-                        vibes: this.t('voteVibes')
-                    };
-                    return labels[category] || category;
-                },
-
-                async openPlayerProfile(playerId) {
-                    if (!playerId) return;
-
-                    this.previousTab = this.selectedSessionId ? 'events' : (this.activeTab === 'playerDetail' ? this.previousTab : this.activeTab);
-                    this.selectedSessionId = '';
-                    this.activeTab = 'playerDetail';
-                    this.isLoading = true;
-                    this.statusMessage = '';
-
-                    try {
-                        const response = await fetch(`/api/players/${encodeURIComponent(playerId)}`);
-                        const result = await response.json();
-                        if (!response.ok) throw new Error(result.message || 'Unable to load player');
-                        this.selectedPlayer = result.player || {};
-                        window.history.pushState({}, '', `/?playerId=${encodeURIComponent(playerId)}`);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                    } catch (error) {
-                        this.statusMessage = error.message || 'Unable to load player';
-                        this.activeTab = this.previousTab || 'players';
-                    } finally {
-                        this.isLoading = false;
-                    }
-                },
-
-                playerScoreRows() {
-                    return [
-                        { label: this.t('voteMvp'), value: this.selectedPlayer.mvpAverage },
-                        { label: this.t('voteSportsmanship'), value: this.selectedPlayer.sportsmanshipAverage },
-                        { label: this.t('voteTeamwork'), value: this.selectedPlayer.teamworkAverage },
-                        { label: this.t('voteSkill'), value: this.selectedPlayer.skillAverage },
-                        { label: this.t('voteVibes'), value: this.selectedPlayer.vibesAverage }
-                    ];
-                },
-
-                async loadProfileHistory() {
-                    if (!this.lineUid) return;
-                    const response = await fetch(`/api/profile/history?lineUid=${encodeURIComponent(this.lineUid)}`);
-                    const result = await response.json();
-                    if (!response.ok) return;
-                    this.profileHistory = result.attended || [];
-                    this.pendingVotes = result.pendingVotes || [];
                 },
 
                 resetCreateEventForm() {
@@ -1564,11 +1202,7 @@
                     this.waitlistCount = session.waitlistCount;
                     this.spotsLeft = session.spotsLeft;
                     this.userStatus = session.userStatus;
-                    this.eventEnded = this.isEventEnded(session);
-                    this.selectedVoteUserId = '';
-                    this.resetVoteForm();
                     if (this.userStatus && this.lineUid) this.loadPayment();
-                    if (this.eventEnded && this.lineUid) this.loadVotes();
                 },
 
                 async selectSession(sessionId) {
@@ -1640,24 +1274,10 @@
                     return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date(`${value}T00:00:00`));
                 },
 
-                dateShort(value) {
-                    if (!value) return this.t('dateTba');
-                    return new Intl.DateTimeFormat(this.language === 'th' ? 'th-TH' : 'en-US', {
-                        month: 'short',
-                        day: 'numeric'
-                    }).format(new Date(`${value}T00:00:00`));
-                },
-
                 timeRange(session) {
                     const start = session.startTime ? session.startTime.slice(0, 5) : this.t('timeTba');
                     const end = session.endTime ? ` - ${session.endTime.slice(0, 5)}` : '';
                     return `${start}${end}`;
-                },
-
-                isEventEnded(session) {
-                    if (!session?.eventDate) return false;
-                    const endTime = session.endTime || '23:59:59';
-                    return new Date(`${session.eventDate}T${endTime}+07:00`).getTime() < Date.now();
                 },
 
                 courtText(session) {
@@ -1707,82 +1327,6 @@
 
                 statusLabel(status) {
                     return status === 'Joined' ? this.t('confirmed') : this.t('waitlisted');
-                },
-
-                resetVoteForm() {
-                    this.voteForm = {
-                        mvpScore: 5,
-                        sportsmanshipScore: 5,
-                        teamworkScore: 5,
-                        skillScore: 5,
-                        vibesScore: 5,
-                        note: ''
-                    };
-                },
-
-                applySelectedVote() {
-                    this.resetVoteForm();
-                    const existingVote = this.myVotes.find((vote) => vote.votedUserId === this.selectedVoteUserId);
-                    if (!existingVote) return;
-
-                    this.voteForm = {
-                        mvpScore: existingVote.mvpScore || 5,
-                        sportsmanshipScore: existingVote.sportsmanshipScore || 5,
-                        teamworkScore: existingVote.teamworkScore || 5,
-                        skillScore: existingVote.skillScore || 5,
-                        vibesScore: existingVote.vibesScore || 5,
-                        note: existingVote.note || ''
-                    };
-                },
-
-                votePlayerName(userId) {
-                    return this.votePlayers.find((player) => player.id === userId)?.displayName || 'Player';
-                },
-
-                sortedVoteSummary() {
-                    return [...this.voteSummary].sort((a, b) => b.totalAverage - a.totalAverage || b.voteCount - a.voteCount);
-                },
-
-                async loadVotes() {
-                    if (!this.lineUid || !this.selectedSessionId) return;
-                    const response = await fetch(`/api/session/${this.selectedSessionId}/votes?lineUid=${encodeURIComponent(this.lineUid)}`);
-                    const result = await response.json();
-                    if (!response.ok) return;
-
-                    this.canVote = Boolean(result.canVote);
-                    this.votePlayers = result.players || [];
-                    this.myVotes = result.myVotes || [];
-                    this.voteSummary = result.voteSummary || [];
-                },
-
-                async submitVote() {
-                    if (!this.lineUid || !this.selectedSessionId || !this.selectedVoteUserId) return;
-
-                    this.isLoading = true;
-                    this.statusMessage = '';
-
-                    try {
-                        const response = await fetch(`/api/session/${this.selectedSessionId}/votes`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                lineUid: this.lineUid,
-                                votedUserId: this.selectedVoteUserId,
-                                ...this.voteForm
-                            })
-                        });
-                        const result = await response.json();
-
-                        if (!response.ok) throw new Error(result.message || this.t('voteFailed'));
-
-                        this.statusMessage = this.t('voteSaved');
-                        await this.loadVotes();
-                        await this.loadProfileHistory();
-                    } catch (error) {
-                        this.statusMessage = error.message || this.t('voteFailed');
-                    } finally {
-                        this.isLoading = false;
-                    }
                 },
 
                 resetPaymentForm() {
