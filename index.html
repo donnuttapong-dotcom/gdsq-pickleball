@@ -511,9 +511,27 @@
     </div>
 
     <script>
+        function initialSessionId() {
+            const params = new URLSearchParams(window.location.search);
+            const directSessionId = params.get('sessionId');
+            if (directSessionId) return directSessionId;
+
+            const liffState = params.get('liff.state');
+            if (!liffState) return '';
+
+            try {
+                const stateText = decodeURIComponent(liffState);
+                const queryText = stateText.includes('?') ? stateText.split('?').pop() : stateText.replace(/^\?/, '');
+                return new URLSearchParams(queryText).get('sessionId') || '';
+            } catch (error) {
+                return '';
+            }
+        }
+
         function eventApp() {
             return {
                 lineUid: null,
+                liffId: '',
                 displayName: null,
                 activeTab: 'home',
                 sessions: [],
@@ -521,7 +539,7 @@
                 rankings: [],
                 sessionPlayers: [],
                 guestNames: [],
-                selectedSessionId: new URLSearchParams(window.location.search).get('sessionId') || '',
+                selectedSessionId: initialSessionId(),
                 profile: {
                     displayName: '',
                     phone: '',
@@ -943,6 +961,7 @@
                             return;
                         }
 
+                        this.liffId = config.liffId;
                         await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: true });
 
                         if (!liff.isLoggedIn()) {
@@ -1195,7 +1214,11 @@
                 },
 
                 async shareEvent() {
-                    const url = `${window.location.origin}/?sessionId=${encodeURIComponent(this.selectedSessionId)}`;
+                    const version = Date.now();
+                    const webUrl = `${window.location.origin}/?sessionId=${encodeURIComponent(this.selectedSessionId)}&v=${version}`;
+                    const url = this.liffId
+                        ? `https://liff.line.me/${encodeURIComponent(this.liffId)}?sessionId=${encodeURIComponent(this.selectedSessionId)}&v=${version}`
+                        : webUrl;
                     const text = `${this.t('shareText')}: ${this.sessionTitle}`;
 
                     if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
