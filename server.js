@@ -108,22 +108,28 @@ function escapeCsvValue(value) {
 }
 
 function getBangkokDateString(date = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Bangkok',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
-  }).format(date);
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function addDaysToDateString(dateString, days) {
-  const date = new Date(`${dateString}T00:00:00+07:00`);
+  const [year, month, day] = String(dateString).split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
   date.setUTCDate(date.getUTCDate() + days);
-  return getBangkokDateString(date);
+  return date.toISOString().slice(0, 10);
 }
 
 function isPublicSessionVisible(session) {
   if (!session.event_date) return true;
+
+  // Keep an event visible for the whole event date in Thailand, then hide it the next day.
   return session.event_date >= getBangkokDateString();
 }
 
