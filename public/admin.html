@@ -70,6 +70,35 @@
             </div>
         </div>
 
+        <div class="mb-5 grid gap-3 md:grid-cols-4">
+            <div class="rounded-xl bg-gdsq p-4 text-white shadow-sm">
+                <p class="text-xs font-bold uppercase text-blue-100" x-text="t('upcomingEvents')">Upcoming</p>
+                <p class="mt-1 text-3xl font-black" x-text="upcomingSessions.length">0</p>
+            </div>
+            <div class="rounded-xl bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('endedEvents')">Ended</p>
+                <p class="mt-1 text-3xl font-black" x-text="endedSessions.length">0</p>
+            </div>
+            <div class="rounded-xl bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('pendingSlipReview')">Slip review</p>
+                <p class="mt-1 text-3xl font-black text-gdsq" x-text="submittedPaymentCount">0</p>
+            </div>
+            <div class="rounded-xl bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('unpaidPlayers')">Unpaid</p>
+                <p class="mt-1 text-3xl font-black text-gdsqRed" x-text="unpaidCount">0</p>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-xl bg-blue-50 p-4 text-sm text-blue-900">
+            <p class="font-black" x-text="t('adminWorkflowTitle')">วิธีใช้หลังบ้านแบบเร็ว</p>
+            <div class="mt-2 grid gap-2 md:grid-cols-4">
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">1.</span> <span x-text="t('adminStepCreate')">สร้างหรือเลือกกิจกรรม</span></div>
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">2.</span> <span x-text="t('adminStepShare')">คัดลอกลิงก์ส่งให้ผู้เล่น</span></div>
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">3.</span> <span x-text="t('adminStepPayment')">ตรวจสลิปและ Mark Paid</span></div>
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">4.</span> <span x-text="t('adminStepExport')">ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ</span></div>
+            </div>
+        </div>
+
         <div class="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
             <div class="rounded-lg bg-white p-4 shadow-sm">
                 <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('event')">Event</label>
@@ -397,6 +426,15 @@
                         checking: 'กำลังตรวจสอบ...',
                         rsvpAdmin: 'จัดการ RSVP',
                         adminSubtitle: 'ดูรายชื่อผู้เล่น Joined และ Waitlist จาก Supabase แบบ real-time',
+                        upcomingEvents: 'กิจกรรมที่ยังไม่จบ',
+                        endedEvents: 'กิจกรรมที่จบแล้ว',
+                        pendingSlipReview: 'รอตรวจสลิป',
+                        unpaidPlayers: 'ยังไม่จ่าย',
+                        adminWorkflowTitle: 'วิธีใช้หลังบ้านแบบเร็ว',
+                        adminStepCreate: 'สร้างหรือเลือกกิจกรรม',
+                        adminStepShare: 'คัดลอกลิงก์ส่งให้ผู้เล่น',
+                        adminStepPayment: 'ตรวจสลิปและกด Mark Paid',
+                        adminStepExport: 'ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ',
                         eventPage: 'หน้า Event',
                         refresh: 'รีเฟรช',
                         logout: 'ออกจากระบบ',
@@ -457,6 +495,15 @@
                         checking: 'Checking...',
                         rsvpAdmin: 'RSVP Admin',
                         adminSubtitle: 'View Joined and Waitlist players from Supabase in real time.',
+                        upcomingEvents: 'Upcoming events',
+                        endedEvents: 'Ended events',
+                        pendingSlipReview: 'Slip review',
+                        unpaidPlayers: 'Unpaid',
+                        adminWorkflowTitle: 'Quick admin workflow',
+                        adminStepCreate: 'Create or select an event',
+                        adminStepShare: 'Copy the event link for players',
+                        adminStepPayment: 'Review slips and mark paid',
+                        adminStepExport: 'Download CSV when needed',
                         eventPage: 'Event page',
                         refresh: 'Refresh',
                         logout: 'Logout',
@@ -540,6 +587,22 @@
 
                 get waitlistRsvps() {
                     return this.rsvps.filter((rsvp) => rsvp.status === 'Waitlist');
+                },
+
+                get upcomingSessions() {
+                    return this.sessions.filter((session) => !this.isSessionEnded(session));
+                },
+
+                get endedSessions() {
+                    return this.sessions.filter((session) => this.isSessionEnded(session));
+                },
+
+                get submittedPaymentCount() {
+                    return this.rsvps.filter((rsvp) => rsvp.kind === 'member' && rsvp.paymentStatus === 'Submitted').length;
+                },
+
+                get unpaidCount() {
+                    return this.rsvps.filter((rsvp) => rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid').length;
                 },
 
                 async init() {
@@ -793,6 +856,12 @@
                     if (status === 'Paid') return 'text-green-700';
                     if (status === 'Submitted') return 'text-gdsq';
                     return 'text-yellow-700';
+                },
+
+                isSessionEnded(session) {
+                    if (!session?.eventDate) return false;
+                    const endTime = session.endTime || '23:59:59';
+                    return new Date(`${session.eventDate}T${endTime}+07:00`).getTime() < Date.now();
                 },
 
                 async markPaid(rsvp) {
