@@ -189,32 +189,6 @@ function isPublicSessionVisible(session) {
   return session.event_date >= getBangkokDateString();
 }
 
-function isSessionEnded(session) {
-  if (!session || !session.event_date) return false;
-
-  const endTime = session.end_time || '23:59:59';
-  const eventEnd = new Date(`${session.event_date}T${endTime}+07:00`);
-  return eventEnd.getTime() < Date.now();
-}
-
-function voteAverage(vote) {
-  const scores = [
-    vote.mvp_score,
-    vote.sportsmanship_score,
-    vote.teamwork_score,
-    vote.skill_score,
-    vote.vibes_score
-  ].map(Number).filter((score) => Number.isFinite(score));
-
-  if (scores.length === 0) return 0;
-  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
-}
-
-function validateVoteScore(value) {
-  const score = Number(value);
-  return Number.isInteger(score) && score >= 1 && score <= 5;
-}
-
 function safeStorageFileName(name = 'slip.jpg') {
   const cleaned = String(name).replace(/[^a-z0-9._-]+/gi, '-').replace(/^-|-$/g, '');
   return cleaned || 'slip.jpg';
@@ -731,7 +705,7 @@ app.get('/', async (req, res) => {
     let meta = buildMetaTags({
       title: 'GDSQ Pickleball',
       description: 'GDSQ Good Game. Good People. Join the Fun!',
-      imageUrl: absoluteUrl(req, '/assets/gdsq-logo.png'),
+      imageUrl: '',
       url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
     });
 
@@ -751,7 +725,7 @@ app.get('/', async (req, res) => {
           priceText,
           spotsText
         ].filter(Boolean).join(' · ');
-        const imageUrl = absoluteUrl(req, publicImageUrl(session.poster_url) || '/assets/gdsq-logo.png');
+        const imageUrl = absoluteUrl(req, publicImageUrl(session.poster_url));
 
         meta = buildMetaTags({
           title,
@@ -860,123 +834,6 @@ app.put('/api/profile', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to save profile.'
-    });
-  }
-});
-
-app.get('/api/profile/history', async (req, res) => {
-  try {
-    const { lineUid } = req.query;
-
-    if (!lineUid) {
-      return res.status(400).json({
-        success: false,
-        message: 'lineUid is required.'
-      });
-    }
-
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select(userSelect)
-      .eq('line_uid', lineUid)
-      .maybeSingle();
-
-    if (userError) throw userError;
-
-    if (!user) {
-      return res.json({
-        success: true,
-        attended: [],
-        hosted: [],
-        pendingVotes: []
-      });
-    }
-
-    const { data: rsvps, error: rsvpError } = await supabase
-      .from('rsvps')
-      .select('session_id, status, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (rsvpError) throw rsvpError;
-
-    const attendedSessionIds = [...new Set((rsvps || []).map((rsvp) => rsvp.session_id))];
-    const rsvpBySessionId = Object.fromEntries((rsvps || []).map((rsvp) => [rsvp.session_id, rsvp]));
-    let attendedSessions = [];
-
-    if (attendedSessionIds.length > 0) {
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('sessions')
-        .select(sessionSelect)
-        .in('id', attendedSessionIds);
-
-      if (sessionsError) throw sessionsError;
-      attendedSessions = sessions || [];
-    }
-
-    const { data: hostedSessions, error: hostedError } = await supabase
-      .from('sessions')
-      .select(sessionSelect)
-      .eq('created_by_user_id', user.id)
-      .neq('status', 'Cancelled')
-      .order('event_date', { ascending: false, nullsFirst: false })
-      .order('start_time', { ascending: false, nullsFirst: false });
-
-    if (hostedError) throw hostedError;
-
-    let votedSessionIds = new Set();
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('session_id')
-      .eq('voter_user_id', user.id);
-
-    if (votesError && votesError.code !== '42P01') throw votesError;
-    if (!votesError) {
-      votedSessionIds = new Set((votes || []).map((vote) => vote.session_id));
-    }
-
-    const attended = await Promise.all(attendedSessions.map(async (session) => {
-      const summary = await getSessionSummary(session.id, lineUid);
-      const isEnded = isSessionEnded(session);
-      const votePending = isEnded
-        && rsvpBySessionId[session.id]?.status === 'Joined'
-        && !votedSessionIds.has(session.id);
-
-      return {
-        ...summary.data,
-        rsvpStatus: rsvpBySessionId[session.id]?.status || null,
-        isEnded,
-        votePending,
-        voted: votedSessionIds.has(session.id)
-      };
-    }));
-
-    const hosted = await Promise.all((hostedSessions || []).map(async (session) => {
-      const summary = await getSessionSummary(session.id, lineUid);
-      return {
-        ...summary.data,
-        isEnded: isSessionEnded(session)
-      };
-    }));
-
-    attended.sort((a, b) => {
-      const aTime = `${a.eventDate || '9999-12-31'}T${a.startTime || '00:00:00'}`;
-      const bTime = `${b.eventDate || '9999-12-31'}T${b.startTime || '00:00:00'}`;
-      return bTime.localeCompare(aTime);
-    });
-
-    return res.json({
-      success: true,
-      attended,
-      hosted,
-      pendingVotes: attended.filter((session) => session.votePending)
-    });
-  } catch (error) {
-    console.error('Profile history error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Unable to load profile history.'
     });
   }
 });
@@ -1124,38 +981,14 @@ app.get('/api/rankings', async (req, res) => {
       users = data || [];
     }
 
-    const ratingByUserId = {};
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('voted_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score');
-
-    if (votesError && votesError.code !== '42P01') {
-      throw votesError;
-    }
-
-    if (!votesError) {
-      for (const vote of votes || []) {
-        if (!ratingByUserId[vote.voted_user_id]) {
-          ratingByUserId[vote.voted_user_id] = { voteCount: 0, totalRating: 0 };
-        }
-
-        ratingByUserId[vote.voted_user_id].voteCount += 1;
-        ratingByUserId[vote.voted_user_id].totalRating += voteAverage(vote);
-      }
-    }
-
     return res.json({
       success: true,
       rankings: users
         .map((user) => ({
           ...serializeUser(user),
-          joinedCount: joinedByUserId[user.id] || 0,
-          voteCount: ratingByUserId[user.id]?.voteCount || 0,
-          ratingAverage: ratingByUserId[user.id]?.voteCount
-            ? Number((ratingByUserId[user.id].totalRating / ratingByUserId[user.id].voteCount).toFixed(2))
-            : null
+          joinedCount: joinedByUserId[user.id] || 0
         }))
-        .sort((a, b) => (b.ratingAverage || 0) - (a.ratingAverage || 0) || b.joinedCount - a.joinedCount)
+        .sort((a, b) => b.joinedCount - a.joinedCount)
     });
   } catch (error) {
     console.error('Rankings list error:', error);
@@ -1372,15 +1205,6 @@ app.delete('/api/sessions/:sessionId', requireAdmin, async (req, res) => {
       throw rsvpDeleteError;
     }
 
-    const { error: voteDeleteError } = await supabase
-      .from('event_player_votes')
-      .delete()
-      .eq('session_id', currentSession.id);
-
-    if (voteDeleteError && voteDeleteError.code !== '42P01') {
-      throw voteDeleteError;
-    }
-
     const { error: sessionDeleteError } = await supabase
       .from('sessions')
       .delete()
@@ -1496,248 +1320,6 @@ app.get('/api/public/session/:sessionId/players', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to load players.'
-    });
-  }
-});
-
-app.get('/api/session/:sessionId/votes', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const { lineUid } = req.query;
-
-    if (!lineUid) {
-      return res.status(400).json({
-        success: false,
-        message: 'lineUid is required.'
-      });
-    }
-
-    const { data, error } = await listSessionRsvps(sessionId);
-
-    if (error || !data) {
-      return res.status(404).json({
-        success: false,
-        message: 'Session not found.'
-      });
-    }
-
-    const { data: voter, error: voterError } = await supabase
-      .from('users')
-      .select(userSelect)
-      .eq('line_uid', lineUid)
-      .maybeSingle();
-
-    if (voterError) throw voterError;
-
-    const eligiblePlayers = data.rows
-      .filter((row) => row.kind === 'member' && row.status === 'Joined')
-      .map((row) => ({
-        id: row.user.id,
-        displayName: row.user.display_name,
-        profileImageUrl: row.user.profile_image_url,
-        isSelf: voter ? row.user.id === voter.id : false
-      }));
-
-    const voterJoined = voter
-      ? data.rows.some((row) => row.kind === 'member' && row.status === 'Joined' && row.user.id === voter.id)
-      : false;
-    const eventEnded = isSessionEnded(data.session);
-    let myVotes = [];
-    let voteSummary = [];
-
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('voted_user_id, voter_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score, note, created_at, updated_at')
-      .eq('session_id', data.session.id);
-
-    if (votesError && votesError.code !== '42P01') throw votesError;
-
-    if (!votesError) {
-      myVotes = (votes || [])
-        .filter((vote) => voter && vote.voter_user_id === voter.id)
-        .map((vote) => ({
-          votedUserId: vote.voted_user_id,
-          mvpScore: vote.mvp_score,
-          sportsmanshipScore: vote.sportsmanship_score,
-          teamworkScore: vote.teamwork_score,
-          skillScore: vote.skill_score,
-          vibesScore: vote.vibes_score,
-          note: vote.note || ''
-        }));
-
-      const summaryByUserId = {};
-      for (const vote of votes || []) {
-        if (!summaryByUserId[vote.voted_user_id]) {
-          summaryByUserId[vote.voted_user_id] = {
-            votedUserId: vote.voted_user_id,
-            voteCount: 0,
-            totalAverage: 0,
-            mvpAverage: 0,
-            sportsmanshipAverage: 0,
-            teamworkAverage: 0,
-            skillAverage: 0,
-            vibesAverage: 0
-          };
-        }
-
-        const summary = summaryByUserId[vote.voted_user_id];
-        summary.voteCount += 1;
-        summary.totalAverage += voteAverage(vote);
-        summary.mvpAverage += vote.mvp_score;
-        summary.sportsmanshipAverage += vote.sportsmanship_score;
-        summary.teamworkAverage += vote.teamwork_score;
-        summary.skillAverage += vote.skill_score;
-        summary.vibesAverage += vote.vibes_score;
-      }
-
-      voteSummary = Object.values(summaryByUserId).map((summary) => ({
-        ...summary,
-        totalAverage: Number((summary.totalAverage / summary.voteCount).toFixed(2)),
-        mvpAverage: Number((summary.mvpAverage / summary.voteCount).toFixed(2)),
-        sportsmanshipAverage: Number((summary.sportsmanshipAverage / summary.voteCount).toFixed(2)),
-        teamworkAverage: Number((summary.teamworkAverage / summary.voteCount).toFixed(2)),
-        skillAverage: Number((summary.skillAverage / summary.voteCount).toFixed(2)),
-        vibesAverage: Number((summary.vibesAverage / summary.voteCount).toFixed(2))
-      }));
-    }
-
-    return res.json({
-      success: true,
-      session: serializeSession(data.session),
-      canVote: Boolean(voter && voterJoined && eventEnded),
-      eventEnded,
-      voter: voter ? serializeUser(voter) : null,
-      players: eligiblePlayers,
-      myVotes,
-      voteSummary
-    });
-  } catch (error) {
-    console.error('Vote load error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Unable to load votes.'
-    });
-  }
-});
-
-app.post('/api/session/:sessionId/votes', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const {
-      lineUid,
-      votedUserId,
-      mvpScore,
-      sportsmanshipScore,
-      teamworkScore,
-      skillScore,
-      vibesScore,
-      note
-    } = req.body;
-
-    if (!lineUid || !votedUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'lineUid and votedUserId are required.'
-      });
-    }
-
-    const scoreValues = [mvpScore, sportsmanshipScore, teamworkScore, skillScore, vibesScore];
-    if (!scoreValues.every(validateVoteScore)) {
-      return res.status(400).json({
-        success: false,
-        message: 'All vote scores must be between 1 and 5.'
-      });
-    }
-
-    const { data, error } = await listSessionRsvps(sessionId);
-
-    if (error || !data) {
-      return res.status(404).json({
-        success: false,
-        message: 'Session not found.'
-      });
-    }
-
-    if (!isSessionEnded(data.session)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Voting opens after the event ends.'
-      });
-    }
-
-    const { data: voter, error: voterError } = await supabase
-      .from('users')
-      .select(userSelect)
-      .eq('line_uid', lineUid)
-      .maybeSingle();
-
-    if (voterError) throw voterError;
-    if (!voter) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found.'
-      });
-    }
-
-    if (voter.id === votedUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'You cannot vote for yourself.'
-      });
-    }
-
-    const voterJoined = data.rows.some((row) => row.kind === 'member' && row.status === 'Joined' && row.user.id === voter.id);
-    const targetJoined = data.rows.some((row) => row.kind === 'member' && row.status === 'Joined' && row.user.id === votedUserId);
-
-    if (!voterJoined || !targetJoined) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only joined players can vote for joined players.'
-      });
-    }
-
-    const { data: vote, error: voteError } = await supabase
-      .from('event_player_votes')
-      .upsert({
-        session_id: data.session.id,
-        voter_user_id: voter.id,
-        voted_user_id: votedUserId,
-        mvp_score: Number(mvpScore),
-        sportsmanship_score: Number(sportsmanshipScore),
-        teamwork_score: Number(teamworkScore),
-        skill_score: Number(skillScore),
-        vibes_score: Number(vibesScore),
-        note: note || null,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'session_id,voter_user_id,voted_user_id'
-      })
-      .select('id, voted_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score, note')
-      .single();
-
-    if (voteError) throw voteError;
-
-    return res.json({
-      success: true,
-      vote: {
-        id: vote.id,
-        votedUserId: vote.voted_user_id,
-        mvpScore: vote.mvp_score,
-        sportsmanshipScore: vote.sportsmanship_score,
-        teamworkScore: vote.teamwork_score,
-        skillScore: vote.skill_score,
-        vibesScore: vote.vibes_score,
-        note: vote.note || ''
-      },
-      message: 'Vote saved.'
-    });
-  } catch (error) {
-    console.error('Vote save error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Unable to save vote.'
     });
   }
 });
@@ -2248,16 +1830,6 @@ app.delete('/api/rsvp', async (req, res) => {
 
     if (existingRsvp.payment_slip_path) {
       await supabase.storage.from(paymentSlipBucket).remove([existingRsvp.payment_slip_path]);
-    }
-
-    const { error: voteDeleteError } = await supabase
-      .from('event_player_votes')
-      .delete()
-      .eq('session_id', session.id)
-      .or(`voter_user_id.eq.${user.id},voted_user_id.eq.${user.id}`);
-
-    if (voteDeleteError && voteDeleteError.code !== '42P01') {
-      throw voteDeleteError;
     }
 
     const { error: deleteError } = await supabase
