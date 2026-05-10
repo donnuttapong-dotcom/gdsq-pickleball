@@ -22,7 +22,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors());
 app.use(express.json({ limit: '12mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
@@ -105,6 +105,56 @@ function requireAdmin(req, res, next) {
 function escapeCsvValue(value) {
   const text = value === null || value === undefined ? '' : String(value);
   return `"${text.replace(/"/g, '""')}"`;
+}
+
+function escapeHtml(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function absoluteUrl(req, value) {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${req.protocol}://${req.get('host')}${value.startsWith('/') ? '' : '/'}${value}`;
+}
+
+function publicImageUrl(url) {
+  if (!url) return '';
+  const text = String(url).trim();
+  const driveMatch = text.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
+  if (driveMatch) {
+    return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w1200`;
+  }
+  return text;
+}
+
+function buildMetaTags({ title, description, imageUrl, url }) {
+  const safeTitle = escapeHtml(title || 'GDSQ Pickleball');
+  const safeDescription = escapeHtml(description || 'GDSQ Good Game. Good People. Join the Fun!');
+  const safeImage = escapeHtml(imageUrl || '');
+  const safeUrl = escapeHtml(url || '');
+  const imageTags = safeImage
+    ? `
+    <meta property="og:image" content="${safeImage}">
+    <meta property="og:image:secure_url" content="${safeImage}">
+    <meta name="twitter:image" content="${safeImage}">`
+    : '';
+
+  return `
+    <meta name="description" content="${safeDescription}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="${safeTitle}">
+    <meta property="og:description" content="${safeDescription}">
+    <meta property="og:url" content="${safeUrl}">
+    <meta property="og:site_name" content="GDSQ Pickleball">
+    ${imageTags}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${safeTitle}">
+    <meta name="twitter:description" content="${safeDescription}">`;
 }
 
 function getBangkokDateString(date = new Date()) {
@@ -639,6 +689,52 @@ app.get('/health', (req, res) => {
     service: 'gdsq-pickleball',
     status: 'ok'
   });
+});
+
+app.get('/', async (req, res) => {
+  try {
+    const htmlPath = path.join(__dirname, 'public', 'index.html');
+    const html = await require('fs').promises.readFile(htmlPath, 'utf8');
+    const sessionId = req.query.sessionId;
+    let meta = buildMetaTags({
+      title: 'GDSQ Pickleball',
+      description: 'GDSQ Good Game. Good People. Join the Fun!',
+      imageUrl: '',
+      url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
+    });
+
+    if (sessionId) {
+      const { data: session } = await findSession(sessionId);
+
+      if (session) {
+        const title = `${session.title} | GDSQ Pickleball`;
+        const dateText = session.event_date || '';
+        const timeText = session.start_time ? session.start_time.slice(0, 5) : '';
+        const priceText = session.price_thb === null || session.price_thb === undefined ? '' : `THB ${session.price_thb}`;
+        const spotsText = `${session.max_players || 0} spots`;
+        const description = [
+          dateText,
+          timeText,
+          session.location,
+          priceText,
+          spotsText
+        ].filter(Boolean).join(' · ');
+        const imageUrl = absoluteUrl(req, publicImageUrl(session.poster_url));
+
+        meta = buildMetaTags({
+          title,
+          description: description || session.description || 'Join this GDSQ Pickleball event.',
+          imageUrl,
+          url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
+        });
+      }
+    }
+
+    return res.send(html.replace('</head>', `${meta}\n</head>`));
+  } catch (error) {
+    console.error('Index render error:', error);
+    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
 });
 
 app.get('/admin', (req, res) => {
