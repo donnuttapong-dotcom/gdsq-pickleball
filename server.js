@@ -127,7 +127,7 @@ function publicImageUrl(url) {
   const text = String(url).trim();
   const driveMatch = text.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
   if (driveMatch) {
-    return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w1200`;
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}=w1200`;
   }
   return text;
 }
@@ -151,6 +151,7 @@ function buildMetaTags({ title, description, imageUrl, url }) {
     <meta property="og:description" content="${safeDescription}">
     <meta property="og:url" content="${safeUrl}">
     <meta property="og:site_name" content="GDSQ Pickleball">
+    <meta property="og:updated_time" content="${new Date().toISOString()}">
     ${imageTags}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${safeTitle}">
@@ -179,7 +180,12 @@ function addDaysToDateString(dateString, days) {
 function isPublicSessionVisible(session) {
   if (!session.event_date) return true;
 
-  // Keep an event visible for the whole event date in Thailand, then hide it the next day.
+  if (session.end_time) {
+    const eventEnd = new Date(`${session.event_date}T${session.end_time}+07:00`);
+    return eventEnd.getTime() >= Date.now();
+  }
+
+  // If no end time is set, keep an event visible for the whole event date in Thailand.
   return session.event_date >= getBangkokDateString();
 }
 
