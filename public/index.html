@@ -30,12 +30,7 @@
         <main x-show="!selectedSessionId" x-cloak>
             <section class="px-5">
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
-                    <img class="aspect-square w-full object-cover" src="/assets/gdsq-home-banner.png" alt="GDSQ Pickleball Club">
-                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent p-5">
-                        <p class="text-2xl font-black uppercase leading-tight text-white" x-text="t('heroLine1')">Good Game.</p>
-                        <p class="text-2xl font-black uppercase leading-tight text-white" x-text="t('heroLine2')">Good People.</p>
-                        <button class="mt-4 rounded-lg bg-gdsq px-5 py-3 text-sm font-black text-white shadow-sm" @click="scrollToEvents()" x-text="t('joinFun')">Join the Fun!</button>
-                    </div>
+                    <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
@@ -808,6 +803,7 @@
                 liffId: '',
                 displayName: null,
                 activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
+                homeBannerUrl: '/assets/gdsq-home-banner.png',
                 sessions: [],
                 players: [],
                 rankings: [],
@@ -1373,6 +1369,7 @@
 
                         const configResponse = await fetch('/api/config');
                         const config = await configResponse.json();
+                        this.homeBannerUrl = config.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
 
                         if (!config.liffId) {
                             this.statusMessage = this.t('liffMissing');

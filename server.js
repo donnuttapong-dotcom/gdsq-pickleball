@@ -29,6 +29,7 @@ const adminCookieName = 'gdsq_admin_session';
 const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, payment_qr_url, payment_bank_name, payment_account_name, payment_account_number, payment_promptpay_id, location, address, skill_level, description, poster_url, created_by_user_id, status, created_at';
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
+const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
 
 function parseCookies(cookieHeader = '') {
   return Object.fromEntries(
@@ -768,9 +769,61 @@ async function cleanupOldPaymentSlips() {
   }
 }
 
-app.get('/api/config', (req, res) => {
+async function getAppSettings() {
+  const fallbackSettings = {
+    homeBannerUrl: defaultHomeBannerUrl
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('key, value');
+
+    if (error) {
+      if (error.code === '42P01') return fallbackSettings;
+      throw error;
+    }
+
+    const settings = { ...fallbackSettings };
+    for (const row of data || []) {
+      if (row.key === 'home_banner_url') {
+        settings.homeBannerUrl = row.value || defaultHomeBannerUrl;
+      }
+    }
+
+    return settings;
+  } catch (error) {
+    console.error('App settings load error:', error);
+    return fallbackSettings;
+  }
+}
+
+async function saveAppSettings(settings) {
+  const homeBannerUrl = settings.homeBannerUrl || defaultHomeBannerUrl;
+
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert({
+      key: 'home_banner_url',
+      value: homeBannerUrl,
+      updated_at: new Date().toISOString()
+    }, {
+      onConflict: 'key'
+    });
+
+  if (error) throw error;
+
+  return {
+    homeBannerUrl
+  };
+}
+
+app.get('/api/config', async (req, res) => {
+  const settings = await getAppSettings();
+
   res.json({
-    liffId: process.env.LINE_LIFF_ID || ''
+    liffId: process.env.LINE_LIFF_ID || '',
+    settings
   });
 });
 
@@ -787,10 +840,11 @@ app.get('/', async (req, res) => {
     const htmlPath = path.join(__dirname, 'public', 'index.html');
     const html = await require('fs').promises.readFile(htmlPath, 'utf8');
     const sessionId = req.query.sessionId;
+    const appSettings = await getAppSettings();
     let meta = buildMetaTags({
       title: 'GDSQ Pickleball',
       description: 'GDSQ Good Game. Good People. Join the Fun!',
-      imageUrl: absoluteUrl(req, '/assets/gdsq-logo.png'),
+      imageUrl: absoluteUrl(req, publicImageUrl(appSettings.homeBannerUrl) || defaultHomeBannerUrl),
       url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
     });
 
@@ -1486,6 +1540,45 @@ app.post('/api/admin/logout', (req, res) => {
     success: true,
     message: 'Logged out.'
   });
+});
+
+app.get('/api/admin/settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await getAppSettings();
+
+    return res.json({
+      success: true,
+      settings
+    });
+  } catch (error) {
+    console.error('Admin settings load error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load settings.'
+    });
+  }
+});
+
+app.put('/api/admin/settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await saveAppSettings({
+      homeBannerUrl: req.body.homeBannerUrl
+    });
+
+    return res.json({
+      success: true,
+      settings,
+      message: 'Settings saved.'
+    });
+  } catch (error) {
+    console.error('Admin settings save error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to save settings. Please run migration-app-settings.sql first.'
+    });
+  }
 });
 
 app.get('/api/sessions', requireAdmin, async (req, res) => {

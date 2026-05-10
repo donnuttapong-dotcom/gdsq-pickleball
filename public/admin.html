@@ -99,6 +99,57 @@
             </div>
         </div>
 
+        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
+            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('appearance')">Appearance</p>
+                    <h2 class="text-xl font-black" x-text="t('homeBannerSettings')">Home Banner</h2>
+                    <p class="mt-1 text-sm text-gray-500" x-text="t('homeBannerHelp')">ปรับรูปแบนเนอร์หน้า Home ของแอพ</p>
+                </div>
+                <p class="rounded-full bg-gray-50 px-3 py-1 text-xs font-bold text-gray-600" x-show="settingsMessage" x-text="settingsMessage"></p>
+            </div>
+            <div class="grid gap-4 lg:grid-cols-[1fr_260px]">
+                <div class="space-y-3">
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold uppercase text-gray-500" x-text="t('homeBannerUrl')">Home banner image URL</span>
+                        <input
+                            class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-gdsq focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            type="url"
+                            x-model="appSettings.homeBannerUrl"
+                            :placeholder="t('homeBannerUrlPlaceholder')"
+                        >
+                    </label>
+                    <p class="text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeBannerDriveHelp')"></p>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <button
+                            class="inline-flex items-center justify-center rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                            @click="saveSettings()"
+                            :disabled="isLoading"
+                        >
+                            <i class="fa-solid fa-floppy-disk mr-2"></i><span x-text="t('saveBanner')">Save Banner</span>
+                        </button>
+                        <button
+                            class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold hover:bg-gray-50"
+                            @click="appSettings.homeBannerUrl = '/assets/gdsq-home-banner.png'"
+                        >
+                            <i class="fa-solid fa-rotate-left mr-2"></i><span x-text="t('useDefaultBanner')">Use default</span>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <p class="mb-2 text-xs font-bold uppercase text-gray-500" x-text="t('preview')">Preview</p>
+                    <div class="overflow-hidden rounded-2xl bg-gray-100 shadow-inner">
+                        <img
+                            class="aspect-square w-full object-cover"
+                            :src="imageUrl(appSettings.homeBannerUrl || '/assets/gdsq-home-banner.png')"
+                            alt="Home banner preview"
+                            @error="$event.target.src = '/assets/gdsq-home-banner.png'"
+                        >
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
             <div class="rounded-lg bg-white p-4 shadow-sm">
                 <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('event')">Event</label>
@@ -413,9 +464,13 @@
                 isAuthenticated: false,
                 formMessage: '',
                 editMessage: '',
+                settingsMessage: '',
                 errorMessage: '',
                 isLoading: false,
                 language: localStorage.getItem('gdsqLanguage') || 'th',
+                appSettings: {
+                    homeBannerUrl: '/assets/gdsq-home-banner.png'
+                },
 
                 translations: {
                     th: {
@@ -435,6 +490,17 @@
                         adminStepShare: 'คัดลอกลิงก์ส่งให้ผู้เล่น',
                         adminStepPayment: 'ตรวจสลิปและกด Mark Paid',
                         adminStepExport: 'ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ',
+                        appearance: 'หน้าตาแอพ',
+                        homeBannerSettings: 'แบนเนอร์หน้า Home',
+                        homeBannerHelp: 'เปลี่ยนรูปแบนเนอร์หลักหน้า Home ได้เอง ไม่ต้องแก้โค้ด',
+                        homeBannerUrl: 'ลิงก์รูปแบนเนอร์',
+                        homeBannerUrlPlaceholder: 'วางลิงก์รูป เช่น Google Drive หรือ URL รูปภาพ',
+                        homeBannerDriveHelp: 'ถ้าใช้ Google Drive: อัปโหลดรูป > Share > Anyone with the link > Copy link > วางที่ช่องนี้',
+                        preview: 'พรีวิว',
+                        saveBanner: 'บันทึกแบนเนอร์',
+                        useDefaultBanner: 'ใช้รูปเริ่มต้น',
+                        settingsSaved: 'บันทึกแบนเนอร์แล้ว',
+                        settingsFailed: 'บันทึกแบนเนอร์ไม่สำเร็จ',
                         eventPage: 'หน้า Event',
                         refresh: 'รีเฟรช',
                         logout: 'ออกจากระบบ',
@@ -504,6 +570,17 @@
                         adminStepShare: 'Copy the event link for players',
                         adminStepPayment: 'Review slips and mark paid',
                         adminStepExport: 'Download CSV when needed',
+                        appearance: 'Appearance',
+                        homeBannerSettings: 'Home Banner',
+                        homeBannerHelp: 'Change the main Home banner without editing code.',
+                        homeBannerUrl: 'Banner image URL',
+                        homeBannerUrlPlaceholder: 'Paste an image link, Google Drive link, or image URL',
+                        homeBannerDriveHelp: 'For Google Drive: upload image > Share > Anyone with the link > Copy link > paste here.',
+                        preview: 'Preview',
+                        saveBanner: 'Save Banner',
+                        useDefaultBanner: 'Use default',
+                        settingsSaved: 'Banner saved',
+                        settingsFailed: 'Unable to save banner',
                         eventPage: 'Event page',
                         refresh: 'Refresh',
                         logout: 'Logout',
@@ -650,8 +727,55 @@
                 async loadAll() {
                     this.errorMessage = '';
                     await this.loadSessions();
+                    if (this.isAuthenticated) {
+                        await this.loadSettings();
+                    }
                     if (this.selectedSessionId) {
                         await this.loadRsvps();
+                    }
+                },
+
+                async loadSettings() {
+                    const response = await fetch('/api/admin/settings');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.settingsMessage = result.message || this.t('settingsFailed');
+                        return;
+                    }
+
+                    this.appSettings.homeBannerUrl = result.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                },
+
+                async saveSettings() {
+                    this.isLoading = true;
+                    this.settingsMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch('/api/admin/settings', {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.appSettings)
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('settingsFailed'));
+                        }
+
+                        this.appSettings.homeBannerUrl = result.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                        this.settingsMessage = this.t('settingsSaved');
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
                     }
                 },
 
