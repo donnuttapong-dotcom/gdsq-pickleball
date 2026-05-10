@@ -148,6 +148,18 @@
                     <h1 class="text-xl font-black" x-text="t('rankings')">Rankings</h1>
                     <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
                 </div>
+                <div class="mb-4 space-y-3">
+                    <div class="grid grid-cols-3 gap-2 rounded-xl bg-gray-100 p-1">
+                        <template x-for="period in rankingPeriods" :key="period">
+                            <button class="rounded-lg px-3 py-2 text-xs font-black" :class="rankingPeriod === period ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
+                        </template>
+                    </div>
+                    <div class="flex gap-2 overflow-x-auto pb-1">
+                        <template x-for="category in rankingCategories" :key="category">
+                            <button class="shrink-0 rounded-full px-3 py-2 text-xs font-black" :class="rankingCategory === category ? 'bg-gdsq text-white' : 'bg-gray-100 text-gray-600'" @click="rankingCategory = category; loadRankings()" x-text="rankingCategoryLabel(category)"></button>
+                        </template>
+                    </div>
+                </div>
                 <div class="space-y-3">
                     <template x-for="(player, index) in rankings" :key="player.id">
                         <button class="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
@@ -156,10 +168,12 @@
                             <div class="min-w-0 flex-1">
                                 <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
                                 <p class="text-xs font-semibold text-gray-500">
-                                    <span x-text="player.ratingAverage ? `${player.ratingAverage}/5 · ` : ''"></span>
+                                    <span x-text="player.categoryAverage ? `${player.categoryAverage}/5 · ` : ''"></span>
+                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votes')"></span> ·
                                     <span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span>
                                 </p>
                             </div>
+                            <i class="fa-solid fa-chevron-right text-gray-300"></i>
                         </button>
                     </template>
                 </div>
@@ -184,6 +198,11 @@
                             <p class="text-2xl font-black text-gray-900" x-text="selectedPlayer.hostedCount || 0"></p>
                             <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('hosted')"></p>
                         </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap justify-center gap-2" x-show="(selectedPlayer.badges || []).length > 0">
+                        <template x-for="badge in selectedPlayer.badges" :key="badge.key">
+                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-gdsq" x-text="badge.label"></span>
+                        </template>
                     </div>
                 </div>
 
@@ -699,6 +718,10 @@
                 sessions: [],
                 players: [],
                 rankings: [],
+                rankingPeriod: 'month',
+                rankingCategory: 'overall',
+                rankingPeriods: ['week', 'month', 'all'],
+                rankingCategories: ['overall', 'mvp', 'sportsmanship', 'teamwork', 'skill', 'vibes'],
                 profileHistory: [],
                 pendingVotes: [],
                 selectedPlayer: {
@@ -708,6 +731,7 @@
                     joinedCount: 0,
                     voteCount: 0,
                     hostedCount: 0,
+                    badges: [],
                     history: []
                 },
                 previousTab: 'players',
@@ -967,6 +991,10 @@
                         hosted: 'จัดงาน',
                         scoreBreakdown: 'คะแนนแยกหัวข้อ',
                         noVotesYet: 'ยังไม่มีคะแนนโหวต',
+                        thisWeek: 'สัปดาห์นี้',
+                        thisMonth: 'เดือนนี้',
+                        allTime: 'ทั้งหมด',
+                        overall: 'รวม',
                         endedEvent: 'จบแล้ว',
                         upcomingEvent: 'กำลังจะมาถึง',
                         eventEnded: 'กิจกรรมจบแล้ว',
@@ -1117,6 +1145,10 @@
                         hosted: 'Hosted',
                         scoreBreakdown: 'Score breakdown',
                         noVotesYet: 'No votes yet',
+                        thisWeek: 'This Week',
+                        thisMonth: 'This Month',
+                        allTime: 'All Time',
+                        overall: 'Overall',
                         endedEvent: 'Ended',
                         upcomingEvent: 'Upcoming',
                         eventEnded: 'Event ended',
@@ -1268,9 +1300,31 @@
                 },
 
                 async loadRankings() {
-                    const response = await fetch('/api/rankings');
+                    const params = new URLSearchParams({
+                        period: this.rankingPeriod,
+                        category: this.rankingCategory
+                    });
+                    const response = await fetch(`/api/rankings?${params.toString()}`);
                     const result = await response.json();
                     if (response.ok) this.rankings = result.rankings || [];
+                },
+
+                rankingPeriodLabel(period) {
+                    if (period === 'week') return this.t('thisWeek');
+                    if (period === 'month') return this.t('thisMonth');
+                    return this.t('allTime');
+                },
+
+                rankingCategoryLabel(category) {
+                    const labels = {
+                        overall: this.t('overall'),
+                        mvp: 'MVP',
+                        sportsmanship: this.t('voteSportsmanship'),
+                        teamwork: this.t('voteTeamwork'),
+                        skill: this.t('voteSkill'),
+                        vibes: this.t('voteVibes')
+                    };
+                    return labels[category] || category;
                 },
 
                 async openPlayerProfile(playerId) {

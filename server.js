@@ -210,6 +210,65 @@ function voteAverage(vote) {
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }
 
+function voteScoreByCategory(vote, category = 'overall') {
+  const scoreMap = {
+    mvp: vote.mvp_score,
+    sportsmanship: vote.sportsmanship_score,
+    teamwork: vote.teamwork_score,
+    skill: vote.skill_score,
+    vibes: vote.vibes_score
+  };
+
+  return category === 'overall' ? voteAverage(vote) : Number(scoreMap[category] || 0);
+}
+
+function getBangkokPeriodRange(period = 'all') {
+  if (period === 'all') return null;
+
+  const now = new Date();
+  const bangkokNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  let start = new Date(bangkokNow);
+  let end = new Date(bangkokNow);
+
+  if (period === 'week') {
+    const day = bangkokNow.getDay();
+    const daysFromMonday = day === 0 ? 6 : day - 1;
+    start.setDate(bangkokNow.getDate() - daysFromMonday);
+    end = new Date(start);
+    end.setDate(start.getDate() + 6);
+  } else if (period === 'month') {
+    start = new Date(bangkokNow.getFullYear(), bangkokNow.getMonth(), 1);
+    end = new Date(bangkokNow.getFullYear(), bangkokNow.getMonth() + 1, 0);
+  } else {
+    return null;
+  }
+
+  const toDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  return {
+    start: toDateString(start),
+    end: toDateString(end)
+  };
+}
+
+function buildPlayerBadges({ joinedCount = 0, hostedCount = 0, rating = {} }) {
+  const badges = [];
+
+  if ((rating.mvpAverage || 0) >= 4.5) badges.push({ key: 'mvp', label: 'MVP' });
+  if ((rating.sportsmanshipAverage || 0) >= 4.5) badges.push({ key: 'fairPlay', label: 'Fair Play' });
+  if ((rating.teamworkAverage || 0) >= 4.5) badges.push({ key: 'teamPlayer', label: 'Team Player' });
+  if ((rating.vibesAverage || 0) >= 4.5) badges.push({ key: 'goodVibes', label: 'Good Vibes' });
+  if (joinedCount >= 5) badges.push({ key: 'regular', label: 'Regular Player' });
+  if (hostedCount > 0) badges.push({ key: 'host', label: 'Host' });
+
+  return badges;
+}
+
 function validateVoteScore(value) {
   const score = Number(value);
   return Number.isInteger(score) && score >= 1 && score <= 5;
@@ -1094,6 +1153,10 @@ app.get('/api/players', async (req, res) => {
 
 app.get('/api/rankings', async (req, res) => {
   try {
+    const allowedPeriods = ['week', 'month', 'all'];
+    const allowedCategories = ['overall', 'mvp', 'sportsmanship', 'teamwork', 'skill', 'vibes'];
+    const period = allowedPeriods.includes(req.query.period) ? req.query.period : 'all';
+    const category = allowedCategories.includes(req.query.category) ? req.query.category : 'overall';
     const { data: rsvps, error } = await supabase
       .from('rsvps')
       .select('user_id, status')
@@ -1125,27 +1188,52 @@ app.get('/api/rankings', async (req, res) => {
     }
 
     const ratingByUserId = {};
+    const periodRange = getBangkokPeriodRange(period);
     const { data: votes, error: votesError } = await supabase
       .from('event_player_votes')
-      .select('voted_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score');
+      .select('session_id, voted_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score');
 
     if (votesError && votesError.code !== '42P01') {
       throw votesError;
     }
 
     if (!votesError) {
+      let allowedSessionIds = null;
+
+      if (periodRange) {
+        const { data: periodSessions, error: periodSessionError } = await supabase
+          .from('sessions')
+          .select('id')
+          .gte('event_date', periodRange.start)
+          .lte('event_date', periodRange.end);
+
+        if (periodSessionError) throw periodSessionError;
+        allowedSessionIds = new Set((periodSessions || []).map((session) => session.id));
+      }
+
       for (const vote of votes || []) {
+        if (allowedSessionIds && !allowedSessionIds.has(vote.session_id)) {
+          continue;
+        }
+
         if (!ratingByUserId[vote.voted_user_id]) {
-          ratingByUserId[vote.voted_user_id] = { voteCount: 0, totalRating: 0 };
+          ratingByUserId[vote.voted_user_id] = {
+            voteCount: 0,
+            totalRating: 0,
+            categoryTotal: 0
+          };
         }
 
         ratingByUserId[vote.voted_user_id].voteCount += 1;
         ratingByUserId[vote.voted_user_id].totalRating += voteAverage(vote);
+        ratingByUserId[vote.voted_user_id].categoryTotal += voteScoreByCategory(vote, category);
       }
     }
 
     return res.json({
       success: true,
+      period,
+      category,
       rankings: users
         .map((user) => ({
           ...serializeUser(user),
@@ -1153,9 +1241,12 @@ app.get('/api/rankings', async (req, res) => {
           voteCount: ratingByUserId[user.id]?.voteCount || 0,
           ratingAverage: ratingByUserId[user.id]?.voteCount
             ? Number((ratingByUserId[user.id].totalRating / ratingByUserId[user.id].voteCount).toFixed(2))
+            : null,
+          categoryAverage: ratingByUserId[user.id]?.voteCount
+            ? Number((ratingByUserId[user.id].categoryTotal / ratingByUserId[user.id].voteCount).toFixed(2))
             : null
         }))
-        .sort((a, b) => (b.ratingAverage || 0) - (a.ratingAverage || 0) || b.joinedCount - a.joinedCount)
+        .sort((a, b) => (b.categoryAverage || 0) - (a.categoryAverage || 0) || b.voteCount - a.voteCount || b.joinedCount - a.joinedCount)
     });
   } catch (error) {
     console.error('Rankings list error:', error);
@@ -1289,6 +1380,11 @@ app.get('/api/players/:playerId', async (req, res) => {
         waitlistCount: waitlistRsvps.length,
         hostedCount: hostedCount || 0,
         ...rating,
+        badges: buildPlayerBadges({
+          joinedCount: joinedRsvps.length,
+          hostedCount: hostedCount || 0,
+          rating
+        }),
         history
       }
     });
