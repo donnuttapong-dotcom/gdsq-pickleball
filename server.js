@@ -622,6 +622,74 @@ async function countSessionSeats(sessionId, status) {
   };
 }
 
+async function promoteWaitlist(sessionId) {
+  const { data: session, error: sessionError } = await findSession(sessionId);
+
+  if (sessionError || !session) {
+    return { promoted: [], error: sessionError || new Error('Session not found.') };
+  }
+
+  const promoted = [];
+
+  while (true) {
+    const { count: joinedSeats, error: joinedError } = await countSessionSeats(session.id, 'Joined');
+    if (joinedError) return { promoted, error: joinedError };
+    if ((joinedSeats || 0) >= session.max_players) break;
+
+    const { data: waitlistMembers, error: memberError } = await supabase
+      .from('rsvps')
+      .select('id, user_id, created_at')
+      .eq('session_id', session.id)
+      .eq('status', 'Waitlist')
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (memberError) return { promoted, error: memberError };
+
+    const { data: waitlistGuests, error: guestError } = await supabase
+      .from('rsvp_guests')
+      .select('id, rsvp_id, display_name, created_at')
+      .eq('session_id', session.id)
+      .eq('status', 'Waitlist')
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (guestError) return { promoted, error: guestError };
+
+    const candidates = [
+      ...(waitlistMembers || []).map((item) => ({ ...item, kind: 'member' })),
+      ...(waitlistGuests || []).map((item) => ({ ...item, kind: 'guest' }))
+    ].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+
+    const next = candidates[0];
+    if (!next) break;
+
+    if (next.kind === 'member') {
+      const { error: updateError } = await supabase
+        .from('rsvps')
+        .update({ status: 'Joined' })
+        .eq('id', next.id);
+
+      if (updateError) return { promoted, error: updateError };
+    } else {
+      const { error: updateError } = await supabase
+        .from('rsvp_guests')
+        .update({ status: 'Joined' })
+        .eq('id', next.id);
+
+      if (updateError) return { promoted, error: updateError };
+    }
+
+    promoted.push({
+      id: next.id,
+      kind: next.kind,
+      displayName: next.display_name || ''
+    });
+  }
+
+  return { promoted, error: null };
+}
+
 async function getSessionSummary(sessionId, lineUid) {
   const { data: session, error: sessionError } = await findSession(sessionId);
 
@@ -771,7 +839,21 @@ async function cleanupOldPaymentSlips() {
 
 async function getAppSettings() {
   const fallbackSettings = {
-    homeBannerUrl: defaultHomeBannerUrl
+    homeBannerUrl: defaultHomeBannerUrl,
+    homeBannerSlides: [defaultHomeBannerUrl],
+    defaultEventSettings: {
+      maxPlayers: 24,
+      courtCount: 1,
+      priceThb: 250,
+      location: '',
+      address: '',
+      skillLevel: '',
+      paymentQrUrl: '',
+      paymentBankName: '',
+      paymentAccountName: '',
+      paymentAccountNumber: '',
+      paymentPromptPayId: ''
+    }
   };
 
   try {
@@ -788,7 +870,29 @@ async function getAppSettings() {
     for (const row of data || []) {
       if (row.key === 'home_banner_url') {
         settings.homeBannerUrl = row.value || defaultHomeBannerUrl;
+      } else if (row.key === 'home_banner_slides') {
+        try {
+          const slides = JSON.parse(row.value || '[]');
+          settings.homeBannerSlides = Array.isArray(slides) && slides.length > 0
+            ? slides.map((slide) => String(slide || '').trim()).filter(Boolean)
+            : [settings.homeBannerUrl || defaultHomeBannerUrl];
+        } catch (parseError) {
+          settings.homeBannerSlides = [settings.homeBannerUrl || defaultHomeBannerUrl];
+        }
+      } else if (row.key === 'default_event_settings') {
+        try {
+          settings.defaultEventSettings = {
+            ...fallbackSettings.defaultEventSettings,
+            ...(JSON.parse(row.value || '{}') || {})
+          };
+        } catch (parseError) {
+          settings.defaultEventSettings = fallbackSettings.defaultEventSettings;
+        }
       }
+    }
+
+    if (!settings.homeBannerSlides || settings.homeBannerSlides.length === 0) {
+      settings.homeBannerSlides = [settings.homeBannerUrl || defaultHomeBannerUrl];
     }
 
     return settings;
@@ -800,21 +904,54 @@ async function getAppSettings() {
 
 async function saveAppSettings(settings) {
   const homeBannerUrl = settings.homeBannerUrl || defaultHomeBannerUrl;
+  const homeBannerSlides = Array.isArray(settings.homeBannerSlides)
+    ? settings.homeBannerSlides.map((slide) => String(slide || '').trim()).filter(Boolean)
+    : String(settings.homeBannerSlides || '')
+      .split('\n')
+      .map((slide) => slide.trim())
+      .filter(Boolean);
+  const defaultEventSettings = {
+    maxPlayers: Number(settings.defaultEventSettings?.maxPlayers || 24),
+    courtCount: Number(settings.defaultEventSettings?.courtCount || 1),
+    priceThb: Number(settings.defaultEventSettings?.priceThb || 0),
+    location: settings.defaultEventSettings?.location || '',
+    address: settings.defaultEventSettings?.address || '',
+    skillLevel: settings.defaultEventSettings?.skillLevel || '',
+    paymentQrUrl: settings.defaultEventSettings?.paymentQrUrl || '',
+    paymentBankName: settings.defaultEventSettings?.paymentBankName || '',
+    paymentAccountName: settings.defaultEventSettings?.paymentAccountName || '',
+    paymentAccountNumber: settings.defaultEventSettings?.paymentAccountNumber || '',
+    paymentPromptPayId: settings.defaultEventSettings?.paymentPromptPayId || ''
+  };
 
   const { error } = await supabase
     .from('app_settings')
-    .upsert({
-      key: 'home_banner_url',
-      value: homeBannerUrl,
-      updated_at: new Date().toISOString()
-    }, {
+    .upsert([
+      {
+        key: 'home_banner_url',
+        value: homeBannerUrl,
+        updated_at: new Date().toISOString()
+      },
+      {
+        key: 'home_banner_slides',
+        value: JSON.stringify(homeBannerSlides.length > 0 ? homeBannerSlides : [homeBannerUrl]),
+        updated_at: new Date().toISOString()
+      },
+      {
+        key: 'default_event_settings',
+        value: JSON.stringify(defaultEventSettings),
+        updated_at: new Date().toISOString()
+      }
+    ], {
       onConflict: 'key'
     });
 
   if (error) throw error;
 
   return {
-    homeBannerUrl
+    homeBannerUrl,
+    homeBannerSlides: homeBannerSlides.length > 0 ? homeBannerSlides : [homeBannerUrl],
+    defaultEventSettings
   };
 }
 
@@ -852,11 +989,14 @@ app.get('/', async (req, res) => {
       const { data: session } = await findSession(sessionId);
 
       if (session) {
+        const { data: sessionSummary } = await getSessionSummary(session.id);
         const title = `${session.title} | GDSQ Pickleball`;
         const dateText = session.event_date || '';
         const timeText = session.start_time ? session.start_time.slice(0, 5) : '';
         const priceText = session.price_thb === null || session.price_thb === undefined ? '' : `THB ${session.price_thb}`;
-        const spotsText = `${session.max_players || 0} spots`;
+        const spotsText = sessionSummary
+          ? `${sessionSummary.spotsLeft}/${session.max_players || 0} spots left`
+          : `${session.max_players || 0} spots`;
         const description = [
           dateText,
           timeText,
@@ -905,6 +1045,42 @@ app.get('/api/public/sessions', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to load sessions.'
+    });
+  }
+});
+
+app.get('/api/public/past-sessions', async (req, res) => {
+  try {
+    const { lineUid } = req.query;
+    const { data: sessions, error } = await supabase
+      .from('sessions')
+      .select(sessionSelect)
+      .neq('status', 'Cancelled')
+      .order('event_date', { ascending: false, nullsFirst: false })
+      .order('start_time', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const pastSessions = (sessions || []).filter(isSessionEnded);
+    const summaries = await Promise.all(
+      pastSessions.map((session, index) => getSessionSummary(session.id, lineUid).then((summary) => ({
+        index: index + 1,
+        ...summary.data,
+        isEnded: true
+      })))
+    );
+
+    return res.json({
+      success: true,
+      sessions: summaries
+    });
+  } catch (error) {
+    console.error('Past sessions list error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load past sessions.'
     });
   }
 });
@@ -1649,6 +1825,62 @@ app.post('/api/sessions', requireAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to create session.'
+    });
+  }
+});
+
+app.post('/api/sessions/:sessionId/duplicate', requireAdmin, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { data: currentSession, error: sessionError } = await findSession(sessionId);
+
+    if (sessionError || !currentSession) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    const copyPayload = {
+      title: req.body.title || `${currentSession.title} (Copy)`,
+      max_players: Number(req.body.maxPlayers || currentSession.max_players || 24),
+      court_count: Number(req.body.courtCount || currentSession.court_count || 1),
+      event_date: req.body.eventDate || currentSession.event_date || null,
+      start_time: req.body.startTime || currentSession.start_time || null,
+      end_time: req.body.endTime || currentSession.end_time || null,
+      price_thb: req.body.priceThb === undefined ? currentSession.price_thb : req.body.priceThb,
+      payment_qr_url: req.body.paymentQrUrl || currentSession.payment_qr_url || null,
+      payment_bank_name: req.body.paymentBankName || currentSession.payment_bank_name || null,
+      payment_account_name: req.body.paymentAccountName || currentSession.payment_account_name || null,
+      payment_account_number: req.body.paymentAccountNumber || currentSession.payment_account_number || null,
+      payment_promptpay_id: req.body.paymentPromptPayId || currentSession.payment_promptpay_id || null,
+      location: req.body.location || currentSession.location || null,
+      address: req.body.address || currentSession.address || null,
+      skill_level: req.body.skillLevel || currentSession.skill_level || null,
+      description: req.body.description || currentSession.description || null,
+      poster_url: req.body.posterUrl || currentSession.poster_url || null,
+      status: 'Published'
+    };
+
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .insert(copyPayload)
+      .select(sessionSelect)
+      .single();
+
+    if (error) throw error;
+
+    return res.status(201).json({
+      success: true,
+      session: serializeSession(session),
+      message: 'Session duplicated.'
+    });
+  } catch (error) {
+    console.error('Duplicate session error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to duplicate session.'
     });
   }
 });
@@ -2643,9 +2875,15 @@ app.delete('/api/rsvp', async (req, res) => {
       throw deleteError;
     }
 
+    const { promoted, error: promoteError } = await promoteWaitlist(session.id);
+    if (promoteError) {
+      throw promoteError;
+    }
+
     return res.json({
       success: true,
       previousStatus: existingRsvp.status,
+      promoted,
       message: 'Your RSVP has been cancelled.'
     });
   } catch (error) {

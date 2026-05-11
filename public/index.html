@@ -30,7 +30,12 @@
         <main x-show="!selectedSessionId" x-cloak>
             <section class="px-5">
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
-                    <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                    <img class="aspect-square w-full object-cover" :src="imageUrl(currentHomeBanner)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                    <div class="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5" x-show="homeBannerSlides.length > 1">
+                        <template x-for="(slide, index) in homeBannerSlides" :key="`${slide}-${index}`">
+                            <button class="h-2 rounded-full transition-all" :class="currentBannerIndex === index ? 'w-6 bg-gdsq' : 'w-2 bg-white/80'" @click="currentBannerIndex = index"></button>
+                        </template>
+                    </div>
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
@@ -55,8 +60,13 @@
 
             <section id="events" class="mt-7 px-5" x-show="activeTab === 'home' || activeTab === 'events'">
                 <div class="mb-4 flex items-center justify-between">
-                    <h1 class="text-xl font-black" x-text="t('upcomingEvents')">Upcoming Events</h1>
-                    <button class="text-sm font-black text-gdsq" @click="loadSessions()" x-text="t('refresh')">Refresh</button>
+                    <h1 class="text-xl font-black" x-text="eventViewMode === 'past' ? t('pastEvents') : t('upcomingEvents')">Upcoming Events</h1>
+                    <button class="text-sm font-black text-gdsq" @click="eventViewMode === 'past' ? loadPastSessions() : loadSessions()" x-text="t('refresh')">Refresh</button>
+                </div>
+
+                <div class="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1" x-show="activeTab === 'events'">
+                    <button class="rounded-lg px-3 py-2 text-sm font-black" :class="eventViewMode === 'upcoming' ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="eventViewMode = 'upcoming'; loadSessions()" x-text="t('upcomingEvents')"></button>
+                    <button class="rounded-lg px-3 py-2 text-sm font-black" :class="eventViewMode === 'past' ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="eventViewMode = 'past'; loadPastSessions()" x-text="t('pastEvents')"></button>
                 </div>
 
                 <div class="mb-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
@@ -64,7 +74,7 @@
                 </div>
 
                 <div class="space-y-3">
-                    <template x-for="session in sessions" :key="session.id">
+                    <template x-for="session in eventList" :key="session.id">
                         <article class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                             <button class="block w-full text-left" @click="selectSession(session.id)">
                                 <div class="aspect-[16/9] bg-gray-100" x-show="session.posterUrl" x-cloak>
@@ -95,7 +105,7 @@
                                         </div>
                                         <div class="mt-3 flex items-center justify-between">
                                             <span class="rounded-lg px-3 py-1 text-xs font-black" :class="skillClass(session.skillLevel)" x-text="session.skillLevel || t('socialPlay')"></span>
-                                            <span class="rounded-lg bg-gdsq px-5 py-2 text-sm font-black text-white" x-text="session.userStatus ? statusLabel(session.userStatus) : 'RSVP'">RSVP</span>
+                                            <span class="rounded-lg px-5 py-2 text-sm font-black text-white" :class="session.isEnded ? 'bg-gray-900' : 'bg-gdsq'" x-text="session.isEnded ? t('viewDetails') : (session.userStatus ? statusLabel(session.userStatus) : 'RSVP')">RSVP</span>
                                         </div>
                                     </div>
                                 </div>
@@ -104,7 +114,7 @@
                     </template>
                 </div>
 
-                <div class="rounded-2xl bg-gray-50 px-5 py-10 text-center text-sm font-semibold text-gray-500" x-show="!isLoading && sessions.length === 0">
+                <div class="rounded-2xl bg-gray-50 px-5 py-10 text-center text-sm font-semibold text-gray-500" x-show="!isLoading && eventList.length === 0">
                     <i class="fa-regular fa-calendar mb-3 block text-2xl"></i>
                     <span x-text="t('noEvents')">ยังไม่มีกิจกรรม</span>
                 </div>
@@ -804,7 +814,12 @@
                 displayName: null,
                 activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
                 homeBannerUrl: '/assets/gdsq-home-banner.png',
+                homeBannerSlides: ['/assets/gdsq-home-banner.png'],
+                currentBannerIndex: 0,
+                bannerTimer: null,
                 sessions: [],
+                pastSessions: [],
+                eventViewMode: 'upcoming',
                 players: [],
                 rankings: [],
                 rankingPeriod: 'month',
@@ -941,6 +956,18 @@
                     return this.imageUrl(this.profile.profileImageUrl) || 'https://ui-avatars.com/api/?background=0044CC&color=fff&name=GDSQ';
                 },
 
+                get currentHomeBanner() {
+                    return this.homeBannerSlides[this.currentBannerIndex] || this.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                },
+
+                get eventList() {
+                    if (this.activeTab === 'events' && this.eventViewMode === 'past') {
+                        return this.pastSessions;
+                    }
+
+                    return this.sessions;
+                },
+
                 get joinedPlayers() {
                     return this.sessionPlayers.filter((player) => player.status === 'Joined');
                 },
@@ -963,6 +990,7 @@
                         heroLine2: 'Good People.',
                         joinFun: 'Join the Fun!',
                         events: 'Events',
+                        pastEvents: 'กิจกรรมที่ผ่านมา',
                         players: 'Players',
                         rankings: 'Rankings',
                         shop: 'Shop',
@@ -970,6 +998,9 @@
                         createEvent: 'สร้างกิจกรรม',
                         createEventHelp: 'สร้างกิจกรรมแล้วขึ้นหน้าแอพทันที',
                         eventInfo: 'ข้อมูลกิจกรรม',
+                        date: 'วันที่',
+                        time: 'เวลา',
+                        price: 'ราคา',
                         eventTitle: 'ชื่อกิจกรรม',
                         description: 'รายละเอียดกิจกรรม',
                         dateTime: 'วันและเวลา',
@@ -995,6 +1026,7 @@
                         upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
                         refresh: 'รีเฟรช',
                         noEvents: 'ยังไม่มีกิจกรรม',
+                        viewDetails: 'ดูรายละเอียด',
                         communityTitle: 'Play. Connect. Improve.',
                         communityText: 'เป็นส่วนหนึ่งของ GDSQ community!',
                         back: 'กลับ',
@@ -1042,6 +1074,7 @@
                         rsvpFailed: 'ยืนยัน RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
                         cancellingRsvp: 'กำลังยกเลิก RSVP...',
                         cancelFailed: 'ยกเลิก RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+                        waitlistPromoted: 'ระบบเลื่อนคนใน Waitlist ขึ้นให้อัตโนมัติแล้ว',
                         lineFailed: 'เชื่อมต่อ LINE ไม่สำเร็จ'
                         ,
                         phoneNotSet: 'ยังไม่ได้ใส่เบอร์',
@@ -1127,6 +1160,7 @@
                         heroLine2: 'Good People.',
                         joinFun: 'Join the Fun!',
                         events: 'Events',
+                        pastEvents: 'Past Events',
                         players: 'Players',
                         rankings: 'Rankings',
                         shop: 'Shop',
@@ -1134,6 +1168,9 @@
                         createEvent: 'Create Event',
                         createEventHelp: 'Publish a community event instantly.',
                         eventInfo: 'Event info',
+                        date: 'Date',
+                        time: 'Time',
+                        price: 'Price',
                         eventTitle: 'Event title',
                         description: 'Event description',
                         dateTime: 'Date & time',
@@ -1159,6 +1196,7 @@
                         upcomingEvents: 'Upcoming Events',
                         refresh: 'Refresh',
                         noEvents: 'No events yet',
+                        viewDetails: 'View details',
                         communityTitle: 'Play. Connect. Improve.',
                         communityText: 'Be part of the GDSQ community!',
                         back: 'Back',
@@ -1206,6 +1244,7 @@
                         rsvpFailed: 'Unable to confirm RSVP. Please try again.',
                         cancellingRsvp: 'Cancelling RSVP...',
                         cancelFailed: 'Unable to cancel RSVP. Please try again.',
+                        waitlistPromoted: 'The first waitlist player was promoted automatically.',
                         lineFailed: 'LINE connection failed',
                         phoneNotSet: 'Phone not set',
                         noPlayers: 'No players yet',
@@ -1322,6 +1361,7 @@
 
                     if (tab === 'players') this.loadPlayers();
                     if (tab === 'rankings') this.loadRankings();
+                    if (tab === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
                     if (tab === 'profile') {
                         this.loadProfile();
                         this.loadProfileHistory();
@@ -1370,6 +1410,12 @@
                         const configResponse = await fetch('/api/config');
                         const config = await configResponse.json();
                         this.homeBannerUrl = config.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                        this.homeBannerSlides = (config.settings?.homeBannerSlides || [this.homeBannerUrl])
+                            .map((slide) => String(slide || '').trim())
+                            .filter(Boolean);
+                        if (this.homeBannerSlides.length === 0) this.homeBannerSlides = [this.homeBannerUrl];
+                        this.applyDefaultEventSettings(config.settings?.defaultEventSettings || {});
+                        this.startBannerSlider();
 
                         if (!config.liffId) {
                             this.statusMessage = this.t('liffMissing');
@@ -1412,6 +1458,40 @@
                     if (!response.ok) throw new Error(result.message || 'Failed to load sessions');
 
                     this.sessions = result.sessions || [];
+                },
+
+                async loadPastSessions() {
+                    const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
+                    const response = await fetch(`/api/public/past-sessions${params}`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load past sessions');
+
+                    this.pastSessions = result.sessions || [];
+                },
+
+                startBannerSlider() {
+                    if (this.bannerTimer) clearInterval(this.bannerTimer);
+                    this.currentBannerIndex = 0;
+                    if (this.homeBannerSlides.length <= 1) return;
+
+                    this.bannerTimer = setInterval(() => {
+                        this.currentBannerIndex = (this.currentBannerIndex + 1) % this.homeBannerSlides.length;
+                    }, 4500);
+                },
+
+                applyDefaultEventSettings(defaults) {
+                    this.createEventForm.maxPlayers = defaults.maxPlayers ?? this.createEventForm.maxPlayers;
+                    this.createEventForm.courtCount = defaults.courtCount ?? this.createEventForm.courtCount;
+                    this.createEventForm.priceThb = defaults.priceThb ?? this.createEventForm.priceThb;
+                    this.createEventForm.location = defaults.location || this.createEventForm.location;
+                    this.createEventForm.address = defaults.address || this.createEventForm.address;
+                    this.createEventForm.skillLevel = defaults.skillLevel || this.createEventForm.skillLevel;
+                    this.createEventForm.paymentQrUrl = defaults.paymentQrUrl || this.createEventForm.paymentQrUrl;
+                    this.createEventForm.paymentBankName = defaults.paymentBankName || this.createEventForm.paymentBankName;
+                    this.createEventForm.paymentAccountName = defaults.paymentAccountName || this.createEventForm.paymentAccountName;
+                    this.createEventForm.paymentAccountNumber = defaults.paymentAccountNumber || this.createEventForm.paymentAccountNumber;
+                    this.createEventForm.paymentPromptPayId = defaults.paymentPromptPayId || this.createEventForm.paymentPromptPayId;
                 },
 
                 async loadPlayers() {
@@ -1771,7 +1851,17 @@
                     const url = this.liffId
                         ? `https://liff.line.me/${encodeURIComponent(this.liffId)}?sessionId=${encodeURIComponent(this.selectedSessionId)}&v=${version}`
                         : webUrl;
-                    const text = `${this.t('shareText')}: ${this.sessionTitle}`;
+                    const details = [
+                        `${this.t('shareText')}: ${this.sessionTitle}`,
+                        `${this.t('date') || 'Date'}: ${this.eventDateText}`,
+                        `${this.t('time') || 'Time'}: ${this.timeRange({
+                            startTime: this.startTime,
+                            endTime: this.endTime
+                        })}`,
+                        `${this.t('price') || 'Price'}: ${this.priceText}`,
+                        `${this.t('spotsLeft')}: ${this.spotsLeft}/${this.maxPlayers}`
+                    ];
+                    const text = details.filter(Boolean).join('\n');
 
                     if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
                         await liff.shareTargetPicker([{
@@ -2079,7 +2169,9 @@
 
                         if (!response.ok) throw new Error(result.message || 'Failed to confirm RSVP');
 
-                        this.statusMessage = result.message;
+                        this.statusMessage = (result.promoted || []).length > 0
+                            ? `${result.message} ${this.t('waitlistPromoted')}`
+                            : result.message;
                         this.userStatus = result.status;
                         this.guestNames = [];
                         this.resetPaymentForm();
