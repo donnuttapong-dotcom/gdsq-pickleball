@@ -284,6 +284,8 @@ function getMimeExtension(mimeType = '') {
   if (mimeType.includes('png')) return 'png';
   if (mimeType.includes('webp')) return 'webp';
   if (mimeType.includes('pdf')) return 'pdf';
+  if (mimeType.includes('heic')) return 'heic';
+  if (mimeType.includes('heif')) return 'heif';
   return 'jpg';
 }
 
@@ -671,6 +673,8 @@ async function promoteWaitlist(sessionId) {
         .eq('id', next.id);
 
       if (updateError) return { promoted, error: updateError };
+      const { error: paymentError } = await addJoinedPaymentDue(next.id, session.price_thb || 0);
+      if (paymentError) return { promoted, error: paymentError };
     } else {
       const { error: updateError } = await supabase
         .from('rsvp_guests')
@@ -678,6 +682,8 @@ async function promoteWaitlist(sessionId) {
         .eq('id', next.id);
 
       if (updateError) return { promoted, error: updateError };
+      const { error: paymentError } = await addJoinedPaymentDue(next.rsvp_id, session.price_thb || 0);
+      if (paymentError) return { promoted, error: paymentError };
     }
 
     promoted.push({
@@ -688,6 +694,34 @@ async function promoteWaitlist(sessionId) {
   }
 
   return { promoted, error: null };
+}
+
+async function addJoinedPaymentDue(rsvpId, priceThb) {
+  const amountToAdd = Number(priceThb || 0);
+  if (!amountToAdd) return { error: null };
+
+  const { data: rsvp, error: rsvpError } = await supabase
+    .from('rsvps')
+    .select('payment_status, payment_amount_due, payment_amount_paid')
+    .eq('id', rsvpId)
+    .maybeSingle();
+
+  if (rsvpError || !rsvp) return { error: rsvpError || new Error('RSVP not found.') };
+
+  const nextAmountDue = Number(rsvp.payment_amount_due || 0) + amountToAdd;
+  const amountPaid = Number(rsvp.payment_amount_paid || 0);
+  const nextStatus = amountPaid >= nextAmountDue ? 'Paid' : 'Pending';
+
+  const { error } = await supabase
+    .from('rsvps')
+    .update({
+      payment_amount_due: nextAmountDue,
+      payment_status: nextStatus,
+      payment_paid_at: nextStatus === 'Paid' ? new Date().toISOString() : null
+    })
+    .eq('id', rsvpId);
+
+  return { error };
 }
 
 async function getSessionSummary(sessionId, lineUid) {
@@ -2490,9 +2524,8 @@ app.post('/api/rsvp', async (req, res) => {
     const waitlistGuests = guestRows.filter((guest) => guest.status === 'Waitlist').length;
     const totalJoined = (status === 'Joined' ? 1 : 0) + joinedGuests;
     const totalWaitlist = (status === 'Waitlist' ? 1 : 0) + waitlistGuests;
-    const totalPlayers = 1 + guestRows.length;
-    const amountDue = (session.price_thb || 0) * totalPlayers;
-    const paymentStatus = amountDue > 0 ? 'Pending' : 'Paid';
+    const amountDue = (session.price_thb || 0) * totalJoined;
+    const paymentStatus = amountDue > 0 ? 'Pending' : (totalJoined > 0 ? 'Paid' : 'Pending');
 
     const { error: paymentUpdateError } = await supabase
       .from('rsvps')
@@ -2733,7 +2766,7 @@ app.post('/api/payment/submit', async (req, res) => {
 app.patch('/api/session/:sessionId/rsvps/:rsvpId/payment', requireAdmin, async (req, res) => {
   try {
     const { sessionId, rsvpId } = req.params;
-    const { status } = req.body;
+    const { status, amountPaid } = req.body;
     const allowedStatuses = ['Pending', 'Submitted', 'Paid'];
 
     if (!allowedStatuses.includes(status)) {
@@ -2751,15 +2784,38 @@ app.patch('/api/session/:sessionId/rsvps/:rsvpId/payment', requireAdmin, async (
       });
     }
 
+    const { data: existingRsvp, error: existingRsvpError } = await supabase
+      .from('rsvps')
+      .select('id, payment_amount_due, payment_amount_paid')
+      .eq('id', rsvpId)
+      .eq('session_id', session.id)
+      .maybeSingle();
+
+    if (existingRsvpError) throw existingRsvpError;
+    if (!existingRsvp) {
+      return res.status(404).json({
+        success: false,
+        message: 'RSVP not found.'
+      });
+    }
+
+    const parsedAmountPaid = amountPaid === '' || amountPaid === null || amountPaid === undefined
+      ? null
+      : Number(amountPaid);
+    const nextAmountPaid = status === 'Paid'
+      ? (Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : Number(existingRsvp.payment_amount_paid || existingRsvp.payment_amount_due || 0))
+      : (Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : existingRsvp.payment_amount_paid);
+
     const { data: rsvp, error } = await supabase
       .from('rsvps')
       .update({
         payment_status: status,
+        payment_amount_paid: nextAmountPaid,
         payment_paid_at: status === 'Paid' ? new Date().toISOString() : null
       })
       .eq('id', rsvpId)
       .eq('session_id', session.id)
-      .select('id, payment_status, payment_paid_at')
+      .select('id, payment_status, payment_amount_due, payment_amount_paid, payment_paid_at')
       .maybeSingle();
 
     if (error) throw error;
@@ -2775,6 +2831,8 @@ app.patch('/api/session/:sessionId/rsvps/:rsvpId/payment', requireAdmin, async (
       payment: {
         rsvpId: rsvp.id,
         status: rsvp.payment_status,
+        amountDue: rsvp.payment_amount_due,
+        amountPaid: rsvp.payment_amount_paid,
         paidAt: rsvp.payment_paid_at
       },
       message: 'Payment updated.'

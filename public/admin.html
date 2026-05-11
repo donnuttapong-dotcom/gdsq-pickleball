@@ -447,6 +447,7 @@
                                 <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700" x-text="t('joined')">Joined</span>
                                 <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
                                 <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                                <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gray-700" x-show="rsvp.kind === 'member' && rsvp.paymentStatus === 'Paid'" @click="markPaymentPending(rsvp)" x-text="t('markPending')">Mark Pending</button>
                             </div>
                         </div>
                     </template>
@@ -472,6 +473,7 @@
                                 <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-gdsqRed" x-text="t('waitlist')">Waitlist</span>
                                 <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
                                 <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                                <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gray-700" x-show="rsvp.kind === 'member' && rsvp.paymentStatus === 'Paid'" @click="markPaymentPending(rsvp)" x-text="t('markPending')">Mark Pending</button>
                             </div>
                         </div>
                     </template>
@@ -634,6 +636,7 @@
                         paymentPaid: 'ชำระแล้ว',
                         viewSlip: 'ดูสลิป',
                         markPaid: 'Mark Paid',
+                        markPending: 'Mark Pending',
                         create: 'สร้าง',
                         save: 'บันทึก',
                         deleteEvent: 'ลบ Event',
@@ -731,6 +734,7 @@
                         paymentPaid: 'Paid',
                         viewSlip: 'View Slip',
                         markPaid: 'Mark Paid',
+                        markPending: 'Mark Pending',
                         create: 'Create',
                         save: 'Save',
                         deleteEvent: 'Delete Event',
@@ -1217,7 +1221,39 @@
                         const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/payment`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ status: 'Paid' })
+                            body: JSON.stringify({
+                                status: 'Paid',
+                                amountPaid: rsvp.paymentAmountPaid || rsvp.paymentAmountDue || 0
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update payment');
+                        }
+
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async markPaymentPending(rsvp) {
+                    if (!this.selectedSessionId || !rsvp?.parentRsvpId) return;
+
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: 'Pending',
+                                amountPaid: rsvp.paymentAmountPaid || null
+                            })
                         });
                         const result = await response.json();
 
