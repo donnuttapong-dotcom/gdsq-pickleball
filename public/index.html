@@ -513,6 +513,81 @@
                 </div>
 
                 <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="font-black" x-text="t('myHostedEvents')">กิจกรรมที่ฉันสร้าง</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('hostManageHelp')">แก้รายละเอียดและเช็คสลิปของกิจกรรมตัวเอง</p>
+                        </div>
+                        <button class="text-xs font-black text-gdsq" @click="loadHostSessions()" x-text="t('refresh')">Refresh</button>
+                    </div>
+
+                    <div class="mt-4 space-y-3" x-show="myHostSessions.length > 0">
+                        <template x-for="session in myHostSessions" :key="session.id">
+                            <div class="rounded-xl border border-gray-100 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <button class="min-w-0 flex-1 text-left" @click="selectSession(session.id)">
+                                        <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                        <p class="text-xs font-semibold text-gray-500" x-text="`${dateShort(session.eventDate)} · ${timeRange(session)} · ${session.joinedCount || 0}/${session.maxPlayers || 0}`"></p>
+                                    </button>
+                                    <button class="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-gdsq" @click="editHostedEvent(session)" x-text="t('manage')">Manage</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="myHostSessions.length === 0" x-text="t('noHostedEvents')">ยังไม่มีกิจกรรมที่สร้าง</p>
+
+                    <div class="mt-4 space-y-4 rounded-2xl bg-gray-50 p-4" x-show="hostEditForm.id" x-cloak>
+                        <div class="flex items-center justify-between gap-3">
+                            <h3 class="font-black" x-text="t('editEvent')">แก้กิจกรรม</h3>
+                            <button class="text-xs font-black text-gray-500" @click="hostEditForm.id = ''; hostRsvps = []" x-text="t('cancel')">Cancel</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.title" :placeholder="t('eventTitle')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="date" x-model="hostEditForm.eventDate">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="hostEditForm.startTime">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="hostEditForm.endTime">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="hostEditForm.maxPlayers" :placeholder="t('maxPlayers')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="hostEditForm.courtCount" :placeholder="t('courtCount')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="hostEditForm.priceThb" :placeholder="t('priceThb')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.location" :placeholder="t('location')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.address" :placeholder="t('address')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.posterUrl" :placeholder="t('posterUrl')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentQrUrl" :placeholder="t('paymentQrUrl')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentBankName" :placeholder="t('paymentBankName')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentAccountName" :placeholder="t('paymentAccountName')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentAccountNumber" :placeholder="t('paymentAccountNumber')">
+                        </div>
+                        <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="saveHostedEvent()" :disabled="isLoading" x-text="t('saveEvent')">Save Event</button>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-black" x-text="t('paymentSlips')">สลิปชำระเงิน</h3>
+                                <button class="text-xs font-black text-gdsq" @click="loadHostRsvps(hostEditForm.id)" x-text="t('refresh')">Refresh</button>
+                            </div>
+                            <template x-for="row in hostRsvps.filter((item) => item.kind === 'member')" :key="row.id">
+                                <div class="rounded-xl bg-white p-3">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-black" x-text="row.user.displayName || row.user.display_name || 'GDSQ'"></p>
+                                            <p class="text-xs font-semibold text-gray-500"><span x-text="statusLabel(row.status)"></span> · <span x-text="moneyText(row.paymentAmountPaid || row.paymentAmountDue || 0)"></span></p>
+                                        </div>
+                                        <span class="rounded-full px-2 py-1 text-[10px] font-black" :class="paymentStatusClass(row.paymentStatus)" x-text="paymentStatusLabel(row.paymentStatus)"></span>
+                                    </div>
+                                    <div class="mt-3 grid grid-cols-3 gap-2">
+                                        <a class="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-black text-gdsq" x-show="row.paymentSlipUrl" :href="row.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                        <button class="rounded-lg bg-green-50 px-3 py-2 text-xs font-black text-green-700" @click="updateHostPaymentStatus(row.id, 'Paid', row.paymentAmountPaid || row.paymentAmountDue)" x-text="t('markPaid')">Paid</button>
+                                        <button class="rounded-lg bg-yellow-50 px-3 py-2 text-xs font-black text-yellow-700" @click="updateHostPaymentStatus(row.id, 'Pending', row.paymentAmountPaid)" x-text="t('markPending')">Pending</button>
+                                    </div>
+                                </div>
+                            </template>
+                            <p class="rounded-xl bg-white p-4 text-center text-sm font-semibold text-gray-500" x-show="hostRsvps.length === 0" x-text="t('noPaymentsYet')">ยังไม่มีรายการชำระเงิน</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 rounded-xl p-3 text-sm font-semibold" x-show="hostMessage" :class="hostMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="hostMessage"></div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
                     <h2 class="font-black" x-text="t('eventHistory')">ประวัติกิจกรรม</h2>
                     <div class="mt-3 space-y-3" x-show="profileHistory.length > 0">
                         <template x-for="session in profileHistory" :key="session.id">
@@ -743,11 +818,11 @@
                     <p x-text="statusMessage"></p>
                 </div>
 
-                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="userStatus">
+                <div id="payment-panel" class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="userStatus || pendingJoinPayment">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <h2 class="text-base font-black" x-text="t('payment')">Payment</h2>
-                            <p class="mt-1 text-xs font-semibold text-gray-500"><span x-text="t('amountDue')"></span>: <span class="font-black text-gray-900" x-text="moneyText(payment.amountDue)"></span></p>
+                            <p class="mt-1 text-xs font-semibold text-gray-500"><span x-text="pendingJoinPayment ? t('paymentRequiredBeforeJoin') : t('amountDue')"></span>: <span class="font-black text-gray-900" x-text="moneyText(paymentAmountDueDisplay)"></span></p>
                         </div>
                         <span class="rounded-full px-3 py-1 text-xs font-black" :class="paymentStatusClass(payment.status)" x-text="paymentStatusLabel(payment.status)">Pending</span>
                     </div>
@@ -770,7 +845,7 @@
 
                         <div class="rounded-xl bg-blue-50 px-3 py-3 text-center">
                             <p class="text-xs font-black text-gdsq" x-text="t('amountDue')">Amount due</p>
-                            <p class="text-2xl font-black text-gdsq" x-text="moneyText(payment.amountDue)">THB 0</p>
+                            <p class="text-2xl font-black text-gdsq" x-text="moneyText(paymentAmountDueDisplay)">THB 0</p>
                         </div>
 
                         <div class="space-y-3" x-show="payment.status !== 'Paid'">
@@ -976,6 +1051,14 @@
                     previewUrl: ''
                 },
                 showPaymentPanel: false,
+                pendingJoinPayment: false,
+                myHostSessions: [],
+                hostRsvps: [],
+                hostEditForm: {
+                    id: ''
+                },
+                hostMessage: '',
+                hostMessageType: 'success',
                 profileMessage: '',
                 profileMessageType: 'success',
                 sessionTitle: '',
@@ -1035,6 +1118,14 @@
 
                 get totalRsvpSpots() {
                     return 1 + this.cleanGuestNames.length;
+                },
+
+                get estimatedPaymentAmount() {
+                    return Math.max(Number(this.priceThb || 0), 0) * this.totalRsvpSpots;
+                },
+
+                get paymentAmountDueDisplay() {
+                    return this.payment.amountDue || this.estimatedPaymentAmount || 0;
                 },
 
                 translations: {
@@ -1170,7 +1261,23 @@
                         paymentSubmitted: 'แจ้งชำระแล้ว',
                         paymentPaid: 'ชำระแล้ว',
                         paymentSubmitFailed: 'แจ้งชำระเงินไม่สำเร็จ',
-                        paymentSubmittedMessage: 'ส่งสลิปแล้ว รอ Admin ตรวจ',
+                        paymentSubmittedMessage: 'ส่งสลิปแล้ว ระบบยืนยันที่ให้เรียบร้อย เจ้าของกิจกรรมจะเช็คสลิปย้อนหลัง',
+                        paymentRequiredBeforeJoin: 'ต้องชำระก่อนยืนยันที่',
+                        slipRequiredToJoin: 'กรุณาอัปโหลดสลิปเพื่อยืนยันการเข้าร่วม',
+                        paymentThenConfirmed: 'ส่งสลิปแล้ว ยืนยันการเข้าร่วมเรียบร้อย',
+                        myHostedEvents: 'กิจกรรมที่ฉันสร้าง',
+                        hostManageHelp: 'แก้รายละเอียดและเช็คสลิปของกิจกรรมตัวเอง',
+                        manage: 'จัดการ',
+                        noHostedEvents: 'ยังไม่มีกิจกรรมที่สร้าง',
+                        editEvent: 'แก้กิจกรรม',
+                        saveEvent: 'บันทึกกิจกรรม',
+                        eventSaved: 'บันทึกกิจกรรมแล้ว',
+                        eventSaveFailed: 'บันทึกกิจกรรมไม่สำเร็จ',
+                        paymentSlips: 'สลิปชำระเงิน',
+                        markPaid: 'ชำระแล้ว',
+                        markPending: 'รอตรวจ',
+                        noPaymentsYet: 'ยังไม่มีรายการชำระเงิน',
+                        hostPaymentUpdated: 'อัปเดตสถานะชำระเงินแล้ว',
                         pendingVotes: 'กิจกรรมที่รอโหวต',
                         voteNow: 'ให้คะแนน',
                         noPendingVotes: 'ยังไม่มีกิจกรรมที่รอโหวต',
@@ -1339,7 +1446,23 @@
                         paymentSubmitted: 'Submitted',
                         paymentPaid: 'Paid',
                         paymentSubmitFailed: 'Unable to submit payment',
-                        paymentSubmittedMessage: 'Slip submitted. Waiting for admin review.',
+                        paymentSubmittedMessage: 'Slip submitted. Your spot is confirmed. The host can review it later.',
+                        paymentRequiredBeforeJoin: 'Payment required before joining',
+                        slipRequiredToJoin: 'Please upload your payment slip to confirm your RSVP.',
+                        paymentThenConfirmed: 'Slip submitted. RSVP confirmed.',
+                        myHostedEvents: 'My hosted events',
+                        hostManageHelp: 'Edit your own events and review payment slips.',
+                        manage: 'Manage',
+                        noHostedEvents: 'No hosted events yet',
+                        editEvent: 'Edit event',
+                        saveEvent: 'Save Event',
+                        eventSaved: 'Event saved',
+                        eventSaveFailed: 'Unable to save event',
+                        paymentSlips: 'Payment slips',
+                        markPaid: 'Paid',
+                        markPending: 'Pending',
+                        noPaymentsYet: 'No payments yet',
+                        hostPaymentUpdated: 'Payment status updated',
                         pendingVotes: 'Pending Votes',
                         voteNow: 'Vote',
                         noPendingVotes: 'No pending votes',
@@ -1418,6 +1541,7 @@
                     if (tab === 'profile') {
                         this.loadProfile();
                         this.loadProfileHistory();
+                        this.loadHostSessions();
                     }
                     if (tab === 'create' && !this.lineUid) {
                         this.createMessageType = 'error';
@@ -1494,6 +1618,7 @@
                         await this.loadProfile();
                         await this.loadProfileHistory();
                         await this.loadMyPlayerStats();
+                        await this.loadHostSessions();
                         await this.loadPlayers();
                         await this.loadSessions();
                         if (this.selectedSessionId) await this.loadSession();
@@ -1746,6 +1871,106 @@
                     }
                 },
 
+                async loadHostSessions() {
+                    if (!this.lineUid) return;
+                    const response = await fetch(`/api/host/sessions?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+                    if (response.ok) {
+                        this.myHostSessions = result.sessions || [];
+                    }
+                },
+
+                editHostedEvent(session) {
+                    this.hostMessage = '';
+                    this.hostEditForm = {
+                        id: session.id,
+                        title: session.title || '',
+                        skillLevel: session.skillLevel || 'Social Play',
+                        description: session.description || '',
+                        eventDate: session.eventDate || '',
+                        startTime: session.startTime ? session.startTime.slice(0, 5) : '',
+                        endTime: session.endTime ? session.endTime.slice(0, 5) : '',
+                        location: session.location || '',
+                        address: session.address || '',
+                        maxPlayers: session.maxPlayers || 16,
+                        courtCount: session.courtCount || 1,
+                        priceThb: session.priceThb ?? 0,
+                        posterUrl: session.posterUrl || '',
+                        paymentQrUrl: session.paymentQrUrl || '',
+                        paymentBankName: session.paymentBankName || '',
+                        paymentAccountName: session.paymentAccountName || '',
+                        paymentAccountNumber: session.paymentAccountNumber || '',
+                        paymentPromptPayId: session.paymentPromptPayId || ''
+                    };
+                    this.loadHostRsvps(session.id);
+                },
+
+                async saveHostedEvent() {
+                    if (!this.lineUid || !this.hostEditForm.id) return;
+                    this.isLoading = true;
+                    this.hostMessage = '';
+                    this.hostMessageType = 'success';
+
+                    try {
+                        const response = await fetch(`/api/host/sessions/${encodeURIComponent(this.hostEditForm.id)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...this.hostEditForm,
+                                lineUid: this.lineUid
+                            })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('eventSaveFailed'));
+
+                        this.hostMessage = this.t('eventSaved');
+                        await this.loadHostSessions();
+                        await this.loadSessions();
+                        if (this.selectedSessionId === this.hostEditForm.id) await this.loadSession();
+                    } catch (error) {
+                        this.hostMessageType = 'error';
+                        this.hostMessage = error.message || this.t('eventSaveFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async loadHostRsvps(sessionId) {
+                    if (!this.lineUid || !sessionId) return;
+                    const response = await fetch(`/api/host/session/${encodeURIComponent(sessionId)}/rsvps?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+                    if (response.ok) {
+                        this.hostRsvps = result.rsvps || [];
+                    }
+                },
+
+                async updateHostPaymentStatus(rsvpId, status, amountPaid) {
+                    if (!this.lineUid || !this.hostEditForm.id) return;
+                    this.hostMessage = '';
+                    this.hostMessageType = 'success';
+
+                    try {
+                        const response = await fetch(`/api/host/session/${encodeURIComponent(this.hostEditForm.id)}/rsvps/${encodeURIComponent(rsvpId)}/payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                status,
+                                amountPaid
+                            })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('paymentSubmitFailed'));
+
+                        this.hostMessage = this.t('hostPaymentUpdated');
+                        await this.loadHostRsvps(this.hostEditForm.id);
+                        await this.loadHostSessions();
+                    } catch (error) {
+                        this.hostMessageType = 'error';
+                        this.hostMessage = error.message || this.t('paymentSubmitFailed');
+                    }
+                },
+
                 async loadProfile() {
                     if (!this.lineUid) return;
 
@@ -1890,6 +2115,7 @@
                     this.waitlistCount = session.waitlistCount;
                     this.spotsLeft = session.spotsLeft;
                     this.userStatus = session.userStatus;
+                    if (this.userStatus) this.pendingJoinPayment = false;
                     this.eventEnded = this.isEventEnded(session);
                     this.selectedVoteUserId = '';
                     this.resetVoteForm();
@@ -1899,6 +2125,8 @@
 
                 async selectSession(sessionId) {
                     this.selectedSessionId = sessionId;
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
                     window.history.pushState({}, '', `/?sessionId=${encodeURIComponent(sessionId)}`);
                     this.statusMessage = this.t('loadingEvent');
                     await this.loadSession();
@@ -1948,6 +2176,8 @@
                     this.selectedSessionId = '';
                     this.sessionPlayers = [];
                     this.guestNames = [];
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
                     this.statusMessage = this.lineUid ? `${this.t('loggedIn')}: ${this.displayName}` : '';
                     window.history.pushState({}, '', '/');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2123,7 +2353,7 @@
 
                 resetPaymentForm() {
                     this.paymentForm = {
-                        amountPaid: '',
+                        amountPaid: this.estimatedPaymentAmount || this.payment.amountDue || '',
                         payerName: this.profile.displayName || this.displayName || '',
                         note: '',
                         fileName: '',
@@ -2174,12 +2404,19 @@
                     this.statusMessage = '';
 
                     try {
-                        const response = await fetch('/api/payment/submit', {
+                        const endpoint = this.pendingJoinPayment && !this.userStatus
+                            ? '/api/rsvp/submit-payment'
+                            : '/api/payment/submit';
+                        const response = await fetch(endpoint, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 lineUid: this.lineUid,
                                 sessionId: this.selectedSessionId,
+                                displayName: this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl,
+                                guestNames: this.cleanGuestNames,
                                 amountPaid: this.paymentForm.amountPaid,
                                 payerName: this.paymentForm.payerName,
                                 note: this.paymentForm.note,
@@ -2192,8 +2429,14 @@
 
                         if (!response.ok) throw new Error(result.message || this.t('paymentSubmitFailed'));
 
-                        this.statusMessage = this.t('paymentSubmittedMessage');
+                        this.statusMessage = this.pendingJoinPayment ? (result.message || this.t('paymentThenConfirmed')) : this.t('paymentSubmittedMessage');
+                        if (result.status) this.userStatus = result.status;
+                        this.pendingJoinPayment = false;
+                        this.showPaymentPanel = false;
+                        this.guestNames = [];
                         this.resetPaymentForm();
+                        await this.loadSessions();
+                        await this.loadSession();
                         await this.loadPayment();
                         await this.loadSessionPlayers();
                     } catch (error) {
@@ -2206,6 +2449,18 @@
                 async confirmRsvp() {
                     if (!this.lineUid) {
                         this.statusMessage = this.t('waitingLine');
+                        return;
+                    }
+
+                    if (Number(this.priceThb || 0) > 0) {
+                        this.pendingJoinPayment = true;
+                        this.showPaymentPanel = true;
+                        this.payment.status = 'Pending';
+                        this.payment.amountDue = this.estimatedPaymentAmount;
+                        this.paymentForm.amountPaid = this.estimatedPaymentAmount || '';
+                        this.paymentForm.payerName = this.profile.displayName || this.displayName || '';
+                        this.statusMessage = this.t('slipRequiredToJoin');
+                        setTimeout(() => document.getElementById('payment-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
                         return;
                     }
 

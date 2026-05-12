@@ -289,6 +289,137 @@ function getMimeExtension(mimeType = '') {
   return 'jpg';
 }
 
+async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, slipFileName, previousSlipPath }) {
+  const base64Text = String(slipBase64 || '').includes(',')
+    ? String(slipBase64).split(',').pop()
+    : String(slipBase64 || '');
+  const buffer = Buffer.from(base64Text, 'base64');
+  const maxBytes = 5 * 1024 * 1024;
+
+  if (!buffer.length || buffer.length > maxBytes) {
+    const error = new Error('Slip image must be under 5 MB.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const mimeType = slipMimeType || 'image/jpeg';
+  const filename = safeStorageFileName(slipFileName || `slip.${getMimeExtension(mimeType)}`);
+  const storagePath = `${sessionId}/${rsvpId}/${Date.now()}-${filename}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(paymentSlipBucket)
+    .upload(storagePath, buffer, {
+      contentType: mimeType,
+      upsert: true
+    });
+
+  if (uploadError) throw uploadError;
+
+  if (previousSlipPath) {
+    await supabase.storage.from(paymentSlipBucket).remove([previousSlipPath]);
+  }
+
+  const { data: publicData } = supabase.storage
+    .from(paymentSlipBucket)
+    .getPublicUrl(storagePath);
+
+  return {
+    storagePath,
+    publicUrl: publicData.publicUrl
+  };
+}
+
+async function updatePaymentStatus({ sessionId, rsvpId, status, amountPaid }) {
+  const allowedStatuses = ['Pending', 'Submitted', 'Paid'];
+
+  if (!allowedStatuses.includes(status)) {
+    const error = new Error('Invalid payment status.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { data: existingRsvp, error: existingRsvpError } = await supabase
+    .from('rsvps')
+    .select('id, payment_amount_due, payment_amount_paid')
+    .eq('id', rsvpId)
+    .eq('session_id', sessionId)
+    .maybeSingle();
+
+  if (existingRsvpError) throw existingRsvpError;
+  if (!existingRsvp) {
+    const error = new Error('RSVP not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const parsedAmountPaid = amountPaid === '' || amountPaid === null || amountPaid === undefined
+    ? null
+    : Number(amountPaid);
+  const nextAmountPaid = status === 'Paid'
+    ? (Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : Number(existingRsvp.payment_amount_paid || existingRsvp.payment_amount_due || 0))
+    : (Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : existingRsvp.payment_amount_paid);
+
+  const { data: rsvp, error } = await supabase
+    .from('rsvps')
+    .update({
+      payment_status: status,
+      payment_amount_paid: nextAmountPaid,
+      payment_paid_at: status === 'Paid' ? new Date().toISOString() : null
+    })
+    .eq('id', rsvpId)
+    .eq('session_id', sessionId)
+    .select('id, payment_status, payment_amount_due, payment_amount_paid, payment_paid_at')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!rsvp) {
+    const error = new Error('RSVP not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return rsvp;
+}
+
+async function getUserByLineUid(lineUid) {
+  if (!lineUid) return null;
+
+  const { data: user, error } = await supabase
+    .from('users')
+    .select(userSelect)
+    .eq('line_uid', lineUid)
+    .maybeSingle();
+
+  if (error) throw error;
+  return user || null;
+}
+
+async function requireSessionHost({ lineUid, sessionId }) {
+  const user = await getUserByLineUid(lineUid);
+
+  if (!user) {
+    const error = new Error('Host login required.');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const { data: session, error: sessionError } = await findSession(sessionId);
+
+  if (sessionError || !session) {
+    const error = sessionError || new Error('Session not found.');
+    error.statusCode = sessionError ? 500 : 404;
+    throw error;
+  }
+
+  if (session.created_by_user_id !== user.id) {
+    const error = new Error('Only the event host can manage this event.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return { user, session };
+}
+
 function serializeSession(session) {
   return {
     id: session.id,
@@ -2565,6 +2696,176 @@ app.post('/api/rsvp', async (req, res) => {
   }
 });
 
+app.post('/api/rsvp/submit-payment', async (req, res) => {
+  try {
+    const {
+      lineUid,
+      sessionId,
+      displayName,
+      profileImageUrl,
+      phone,
+      amountPaid,
+      payerName,
+      note,
+      slipFileName,
+      slipMimeType,
+      slipBase64
+    } = req.body;
+    const guestNames = Array.isArray(req.body.guestNames)
+      ? req.body.guestNames.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 10)
+      : [];
+
+    if (!lineUid || !sessionId || !slipBase64) {
+      return res.status(400).json({
+        success: false,
+        message: 'lineUid, sessionId, and slip image are required.'
+      });
+    }
+
+    const user = await upsertLineUser({
+      lineUid,
+      displayName,
+      phone,
+      profileImageUrl
+    });
+
+    const { data: session, error: sessionError } = await findSession(sessionId);
+
+    if (sessionError || !session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    const { data: existingRsvp, error: existingRsvpError } = await supabase
+      .from('rsvps')
+      .select('id, status, payment_slip_path, payment_amount_due')
+      .eq('session_id', session.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (existingRsvpError) throw existingRsvpError;
+
+    let createdRsvp = existingRsvp;
+    let guestRows = [];
+    let status = existingRsvp?.status || null;
+    let totalJoined = status === 'Joined' ? 1 : 0;
+    let totalWaitlist = status === 'Waitlist' ? 1 : 0;
+
+    if (!createdRsvp) {
+      const { count: joinedCount, error: countError } = await countSessionSeats(session.id, 'Joined');
+      if (countError) throw countError;
+
+      let joinedSeats = joinedCount || 0;
+      const nextStatus = () => {
+        if (joinedSeats < session.max_players) {
+          joinedSeats += 1;
+          return 'Joined';
+        }
+
+        return 'Waitlist';
+      };
+
+      status = nextStatus();
+
+      const { data: newRsvp, error: rsvpError } = await supabase
+        .from('rsvps')
+        .insert({
+          session_id: session.id,
+          user_id: user.id,
+          status
+        })
+        .select('id, status, payment_slip_path')
+        .single();
+
+      if (rsvpError) throw rsvpError;
+      createdRsvp = newRsvp;
+
+      guestRows = guestNames.map((guestName) => ({
+        rsvp_id: createdRsvp.id,
+        session_id: session.id,
+        added_by_user_id: user.id,
+        display_name: guestName,
+        status: nextStatus()
+      }));
+
+      if (guestRows.length > 0) {
+        const { error: guestError } = await supabase
+          .from('rsvp_guests')
+          .insert(guestRows);
+
+        if (guestError) throw guestError;
+      }
+
+      const joinedGuests = guestRows.filter((guest) => guest.status === 'Joined').length;
+      const waitlistGuests = guestRows.filter((guest) => guest.status === 'Waitlist').length;
+      totalJoined = (status === 'Joined' ? 1 : 0) + joinedGuests;
+      totalWaitlist = (status === 'Waitlist' ? 1 : 0) + waitlistGuests;
+    }
+
+    const slip = await uploadPaymentSlip({
+      sessionId: session.id,
+      rsvpId: createdRsvp.id,
+      slipBase64,
+      slipMimeType,
+      slipFileName,
+      previousSlipPath: createdRsvp.payment_slip_path
+    });
+
+    const paidAmount = amountPaid === '' || amountPaid === null || amountPaid === undefined
+      ? null
+      : Number(amountPaid);
+    const amountDue = createdRsvp.payment_amount_due !== undefined && createdRsvp.payment_amount_due !== null
+      ? Number(createdRsvp.payment_amount_due || 0)
+      : Number(session.price_thb || 0) * totalJoined;
+
+    const { data: updatedRsvp, error: updateError } = await supabase
+      .from('rsvps')
+      .update({
+        payment_status: 'Submitted',
+        payment_amount_due: amountDue,
+        payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : amountDue,
+        payment_slip_url: slip.publicUrl,
+        payment_slip_path: slip.storagePath,
+        payment_slip_deleted: false,
+        payment_note: note || null,
+        payment_payer_name: payerName || user.display_name || null,
+        payment_submitted_at: new Date().toISOString(),
+        payment_paid_at: null
+      })
+      .eq('id', createdRsvp.id)
+      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_submitted_at')
+      .single();
+
+    if (updateError) throw updateError;
+
+    return res.status(existingRsvp ? 200 : 201).json({
+      success: true,
+      status: updatedRsvp.status,
+      paymentStatus: updatedRsvp.payment_status,
+      amountDue: updatedRsvp.payment_amount_due,
+      amountPaid: updatedRsvp.payment_amount_paid,
+      slipUrl: updatedRsvp.payment_slip_url,
+      guestCount: guestRows.length,
+      totalJoined,
+      totalWaitlist,
+      message: updatedRsvp.status === 'Joined'
+        ? (totalWaitlist > 0
+          ? `Payment submitted. Confirmed ${totalJoined} spot${totalJoined === 1 ? '' : 's'}, ${totalWaitlist} on waitlist.`
+          : 'Payment submitted. You are confirmed!')
+        : 'Payment submitted. You are on the waitlist.'
+    });
+  } catch (error) {
+    console.error('RSVP payment submit error:', error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Unable to submit payment and RSVP.'
+    });
+  }
+});
+
 app.get('/api/payment', async (req, res) => {
   try {
     const { lineUid, sessionId } = req.query;
@@ -2686,39 +2987,14 @@ app.post('/api/payment/submit', async (req, res) => {
       });
     }
 
-    const base64Text = String(slipBase64).includes(',')
-      ? String(slipBase64).split(',').pop()
-      : String(slipBase64);
-    const buffer = Buffer.from(base64Text, 'base64');
-    const maxBytes = 5 * 1024 * 1024;
-
-    if (!buffer.length || buffer.length > maxBytes) {
-      return res.status(400).json({
-        success: false,
-        message: 'Slip image must be under 5 MB.'
-      });
-    }
-
-    const mimeType = slipMimeType || 'image/jpeg';
-    const filename = safeStorageFileName(slipFileName || `slip.${getMimeExtension(mimeType)}`);
-    const storagePath = `${session.id}/${rsvp.id}/${Date.now()}-${filename}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(paymentSlipBucket)
-      .upload(storagePath, buffer, {
-        contentType: mimeType,
-        upsert: true
-      });
-
-    if (uploadError) throw uploadError;
-
-    if (rsvp.payment_slip_path) {
-      await supabase.storage.from(paymentSlipBucket).remove([rsvp.payment_slip_path]);
-    }
-
-    const { data: publicData } = supabase.storage
-      .from(paymentSlipBucket)
-      .getPublicUrl(storagePath);
+    const slip = await uploadPaymentSlip({
+      sessionId: session.id,
+      rsvpId: rsvp.id,
+      slipBase64,
+      slipMimeType,
+      slipFileName,
+      previousSlipPath: rsvp.payment_slip_path
+    });
 
     const paidAmount = amountPaid === '' || amountPaid === null || amountPaid === undefined
       ? null
@@ -2729,8 +3005,8 @@ app.post('/api/payment/submit', async (req, res) => {
       .update({
         payment_status: 'Submitted',
         payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : null,
-        payment_slip_url: publicData.publicUrl,
-        payment_slip_path: storagePath,
+        payment_slip_url: slip.publicUrl,
+        payment_slip_path: slip.storagePath,
         payment_slip_deleted: false,
         payment_note: note || null,
         payment_payer_name: payerName || user.display_name || null,
@@ -2842,6 +3118,157 @@ app.patch('/api/session/:sessionId/rsvps/:rsvpId/payment', requireAdmin, async (
     return res.status(500).json({
       success: false,
       message: 'Unable to update payment.'
+    });
+  }
+});
+
+app.get('/api/host/sessions', async (req, res) => {
+  try {
+    const { lineUid } = req.query;
+    const user = await getUserByLineUid(lineUid);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Host login required.'
+      });
+    }
+
+    const { data: sessions, error } = await supabase
+      .from('sessions')
+      .select(sessionSelect)
+      .eq('created_by_user_id', user.id)
+      .neq('status', 'Cancelled')
+      .order('event_date', { ascending: true, nullsFirst: false })
+      .order('start_time', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const summaries = await Promise.all(
+      (sessions || []).map(async (session) => {
+        const summary = await getSessionSummary(session.id, lineUid);
+        return {
+          ...serializeSession(session),
+          ...(summary.data || {}),
+          isEnded: isSessionEnded(session)
+        };
+      })
+    );
+
+    return res.json({
+      success: true,
+      sessions: summaries
+    });
+  } catch (error) {
+    console.error('Host sessions error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load hosted events.'
+    });
+  }
+});
+
+app.get('/api/host/session/:sessionId/rsvps', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { lineUid } = req.query;
+    const { session } = await requireSessionHost({ lineUid, sessionId });
+    const { data, error } = await listSessionRsvps(session.id);
+
+    if (error || !data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      session: {
+        ...serializeSession(session),
+        joinedCount: data.rows.filter((row) => row.status === 'Joined').length,
+        waitlistCount: data.rows.filter((row) => row.status === 'Waitlist').length
+      },
+      rsvps: data.rows
+    });
+  } catch (error) {
+    console.error('Host RSVP list error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Unable to load event RSVPs.'
+    });
+  }
+});
+
+app.patch('/api/host/sessions/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { lineUid } = req.body;
+    const { session } = await requireSessionHost({ lineUid, sessionId });
+    const { data: sessionPayload, error: payloadError } = parseSessionPayload(req.body);
+
+    if (payloadError) {
+      return res.status(400).json({
+        success: false,
+        message: payloadError
+      });
+    }
+
+    const { data: updatedSession, error } = await supabase
+      .from('sessions')
+      .update({
+        ...sessionPayload,
+        status: session.status || 'Published'
+      })
+      .eq('id', session.id)
+      .select(sessionSelect)
+      .single();
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      session: serializeSession(updatedSession),
+      message: 'Event updated.'
+    });
+  } catch (error) {
+    console.error('Host session update error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Unable to update event.'
+    });
+  }
+});
+
+app.patch('/api/host/session/:sessionId/rsvps/:rsvpId/payment', async (req, res) => {
+  try {
+    const { sessionId, rsvpId } = req.params;
+    const { lineUid, status, amountPaid } = req.body;
+    const { session } = await requireSessionHost({ lineUid, sessionId });
+    const rsvp = await updatePaymentStatus({
+      sessionId: session.id,
+      rsvpId,
+      status,
+      amountPaid
+    });
+
+    return res.json({
+      success: true,
+      payment: {
+        rsvpId: rsvp.id,
+        status: rsvp.payment_status,
+        amountDue: rsvp.payment_amount_due,
+        amountPaid: rsvp.payment_amount_paid,
+        paidAt: rsvp.payment_paid_at
+      },
+      message: 'Payment updated.'
+    });
+  } catch (error) {
+    console.error('Host payment status update error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Unable to update payment.'
     });
   }
 });
