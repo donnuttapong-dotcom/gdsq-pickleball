@@ -67,7 +67,7 @@
         </div>
     </div>
 
-    <div class="w-full max-w-md bg-white min-h-screen relative" :class="selectedSessionId ? 'pb-32' : 'pb-24'" x-data="eventApp()" x-init="init()">
+    <div class="w-full max-w-md bg-white min-h-screen relative" :class="selectedSessionId ? ((pendingJoinPayment || showPaymentPanel) ? 'pb-56' : 'pb-32') : 'pb-24'" x-data="eventApp()" x-init="init()">
         <header class="sticky top-0 z-40 bg-white/95 px-5 py-4 backdrop-blur">
             <div class="flex items-center justify-between">
                 <button class="text-2xl text-gray-900" @click="handleBack()">
@@ -882,10 +882,13 @@
                             <div class="overflow-hidden rounded-xl bg-gray-100" x-show="paymentForm.previewUrl">
                                 <img class="max-h-72 w-full object-contain" :src="paymentForm.previewUrl" alt="Slip preview">
                             </div>
-                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="submitPayment()" :disabled="isLoading || !paymentForm.slipBase64">
+                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click.stop.prevent="submitPayment()" :disabled="isLoading || !paymentForm.slipBase64">
                                 <span x-show="!isLoading" x-text="t('submitPayment')">Submit Payment</span>
                                 <span x-show="isLoading" x-text="t('uploadingSlip')">Uploading...</span>
                             </button>
+                            <div class="rounded-xl px-3 py-2 text-center text-xs font-bold" x-show="statusMessage" :class="statusMessage.includes('สำเร็จ') || statusMessage.includes('confirmed') || statusMessage.includes('submitted') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                                <span x-text="statusMessage"></span>
+                            </div>
                         </div>
 
                         <a class="block rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-black text-gdsq" x-show="payment.slipUrl" :href="payment.slipUrl" target="_blank">
@@ -911,7 +914,7 @@
                 </div>
             </section>
 
-            <section class="fixed bottom-0 left-0 w-full border-t bg-white p-4 z-50">
+            <section class="fixed bottom-0 left-0 w-full border-t bg-white p-4 z-50" x-show="!pendingJoinPayment && !showPaymentPanel">
                 <div class="mx-auto flex max-w-md items-center justify-between gap-3">
                     <div>
                         <p class="text-xs font-bold text-gray-500" x-text="t('spotsLeft')">Spots Left</p>
