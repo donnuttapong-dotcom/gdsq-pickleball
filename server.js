@@ -10,7 +10,8 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseKey = supabaseServiceRoleKey || process.env.SUPABASE_ANON_KEY;
 const adminPassword = process.env.ADMIN_PASSWORD;
 const adminSessionSecret = process.env.ADMIN_SESSION_SECRET || supabaseKey;
 
@@ -325,6 +326,12 @@ function calculatePaymentDue(session, joinedSeatCount, phase = 'deposit') {
 }
 
 async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, slipFileName, previousSlipPath }) {
+  if (!supabaseServiceRoleKey) {
+    const error = new Error('Payment slip storage requires SUPABASE_SERVICE_ROLE_KEY on the server.');
+    error.statusCode = 503;
+    throw error;
+  }
+
   const base64Text = String(slipBase64 || '').includes(',')
     ? String(slipBase64).split(',').pop()
     : String(slipBase64 || '');
@@ -361,6 +368,7 @@ async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, 
 
 async function createSignedSlipUrl(storagePath, expiresInSeconds = 60 * 60) {
   if (!storagePath) return '';
+  if (!supabaseServiceRoleKey) return '';
 
   try {
     const { data, error } = await supabase.storage
@@ -3241,7 +3249,8 @@ app.post('/api/payment/submit', async (req, res) => {
       note,
       slipFileName,
       slipMimeType,
-      slipBase64
+      slipBase64,
+      phase = 'deposit'
     } = req.body;
 
     if (!lineUid || !sessionId || !slipBase64) {
@@ -3345,9 +3354,9 @@ app.post('/api/payment/submit', async (req, res) => {
     });
   } catch (error) {
     console.error('Payment submit error:', error);
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Unable to submit payment.'
+      message: error.statusCode ? error.message : 'Unable to submit payment.'
     });
   }
 });
