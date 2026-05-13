@@ -22,7 +22,17 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors());
-app.use(express.json({ limit: '12mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use((error, req, res, next) => {
+  if (error?.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      message: 'Slip image is too large. Please upload an image under 10 MB.'
+    });
+  }
+
+  return next(error);
+});
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -336,10 +346,10 @@ async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, 
     ? String(slipBase64).split(',').pop()
     : String(slipBase64 || '');
   const buffer = Buffer.from(base64Text, 'base64');
-  const maxBytes = 5 * 1024 * 1024;
+  const maxBytes = 10 * 1024 * 1024;
 
   if (!buffer.length || buffer.length > maxBytes) {
-    const error = new Error('Slip image must be under 5 MB.');
+    const error = new Error('Slip image must be under 10 MB.');
     error.statusCode = 400;
     throw error;
   }
@@ -991,6 +1001,12 @@ async function reserveSessionRsvp({ sessionId, userId, guestNames = [] }) {
   });
 
   if (error) {
+    if (error.code === '42883' || String(error.message || '').includes('reserve_session_rsvp')) {
+      const migrationError = new Error('Database booking protection is not installed. Please run migration-rsvp-duplicate-capacity.sql in Supabase SQL Editor.');
+      migrationError.statusCode = 503;
+      throw migrationError;
+    }
+
     throw error;
   }
 

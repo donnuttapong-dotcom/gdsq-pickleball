@@ -1342,6 +1342,7 @@
                         paymentSubmitted: 'แจ้งชำระแล้ว',
                         paymentPaid: 'ชำระแล้ว',
                         paymentSubmitFailed: 'แจ้งชำระเงินไม่สำเร็จ',
+                        slipTooLarge: 'ไฟล์สลิปต้องไม่เกิน 10 MB',
                         paymentSubmittedMessage: 'ส่งสลิปแล้ว ระบบยืนยันที่ให้เรียบร้อย เจ้าของกิจกรรมจะเช็คสลิปย้อนหลัง',
                         paymentRequiredBeforeJoin: 'ต้องชำระก่อนยืนยันที่',
                         slipRequiredToJoin: 'กรุณาอัปโหลดสลิปเพื่อยืนยันการเข้าร่วม',
@@ -1541,6 +1542,7 @@
                         paymentSubmitted: 'Submitted',
                         paymentPaid: 'Paid',
                         paymentSubmitFailed: 'Unable to submit payment',
+                        slipTooLarge: 'Slip image must be under 10 MB',
                         paymentSubmittedMessage: 'Slip submitted. Your spot is confirmed. The host can review it later.',
                         paymentRequiredBeforeJoin: 'Payment required before joining',
                         slipRequiredToJoin: 'Please upload your payment slip to confirm your RSVP.',
@@ -2514,6 +2516,16 @@
                     const file = event.target.files?.[0];
                     if (!file) return;
 
+                    if (file.size > 10 * 1024 * 1024) {
+                        this.statusMessage = this.t('slipTooLarge');
+                        event.target.value = '';
+                        this.paymentForm.fileName = '';
+                        this.paymentForm.fileType = '';
+                        this.paymentForm.slipBase64 = '';
+                        this.paymentForm.previewUrl = '';
+                        return;
+                    }
+
                     const reader = new FileReader();
                     reader.onload = () => {
                         this.paymentForm.fileName = file.name;
@@ -2553,7 +2565,7 @@
                                 phase: this.paymentForm.phase || 'deposit'
                             })
                         });
-                        const result = await response.json();
+                        const result = await this.readJsonResponse(response);
 
                         if (!response.ok) throw new Error(result.message || this.t('paymentSubmitFailed'));
 
@@ -2577,6 +2589,17 @@
                         this.statusMessage = error.message || this.t('paymentSubmitFailed');
                     } finally {
                         this.isLoading = false;
+                    }
+                },
+
+                async readJsonResponse(response) {
+                    try {
+                        return await response.json();
+                    } catch (error) {
+                        return {
+                            success: false,
+                            message: response.ok ? '' : this.t('paymentSubmitFailed')
+                        };
                     }
                 },
 
