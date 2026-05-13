@@ -26,7 +26,7 @@ app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const adminCookieName = 'gdsq_admin_session';
-const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, payment_qr_url, payment_bank_name, payment_account_name, payment_account_number, payment_promptpay_id, location, address, skill_level, description, poster_url, created_by_user_id, status, created_at';
+const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, payment_mode, deposit_amount_thb, estimated_total_thb, final_amount_thb, payment_note_public, payment_qr_url, payment_bank_name, payment_account_name, payment_account_number, payment_promptpay_id, location, address, skill_level, description, poster_url, created_by_user_id, status, created_at';
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
 const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
@@ -289,6 +289,41 @@ function getMimeExtension(mimeType = '') {
   return 'jpg';
 }
 
+function normalizePaymentMode(mode) {
+  return ['none', 'deposit_then_final', 'final_only'].includes(mode) ? mode : 'deposit_then_final';
+}
+
+function joinedSeatCountForRsvp(rsvp, guests = []) {
+  return (rsvp.status === 'Joined' ? 1 : 0)
+    + (guests || []).filter((guest) => guest.status === 'Joined').length;
+}
+
+function depositAmountPerSeat(session) {
+  const mode = normalizePaymentMode(session.payment_mode);
+  if (mode !== 'deposit_then_final') return 0;
+  const amount = session.deposit_amount_thb === null || session.deposit_amount_thb === undefined
+    ? session.price_thb
+    : session.deposit_amount_thb;
+  return Math.max(Number(amount || 0), 0);
+}
+
+function finalAmountPerSeat(session) {
+  const mode = normalizePaymentMode(session.payment_mode);
+  if (session.final_amount_thb === null || session.final_amount_thb === undefined) return 0;
+  const finalAmount = Math.max(Number(session.final_amount_thb || 0), 0);
+  if (mode === 'deposit_then_final') {
+    return Math.max(finalAmount - depositAmountPerSeat(session), 0);
+  }
+  if (mode === 'final_only') return finalAmount;
+  return 0;
+}
+
+function calculatePaymentDue(session, joinedSeatCount, phase = 'deposit') {
+  const seats = Math.max(Number(joinedSeatCount || 0), 0);
+  if (phase === 'final') return finalAmountPerSeat(session) * seats;
+  return depositAmountPerSeat(session) * seats;
+}
+
 async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, slipFileName, previousSlipPath }) {
   const base64Text = String(slipBase64 || '').includes(',')
     ? String(slipBase64).split(',').pop()
@@ -381,6 +416,58 @@ async function updatePaymentStatus({ sessionId, rsvpId, status, amountPaid }) {
   return rsvp;
 }
 
+async function updateFinalPaymentStatus({ sessionId, rsvpId, status, amountPaid }) {
+  const allowedStatuses = ['NotOpened', 'Pending', 'Submitted', 'Paid'];
+
+  if (!allowedStatuses.includes(status)) {
+    const error = new Error('Invalid final payment status.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { data: existingRsvp, error: existingRsvpError } = await supabase
+    .from('rsvps')
+    .select('id, final_payment_amount_due, final_payment_amount_paid')
+    .eq('id', rsvpId)
+    .eq('session_id', sessionId)
+    .maybeSingle();
+
+  if (existingRsvpError) throw existingRsvpError;
+  if (!existingRsvp) {
+    const error = new Error('RSVP not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const parsedAmountPaid = amountPaid === '' || amountPaid === null || amountPaid === undefined
+    ? null
+    : Number(amountPaid);
+  const nextAmountPaid = status === 'Paid'
+    ? (Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : Number(existingRsvp.final_payment_amount_paid || existingRsvp.final_payment_amount_due || 0))
+    : (Number.isFinite(parsedAmountPaid) ? parsedAmountPaid : existingRsvp.final_payment_amount_paid);
+
+  const { data: rsvp, error } = await supabase
+    .from('rsvps')
+    .update({
+      final_payment_status: status,
+      final_payment_amount_paid: nextAmountPaid,
+      final_payment_paid_at: status === 'Paid' ? new Date().toISOString() : null
+    })
+    .eq('id', rsvpId)
+    .eq('session_id', sessionId)
+    .select('id, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_paid_at')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!rsvp) {
+    const error = new Error('RSVP not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return rsvp;
+}
+
 async function getUserByLineUid(lineUid) {
   if (!lineUid) return null;
 
@@ -430,6 +517,11 @@ function serializeSession(session) {
     startTime: session.start_time,
     endTime: session.end_time,
     priceThb: session.price_thb,
+    paymentMode: normalizePaymentMode(session.payment_mode),
+    depositAmountThb: session.deposit_amount_thb,
+    estimatedTotalThb: session.estimated_total_thb,
+    finalAmountThb: session.final_amount_thb,
+    paymentNotePublic: session.payment_note_public,
     paymentQrUrl: session.payment_qr_url,
     paymentBankName: session.payment_bank_name,
     paymentAccountName: session.payment_account_name,
@@ -524,6 +616,15 @@ function parseSessionPayload(body) {
   const parsedPriceThb = body.priceThb === '' || body.priceThb === null || body.priceThb === undefined
     ? null
     : Number(body.priceThb);
+  const parsedDepositAmountThb = body.depositAmountThb === '' || body.depositAmountThb === null || body.depositAmountThb === undefined
+    ? null
+    : Number(body.depositAmountThb);
+  const parsedEstimatedTotalThb = body.estimatedTotalThb === '' || body.estimatedTotalThb === null || body.estimatedTotalThb === undefined
+    ? null
+    : Number(body.estimatedTotalThb);
+  const parsedFinalAmountThb = body.finalAmountThb === '' || body.finalAmountThb === null || body.finalAmountThb === undefined
+    ? null
+    : Number(body.finalAmountThb);
   const parsedCourtCount = body.courtCount === '' || body.courtCount === null || body.courtCount === undefined
     ? 1
     : Number(body.courtCount);
@@ -542,6 +643,19 @@ function parseSessionPayload(body) {
     };
   }
 
+  for (const [label, value] of [
+    ['depositAmountThb', parsedDepositAmountThb],
+    ['estimatedTotalThb', parsedEstimatedTotalThb],
+    ['finalAmountThb', parsedFinalAmountThb]
+  ]) {
+    if (value !== null && (!Number.isInteger(value) || value < 0)) {
+      return {
+        data: null,
+        error: `${label} must be zero or a positive number.`
+      };
+    }
+  }
+
   if (!Number.isInteger(parsedCourtCount) || parsedCourtCount <= 0) {
     return {
       data: null,
@@ -558,6 +672,11 @@ function parseSessionPayload(body) {
       start_time: body.startTime || null,
       end_time: body.endTime || null,
       price_thb: parsedPriceThb,
+      payment_mode: normalizePaymentMode(body.paymentMode),
+      deposit_amount_thb: parsedDepositAmountThb,
+      estimated_total_thb: parsedEstimatedTotalThb,
+      final_amount_thb: parsedFinalAmountThb,
+      payment_note_public: body.paymentNotePublic || null,
       payment_qr_url: body.paymentQrUrl || null,
       payment_bank_name: body.paymentBankName || null,
       payment_account_name: body.paymentAccountName || null,
@@ -615,7 +734,7 @@ async function listSessionRsvps(sessionId) {
 
   const { data: rsvps, error: rsvpError } = await supabase
     .from('rsvps')
-    .select('id, user_id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_slip_path, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, created_at')
+    .select('id, user_id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_slip_path, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_slip_path, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at, admin_payment_note, created_at')
     .eq('session_id', session.id)
     .order('created_at', { ascending: true });
 
@@ -662,15 +781,16 @@ async function listSessionRsvps(sessionId) {
   }
 
   for (const rsvp of rsvps || []) {
-    const joinedSeatCount = (rsvp.status === 'Joined' ? 1 : 0)
-      + (guestsByRsvpId[rsvp.id] || []).filter((guest) => guest.status === 'Joined').length;
-    const nextAmountDue = Number(session.price_thb || 0) * joinedSeatCount;
+    const joinedSeatCount = joinedSeatCountForRsvp(rsvp, guestsByRsvpId[rsvp.id] || []);
+    const nextAmountDue = calculatePaymentDue(session, joinedSeatCount, 'deposit');
+    const nextFinalAmountDue = calculatePaymentDue(session, joinedSeatCount, 'final');
 
-    if (Number(rsvp.payment_amount_due || 0) !== nextAmountDue) {
+    if (Number(rsvp.payment_amount_due || 0) !== nextAmountDue || Number(rsvp.final_payment_amount_due || 0) !== nextFinalAmountDue) {
       const paidAmount = rsvp.payment_amount_paid === null || rsvp.payment_amount_paid === undefined
         ? null
         : Number(rsvp.payment_amount_paid);
       let nextPaymentStatus = rsvp.payment_status || 'Pending';
+      let nextFinalPaymentStatus = rsvp.final_payment_status || 'NotOpened';
 
       if (nextAmountDue > 0) {
         if (nextPaymentStatus === 'Paid' && Number(paidAmount || 0) < nextAmountDue) {
@@ -680,12 +800,20 @@ async function listSessionRsvps(sessionId) {
         nextPaymentStatus = 'Pending';
       }
 
+      if (nextFinalAmountDue > 0 && ['NotOpened', 'Paid'].includes(nextFinalPaymentStatus)) {
+        const finalPaidAmount = Number(rsvp.final_payment_amount_paid || 0);
+        nextFinalPaymentStatus = finalPaidAmount >= nextFinalAmountDue ? 'Paid' : 'Pending';
+      }
+
       const { error: syncPaymentError } = await supabase
         .from('rsvps')
         .update({
           payment_amount_due: nextAmountDue,
           payment_status: nextPaymentStatus,
-          payment_paid_at: nextPaymentStatus === 'Paid' ? rsvp.payment_paid_at : null
+          payment_paid_at: nextPaymentStatus === 'Paid' ? rsvp.payment_paid_at : null,
+          final_payment_amount_due: nextFinalAmountDue,
+          final_payment_status: nextFinalPaymentStatus,
+          final_payment_paid_at: nextFinalPaymentStatus === 'Paid' ? rsvp.final_payment_paid_at : null
         })
         .eq('id', rsvp.id);
 
@@ -696,6 +824,9 @@ async function listSessionRsvps(sessionId) {
       rsvp.payment_amount_due = nextAmountDue;
       rsvp.payment_status = nextPaymentStatus;
       if (nextPaymentStatus !== 'Paid') rsvp.payment_paid_at = null;
+      rsvp.final_payment_amount_due = nextFinalAmountDue;
+      rsvp.final_payment_status = nextFinalPaymentStatus;
+      if (nextFinalPaymentStatus !== 'Paid') rsvp.final_payment_paid_at = null;
     }
   }
 
@@ -724,6 +855,16 @@ async function listSessionRsvps(sessionId) {
       paymentPayerName: rsvp.payment_payer_name || '',
       paymentSubmittedAt: rsvp.payment_submitted_at || null,
       paymentPaidAt: rsvp.payment_paid_at || null,
+      finalPaymentStatus: rsvp.final_payment_status || 'NotOpened',
+      finalPaymentAmountDue: rsvp.final_payment_amount_due || 0,
+      finalPaymentAmountPaid: rsvp.final_payment_amount_paid || null,
+      finalPaymentSlipUrl: rsvp.final_payment_slip_url || '',
+      finalPaymentSlipPath: rsvp.final_payment_slip_path || '',
+      finalPaymentNote: rsvp.final_payment_note || '',
+      finalPaymentPayerName: rsvp.final_payment_payer_name || '',
+      finalPaymentSubmittedAt: rsvp.final_payment_submitted_at || null,
+      finalPaymentPaidAt: rsvp.final_payment_paid_at || null,
+      adminPaymentNote: rsvp.admin_payment_note || '',
       createdAt: rsvp.created_at,
       addedBy: null,
       user: owner
@@ -744,6 +885,16 @@ async function listSessionRsvps(sessionId) {
         paymentPayerName: rsvp.payment_payer_name || '',
         paymentSubmittedAt: rsvp.payment_submitted_at || null,
         paymentPaidAt: rsvp.payment_paid_at || null,
+        finalPaymentStatus: rsvp.final_payment_status || 'NotOpened',
+        finalPaymentAmountDue: rsvp.final_payment_amount_due || 0,
+        finalPaymentAmountPaid: rsvp.final_payment_amount_paid || null,
+        finalPaymentSlipUrl: rsvp.final_payment_slip_url || '',
+        finalPaymentSlipPath: rsvp.final_payment_slip_path || '',
+        finalPaymentNote: rsvp.final_payment_note || '',
+        finalPaymentPayerName: rsvp.final_payment_payer_name || '',
+        finalPaymentSubmittedAt: rsvp.final_payment_submitted_at || null,
+        finalPaymentPaidAt: rsvp.final_payment_paid_at || null,
+        adminPaymentNote: rsvp.admin_payment_note || '',
         createdAt: guest.created_at,
         addedBy: owner,
         user: {
@@ -842,7 +993,7 @@ async function promoteWaitlist(sessionId) {
         .eq('id', next.id);
 
       if (updateError) return { promoted, error: updateError };
-      const { error: paymentError } = await addJoinedPaymentDue(next.id, session.price_thb || 0);
+      const { error: paymentError } = await addJoinedPaymentDue(next.id, depositAmountPerSeat(session));
       if (paymentError) return { promoted, error: paymentError };
     } else {
       const { error: updateError } = await supabase
@@ -851,7 +1002,7 @@ async function promoteWaitlist(sessionId) {
         .eq('id', next.id);
 
       if (updateError) return { promoted, error: updateError };
-      const { error: paymentError } = await addJoinedPaymentDue(next.rsvp_id, session.price_thb || 0);
+      const { error: paymentError } = await addJoinedPaymentDue(next.rsvp_id, depositAmountPerSeat(session));
       if (paymentError) return { promoted, error: paymentError };
     }
 
@@ -1055,7 +1206,12 @@ async function getAppSettings() {
       paymentBankName: '',
       paymentAccountName: '',
       paymentAccountNumber: '',
-      paymentPromptPayId: ''
+      paymentPromptPayId: '',
+      paymentMode: 'deposit_then_final',
+      depositAmountThb: 100,
+      estimatedTotalThb: 250,
+      finalAmountThb: '',
+      paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม'
     }
   };
 
@@ -1124,7 +1280,14 @@ async function saveAppSettings(settings) {
     paymentBankName: settings.defaultEventSettings?.paymentBankName || '',
     paymentAccountName: settings.defaultEventSettings?.paymentAccountName || '',
     paymentAccountNumber: settings.defaultEventSettings?.paymentAccountNumber || '',
-    paymentPromptPayId: settings.defaultEventSettings?.paymentPromptPayId || ''
+    paymentPromptPayId: settings.defaultEventSettings?.paymentPromptPayId || '',
+    paymentMode: normalizePaymentMode(settings.defaultEventSettings?.paymentMode),
+    depositAmountThb: Number(settings.defaultEventSettings?.depositAmountThb || 0),
+    estimatedTotalThb: Number(settings.defaultEventSettings?.estimatedTotalThb || settings.defaultEventSettings?.priceThb || 0),
+    finalAmountThb: settings.defaultEventSettings?.finalAmountThb === '' || settings.defaultEventSettings?.finalAmountThb === null || settings.defaultEventSettings?.finalAmountThb === undefined
+      ? ''
+      : Number(settings.defaultEventSettings?.finalAmountThb || 0),
+    paymentNotePublic: settings.defaultEventSettings?.paymentNotePublic || ''
   };
 
   const { error } = await supabase
@@ -2293,6 +2456,9 @@ app.get('/api/public/session/:sessionId/players', async (req, res) => {
         paymentStatus: rsvp.paymentStatus,
         paymentAmountDue: rsvp.paymentAmountDue,
         paymentAmountPaid: rsvp.paymentAmountPaid,
+        finalPaymentStatus: rsvp.finalPaymentStatus,
+        finalPaymentAmountDue: rsvp.finalPaymentAmountDue,
+        finalPaymentAmountPaid: rsvp.finalPaymentAmountPaid,
         createdAt: rsvp.createdAt,
         user: {
           id: rsvp.kind === 'member' ? rsvp.user.id : null,
@@ -2642,7 +2808,7 @@ app.post('/api/rsvp', async (req, res) => {
       });
     }
 
-    if (Number(session.price_thb || 0) > 0) {
+    if (depositAmountPerSeat(session) > 0) {
       return res.status(402).json({
         success: false,
         paymentRequired: true,
@@ -2703,7 +2869,7 @@ app.post('/api/rsvp', async (req, res) => {
     const waitlistGuests = guestRows.filter((guest) => guest.status === 'Waitlist').length;
     const totalJoined = (status === 'Joined' ? 1 : 0) + joinedGuests;
     const totalWaitlist = (status === 'Waitlist' ? 1 : 0) + waitlistGuests;
-    const amountDue = (session.price_thb || 0) * totalJoined;
+    const amountDue = calculatePaymentDue(session, totalJoined, 'deposit');
     const paymentStatus = amountDue > 0 ? 'Pending' : (totalJoined > 0 ? 'Paid' : 'Pending');
 
     const { error: paymentUpdateError } = await supabase
@@ -2757,7 +2923,8 @@ app.post('/api/rsvp/submit-payment', async (req, res) => {
       note,
       slipFileName,
       slipMimeType,
-      slipBase64
+      slipBase64,
+      phase = 'deposit'
     } = req.body;
     const guestNames = Array.isArray(req.body.guestNames)
       ? req.body.guestNames.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 10)
@@ -2883,7 +3050,7 @@ app.post('/api/rsvp/submit-payment', async (req, res) => {
     const paidAmount = amountPaid === '' || amountPaid === null || amountPaid === undefined
       ? null
       : Number(amountPaid);
-    const amountDue = Number(session.price_thb || 0) * totalJoined;
+    const amountDue = calculatePaymentDue(session, totalJoined, 'deposit');
 
     const { data: updatedRsvp, error: updateError } = await supabase
       .from('rsvps')
@@ -2963,7 +3130,7 @@ app.get('/api/payment', async (req, res) => {
 
     const { data: rsvp, error: rsvpError } = await supabase
       .from('rsvps')
-      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at')
+      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at')
       .eq('session_id', session.id)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -2980,11 +3147,13 @@ app.get('/api/payment', async (req, res) => {
       if (guestCountError) throw guestCountError;
 
       const joinedSeatCount = (rsvp.status === 'Joined' ? 1 : 0) + (joinedGuestCount || 0);
-      const nextAmountDue = Number(session.price_thb || 0) * joinedSeatCount;
+      const nextAmountDue = calculatePaymentDue(session, joinedSeatCount, 'deposit');
+      const nextFinalAmountDue = calculatePaymentDue(session, joinedSeatCount, 'final');
 
-      if (Number(rsvp.payment_amount_due || 0) !== nextAmountDue) {
+      if (Number(rsvp.payment_amount_due || 0) !== nextAmountDue || Number(rsvp.final_payment_amount_due || 0) !== nextFinalAmountDue) {
         let nextPaymentStatus = rsvp.payment_status || 'Pending';
         const paidAmount = Number(rsvp.payment_amount_paid || 0);
+        let nextFinalPaymentStatus = rsvp.final_payment_status || 'NotOpened';
 
         if (nextPaymentStatus === 'Paid' && paidAmount < nextAmountDue) {
           nextPaymentStatus = rsvp.payment_slip_url ? 'Submitted' : 'Pending';
@@ -2992,15 +3161,22 @@ app.get('/api/payment', async (req, res) => {
           nextPaymentStatus = 'Pending';
         }
 
+        if (nextFinalAmountDue > 0 && ['NotOpened', 'Paid'].includes(nextFinalPaymentStatus)) {
+          nextFinalPaymentStatus = Number(rsvp.final_payment_amount_paid || 0) >= nextFinalAmountDue ? 'Paid' : 'Pending';
+        }
+
         const { data: syncedRsvp, error: syncError } = await supabase
           .from('rsvps')
           .update({
             payment_amount_due: nextAmountDue,
             payment_status: nextPaymentStatus,
-            payment_paid_at: nextPaymentStatus === 'Paid' ? rsvp.payment_paid_at : null
+            payment_paid_at: nextPaymentStatus === 'Paid' ? rsvp.payment_paid_at : null,
+            final_payment_amount_due: nextFinalAmountDue,
+            final_payment_status: nextFinalPaymentStatus,
+            final_payment_paid_at: nextFinalPaymentStatus === 'Paid' ? rsvp.final_payment_paid_at : null
           })
           .eq('id', rsvp.id)
-          .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at')
+          .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at')
           .single();
 
         if (syncError) throw syncError;
@@ -3021,7 +3197,15 @@ app.get('/api/payment', async (req, res) => {
         note: rsvp.payment_note || '',
         payerName: rsvp.payment_payer_name || '',
         submittedAt: rsvp.payment_submitted_at,
-        paidAt: rsvp.payment_paid_at
+        paidAt: rsvp.payment_paid_at,
+        finalStatus: rsvp.final_payment_status || 'NotOpened',
+        finalAmountDue: rsvp.final_payment_amount_due || 0,
+        finalAmountPaid: rsvp.final_payment_amount_paid || null,
+        finalSlipUrl: rsvp.final_payment_slip_url || '',
+        finalNote: rsvp.final_payment_note || '',
+        finalPayerName: rsvp.final_payment_payer_name || '',
+        finalSubmittedAt: rsvp.final_payment_submitted_at,
+        finalPaidAt: rsvp.final_payment_paid_at
       } : null
     });
   } catch (error) {
@@ -3077,7 +3261,7 @@ app.post('/api/payment/submit', async (req, res) => {
 
     const { data: rsvp, error: rsvpError } = await supabase
       .from('rsvps')
-      .select('id, payment_slip_path')
+      .select('id, payment_slip_path, final_payment_slip_path')
       .eq('session_id', session.id)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -3096,16 +3280,24 @@ app.post('/api/payment/submit', async (req, res) => {
       slipBase64,
       slipMimeType,
       slipFileName,
-      previousSlipPath: rsvp.payment_slip_path
+      previousSlipPath: phase === 'final' ? rsvp.final_payment_slip_path : rsvp.payment_slip_path
     });
 
     const paidAmount = amountPaid === '' || amountPaid === null || amountPaid === undefined
       ? null
       : Number(amountPaid);
 
-    const { data: updatedRsvp, error: updateError } = await supabase
-      .from('rsvps')
-      .update({
+    const updatePayload = phase === 'final'
+      ? {
+        final_payment_status: 'Submitted',
+        final_payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : null,
+        final_payment_slip_url: slip.publicUrl,
+        final_payment_slip_path: slip.storagePath,
+        final_payment_note: note || null,
+        final_payment_payer_name: payerName || user.display_name || null,
+        final_payment_submitted_at: new Date().toISOString()
+      }
+      : {
         payment_status: 'Submitted',
         payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : null,
         payment_slip_url: slip.publicUrl,
@@ -3114,9 +3306,13 @@ app.post('/api/payment/submit', async (req, res) => {
         payment_note: note || null,
         payment_payer_name: payerName || user.display_name || null,
         payment_submitted_at: new Date().toISOString()
-      })
+      };
+
+    const { data: updatedRsvp, error: updateError } = await supabase
+      .from('rsvps')
+      .update(updatePayload)
       .eq('id', rsvp.id)
-      .select('id, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_submitted_at')
+      .select('id, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_submitted_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_submitted_at')
       .single();
 
     if (updateError) throw updateError;
@@ -3125,11 +3321,12 @@ app.post('/api/payment/submit', async (req, res) => {
       success: true,
       payment: {
         rsvpId: updatedRsvp.id,
-        status: updatedRsvp.payment_status,
-        amountDue: updatedRsvp.payment_amount_due,
-        amountPaid: updatedRsvp.payment_amount_paid,
-        slipUrl: updatedRsvp.payment_slip_url,
-        submittedAt: updatedRsvp.payment_submitted_at
+        phase,
+        status: phase === 'final' ? updatedRsvp.final_payment_status : updatedRsvp.payment_status,
+        amountDue: phase === 'final' ? updatedRsvp.final_payment_amount_due : updatedRsvp.payment_amount_due,
+        amountPaid: phase === 'final' ? updatedRsvp.final_payment_amount_paid : updatedRsvp.payment_amount_paid,
+        slipUrl: phase === 'final' ? updatedRsvp.final_payment_slip_url : updatedRsvp.payment_slip_url,
+        submittedAt: phase === 'final' ? updatedRsvp.final_payment_submitted_at : updatedRsvp.payment_submitted_at
       },
       message: 'Payment submitted.'
     });
@@ -3221,6 +3418,46 @@ app.patch('/api/session/:sessionId/rsvps/:rsvpId/payment', requireAdmin, async (
     return res.status(500).json({
       success: false,
       message: 'Unable to update payment.'
+    });
+  }
+});
+
+app.patch('/api/session/:sessionId/rsvps/:rsvpId/final-payment', requireAdmin, async (req, res) => {
+  try {
+    const { sessionId, rsvpId } = req.params;
+    const { status, amountPaid } = req.body;
+
+    const { data: session, error: sessionError } = await findSession(sessionId);
+    if (sessionError || !session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    const rsvp = await updateFinalPaymentStatus({
+      sessionId: session.id,
+      rsvpId,
+      status,
+      amountPaid
+    });
+
+    return res.json({
+      success: true,
+      payment: {
+        rsvpId: rsvp.id,
+        status: rsvp.final_payment_status,
+        amountDue: rsvp.final_payment_amount_due,
+        amountPaid: rsvp.final_payment_amount_paid,
+        paidAt: rsvp.final_payment_paid_at
+      },
+      message: 'Final payment updated.'
+    });
+  } catch (error) {
+    console.error('Final payment status update error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Unable to update final payment.'
     });
   }
 });
@@ -3374,6 +3611,38 @@ app.patch('/api/host/session/:sessionId/rsvps/:rsvpId/payment', async (req, res)
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.statusCode ? error.message : 'Unable to update payment.'
+    });
+  }
+});
+
+app.patch('/api/host/session/:sessionId/rsvps/:rsvpId/final-payment', async (req, res) => {
+  try {
+    const { sessionId, rsvpId } = req.params;
+    const { lineUid, status, amountPaid } = req.body;
+    const { session } = await requireSessionHost({ lineUid, sessionId });
+    const rsvp = await updateFinalPaymentStatus({
+      sessionId: session.id,
+      rsvpId,
+      status,
+      amountPaid
+    });
+
+    return res.json({
+      success: true,
+      payment: {
+        rsvpId: rsvp.id,
+        status: rsvp.final_payment_status,
+        amountDue: rsvp.final_payment_amount_due,
+        amountPaid: rsvp.final_payment_amount_paid,
+        paidAt: rsvp.final_payment_paid_at
+      },
+      message: 'Final payment updated.'
+    });
+  } catch (error) {
+    console.error('Host final payment status update error:', error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Unable to update final payment.'
     });
   }
 });

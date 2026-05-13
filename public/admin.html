@@ -170,8 +170,17 @@
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" :placeholder="t('courtCount')" x-model="appSettings.defaultEventSettings.courtCount">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('priceThb')" x-model="appSettings.defaultEventSettings.priceThb">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('skillLevel')" x-model="appSettings.defaultEventSettings.skillLevel">
+                <select class="rounded-lg border border-gray-300 px-3 py-2 text-sm" x-model="appSettings.defaultEventSettings.paymentMode">
+                    <option value="none" x-text="t('paymentModeNone')"></option>
+                    <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                    <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                </select>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('depositAmountThb')" x-model="appSettings.defaultEventSettings.depositAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('estimatedTotalThb')" x-model="appSettings.defaultEventSettings.estimatedTotalThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('finalAmountThb')" x-model="appSettings.defaultEventSettings.finalAmountThb">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('location')" x-model="appSettings.defaultEventSettings.location">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('address')" x-model="appSettings.defaultEventSettings.address">
+                <textarea class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" rows="2" :placeholder="t('paymentNotePublic')" x-model="appSettings.defaultEventSettings.paymentNotePublic"></textarea>
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="appSettings.defaultEventSettings.paymentQrUrl">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="appSettings.defaultEventSettings.paymentBankName">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="appSettings.defaultEventSettings.paymentAccountName">
@@ -343,6 +352,15 @@
                     :placeholder="t('posterUrl')"
                     x-model="newSession.posterUrl"
                 >
+                <select class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" x-model="newSession.paymentMode">
+                    <option value="none" x-text="t('paymentModeNone')"></option>
+                    <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                    <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                </select>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('depositAmountThb')" x-model="newSession.depositAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('estimatedTotalThb')" x-model="newSession.estimatedTotalThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('finalAmountThb')" x-model="newSession.finalAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('paymentNotePublic')" x-model="newSession.paymentNotePublic">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="newSession.paymentQrUrl">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="newSession.paymentBankName">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="newSession.paymentAccountName">
@@ -381,6 +399,15 @@
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('address')" x-model="editSession.address">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('skillLevel')" x-model="editSession.skillLevel">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('posterUrl')" x-model="editSession.posterUrl">
+                <select class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" x-model="editSession.paymentMode">
+                    <option value="none" x-text="t('paymentModeNone')"></option>
+                    <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                    <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                </select>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('depositAmountThb')" x-model="editSession.depositAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('estimatedTotalThb')" x-model="editSession.estimatedTotalThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('finalAmountThb')" x-model="editSession.finalAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('paymentNotePublic')" x-model="editSession.paymentNotePublic">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="editSession.paymentQrUrl">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="editSession.paymentBankName">
                 <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="editSession.paymentAccountName">
@@ -440,13 +467,16 @@
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
                                 <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
                                 <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
-                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`${t('payment')}: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`Deposit: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.finalPaymentStatus)" x-show="rsvp.finalPaymentAmountDue > 0" x-text="`Final: ${paymentStatusLabel(rsvp.finalPaymentStatus)} · ${moneyText(rsvp.finalPaymentAmountDue)}`"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
                             <div class="flex flex-col items-end gap-2">
                                 <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700" x-text="t('joined')">Joined</span>
                                 <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.finalPaymentSlipUrl" :href="rsvp.finalPaymentSlipUrl" target="_blank">Final Slip</a>
                                 <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                                <button class="rounded-full bg-green-700 px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.finalPaymentAmountDue > 0 && rsvp.finalPaymentStatus !== 'Paid'" @click="markFinalPaid(rsvp)">Final Paid</button>
                                 <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gray-700" x-show="rsvp.kind === 'member' && rsvp.paymentStatus === 'Paid'" @click="markPaymentPending(rsvp)" x-text="t('markPending')">Mark Pending</button>
                             </div>
                         </div>
@@ -466,13 +496,16 @@
                                 <p class="font-bold" x-text="rsvp.user.display_name"></p>
                                 <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
                                 <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
-                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`${t('payment')}: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`Deposit: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.finalPaymentStatus)" x-show="rsvp.finalPaymentAmountDue > 0" x-text="`Final: ${paymentStatusLabel(rsvp.finalPaymentStatus)} · ${moneyText(rsvp.finalPaymentAmountDue)}`"></p>
                                 <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
                             </div>
                             <div class="flex flex-col items-end gap-2">
                                 <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-gdsqRed" x-text="t('waitlist')">Waitlist</span>
                                 <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.finalPaymentSlipUrl" :href="rsvp.finalPaymentSlipUrl" target="_blank">Final Slip</a>
                                 <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                                <button class="rounded-full bg-green-700 px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.finalPaymentAmountDue > 0 && rsvp.finalPaymentStatus !== 'Paid'" @click="markFinalPaid(rsvp)">Final Paid</button>
                                 <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gray-700" x-show="rsvp.kind === 'member' && rsvp.paymentStatus === 'Paid'" @click="markPaymentPending(rsvp)" x-text="t('markPending')">Mark Pending</button>
                             </div>
                         </div>
@@ -507,6 +540,11 @@
                     startTime: '',
                     endTime: '',
                     priceThb: 250,
+                    paymentMode: 'deposit_then_final',
+                    depositAmountThb: 100,
+                    estimatedTotalThb: 250,
+                    finalAmountThb: '',
+                    paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
                     location: '',
                     address: '',
                     skillLevel: '',
@@ -526,6 +564,11 @@
                     startTime: '',
                     endTime: '',
                     priceThb: 250,
+                    paymentMode: 'deposit_then_final',
+                    depositAmountThb: 100,
+                    estimatedTotalThb: 250,
+                    finalAmountThb: '',
+                    paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
                     location: '',
                     address: '',
                     skillLevel: '',
@@ -553,6 +596,11 @@
                         maxPlayers: 24,
                         courtCount: 1,
                         priceThb: 250,
+                        paymentMode: 'deposit_then_final',
+                        depositAmountThb: 100,
+                        estimatedTotalThb: 250,
+                        finalAmountThb: '',
+                        paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
                         location: '',
                         address: '',
                         skillLevel: '',
@@ -625,6 +673,13 @@
                         description: 'รายละเอียดกิจกรรม',
                         posterUrl: 'ลิงก์รูปโปสเตอร์กิจกรรม',
                         paymentQrUrl: 'ลิงก์รูป QR ชำระเงิน',
+                        paymentModeNone: 'ไม่เก็บผ่านแอพ',
+                        paymentModeDepositFinal: 'มัดจำ + ส่วนต่าง',
+                        paymentModeFinalOnly: 'จ่ายหลังจบทีเดียว',
+                        depositAmountThb: 'มัดจำ THB',
+                        estimatedTotalThb: 'ยอดประมาณ THB',
+                        finalAmountThb: 'ยอดจริงหลังจบ THB',
+                        paymentNotePublic: 'หมายเหตุการชำระเงิน',
                         paymentBankName: 'ชื่อธนาคาร',
                         paymentAccountName: 'ชื่อบัญชี',
                         paymentAccountNumber: 'เลขบัญชี',
@@ -723,6 +778,13 @@
                         description: 'Event description',
                         posterUrl: 'Event poster image URL',
                         paymentQrUrl: 'Payment QR image URL',
+                        paymentModeNone: 'No in-app payment',
+                        paymentModeDepositFinal: 'Deposit + final',
+                        paymentModeFinalOnly: 'Final only',
+                        depositAmountThb: 'Deposit THB',
+                        estimatedTotalThb: 'Estimated THB',
+                        finalAmountThb: 'Final THB',
+                        paymentNotePublic: 'Payment note',
                         paymentBankName: 'Bank name',
                         paymentAccountName: 'Account name',
                         paymentAccountNumber: 'Account number',
@@ -817,11 +879,15 @@
                     const members = this.rsvps.filter((rsvp) => rsvp.kind === 'member');
                     return members.reduce((summary, rsvp) => {
                         const due = Number(rsvp.paymentAmountDue || 0);
+                        const finalDue = Number(rsvp.finalPaymentAmountDue || 0);
                         const paid = Number(rsvp.paymentAmountPaid || 0);
-                        summary.expected += due;
+                        const finalPaid = Number(rsvp.finalPaymentAmountPaid || 0);
+                        summary.expected += due + finalDue;
                         if (rsvp.paymentStatus === 'Paid') summary.paid += paid || due;
+                        if (rsvp.finalPaymentStatus === 'Paid') summary.paid += finalPaid || finalDue;
                         if (rsvp.paymentStatus !== 'Paid') summary.unpaid += due;
-                        if (rsvp.paymentStatus === 'Submitted') summary.submittedCount += 1;
+                        if (rsvp.finalPaymentStatus !== 'Paid') summary.unpaid += finalDue;
+                        if (rsvp.paymentStatus === 'Submitted' || rsvp.finalPaymentStatus === 'Submitted') summary.submittedCount += 1;
                         return summary;
                     }, {
                         expected: 0,
@@ -840,11 +906,16 @@
                 },
 
                 get submittedPaymentCount() {
-                    return this.rsvps.filter((rsvp) => rsvp.kind === 'member' && rsvp.paymentStatus === 'Submitted').length;
+                    return this.rsvps.filter((rsvp) => rsvp.kind === 'member' && (rsvp.paymentStatus === 'Submitted' || rsvp.finalPaymentStatus === 'Submitted')).length;
                 },
 
                 get unpaidCount() {
-                    return this.rsvps.filter((rsvp) => rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid').length;
+                    return this.rsvps.filter((rsvp) => {
+                        if (rsvp.kind !== 'member') return false;
+                        const hasDepositDue = Number(rsvp.paymentAmountDue || 0) > 0 && rsvp.paymentStatus !== 'Paid';
+                        const hasFinalDue = Number(rsvp.finalPaymentAmountDue || 0) > 0 && rsvp.finalPaymentStatus !== 'Paid';
+                        return hasDepositDue || hasFinalDue;
+                    }).length;
                 },
 
                 async init() {
@@ -968,6 +1039,11 @@
                     this.newSession.maxPlayers = defaults.maxPlayers || 24;
                     this.newSession.courtCount = defaults.courtCount || 1;
                     this.newSession.priceThb = defaults.priceThb ?? 250;
+                    this.newSession.paymentMode = defaults.paymentMode || 'deposit_then_final';
+                    this.newSession.depositAmountThb = defaults.depositAmountThb ?? 100;
+                    this.newSession.estimatedTotalThb = defaults.estimatedTotalThb ?? defaults.priceThb ?? 250;
+                    this.newSession.finalAmountThb = defaults.finalAmountThb ?? '';
+                    this.newSession.paymentNotePublic = defaults.paymentNotePublic || this.newSession.paymentNotePublic || '';
                     this.newSession.location = defaults.location || '';
                     this.newSession.address = defaults.address || '';
                     this.newSession.skillLevel = defaults.skillLevel || '';
@@ -1176,6 +1252,11 @@
                         startTime: session.startTime ? session.startTime.slice(0, 5) : '',
                         endTime: session.endTime ? session.endTime.slice(0, 5) : '',
                         priceThb: session.priceThb ?? '',
+                        paymentMode: session.paymentMode || 'deposit_then_final',
+                        depositAmountThb: session.depositAmountThb ?? session.priceThb ?? 0,
+                        estimatedTotalThb: session.estimatedTotalThb ?? session.priceThb ?? 0,
+                        finalAmountThb: session.finalAmountThb ?? '',
+                        paymentNotePublic: session.paymentNotePublic || '',
                         location: session.location || '',
                         address: session.address || '',
                         skillLevel: session.skillLevel || '',
@@ -1196,6 +1277,7 @@
                 paymentStatusLabel(status) {
                     if (status === 'Paid') return this.t('paymentPaid');
                     if (status === 'Submitted') return this.t('paymentSubmitted');
+                    if (status === 'NotOpened') return 'Not opened';
                     return this.t('paymentPending');
                 },
 
@@ -1259,6 +1341,35 @@
 
                         if (!response.ok) {
                             throw new Error(result.message || 'Unable to update payment');
+                        }
+
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async markFinalPaid(rsvp) {
+                    if (!this.selectedSessionId || !rsvp?.parentRsvpId) return;
+
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/final-payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: 'Paid',
+                                amountPaid: rsvp.finalPaymentAmountPaid || rsvp.finalPaymentAmountDue || 0
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update final payment');
                         }
 
                         await this.loadAll();
