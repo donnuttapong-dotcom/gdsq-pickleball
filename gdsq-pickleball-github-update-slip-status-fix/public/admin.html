@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDSQ Pickleball - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { gdsq: '#0044CC', gdsqRed: '#E32636' } } } }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+    <div class="mx-auto min-h-screen max-w-6xl px-4 py-6" x-data="adminDashboard()" x-init="init()">
+        <div class="mb-4 flex justify-end">
+            <button
+                class="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold text-gray-700"
+                @click="toggleLanguage()"
+                x-text="language === 'th' ? 'EN' : 'ไทย'"
+            ></button>
+        </div>
+
+        <div class="flex min-h-screen items-center justify-center" x-show="!isAuthenticated">
+            <div class="w-full max-w-sm rounded-lg bg-white p-6 shadow-sm">
+                <p class="text-xs font-bold uppercase tracking-wide text-gdsq">GDSQ Pickleball</p>
+                <h1 class="mt-1 text-2xl font-black" x-text="t('adminLogin')">Admin Login</h1>
+                <p class="mt-2 text-sm text-gray-500" x-text="t('loginHint')">ใส่รหัสผ่านเพื่อดูรายชื่อ RSVP และจัดการ event</p>
+
+                <form class="mt-5 space-y-3" @submit.prevent="login()">
+                    <input
+                        class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm"
+                        type="password"
+                        :placeholder="t('adminPassword')"
+                        x-model="adminPassword"
+                        autocomplete="current-password"
+                    >
+                    <button
+                        class="w-full rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                        type="submit"
+                        :disabled="isLoading"
+                    >
+                        <span x-show="!isLoading" x-text="t('login')">Login</span>
+                        <span x-show="isLoading" x-text="t('checking')">Checking...</span>
+                    </button>
+                </form>
+
+                <div class="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" x-show="errorMessage" x-text="errorMessage"></div>
+            </div>
+        </div>
+
+        <div x-show="isAuthenticated">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-gdsq">GDSQ Pickleball</p>
+                <h1 class="text-3xl font-black" x-text="t('rsvpAdmin')">RSVP Admin</h1>
+                <p class="mt-1 text-sm text-gray-500" x-text="t('adminSubtitle')">ดูรายชื่อผู้เล่น Joined และ Waitlist จาก Supabase แบบ real-time</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="/" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50">
+                    <i class="fa-solid fa-mobile-screen-button mr-2"></i><span x-text="t('eventPage')">Event page</span>
+                </a>
+                <button class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800" @click="loadAll()">
+                    <i class="fa-solid fa-rotate mr-2"></i><span x-text="t('refresh')">Refresh</span>
+                </button>
+                <button class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50" @click="logout()">
+                    <i class="fa-solid fa-right-from-bracket mr-2"></i><span x-text="t('logout')">Logout</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-5 grid gap-3 md:grid-cols-4">
+            <div class="rounded-xl bg-gdsq p-4 text-white shadow-sm">
+                <p class="text-xs font-bold uppercase text-blue-100" x-text="t('upcomingEvents')">Upcoming</p>
+                <p class="mt-1 text-3xl font-black" x-text="upcomingSessions.length">0</p>
+            </div>
+            <div class="rounded-xl bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('endedEvents')">Ended</p>
+                <p class="mt-1 text-3xl font-black" x-text="endedSessions.length">0</p>
+            </div>
+            <div class="rounded-xl bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('pendingSlipReview')">Slip review</p>
+                <p class="mt-1 text-3xl font-black text-gdsq" x-text="submittedPaymentCount">0</p>
+            </div>
+            <div class="rounded-xl bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('unpaidPlayers')">Unpaid</p>
+                <p class="mt-1 text-3xl font-black text-gdsqRed" x-text="unpaidCount">0</p>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-xl bg-blue-50 p-4 text-sm text-blue-900">
+            <p class="font-black" x-text="t('adminWorkflowTitle')">วิธีใช้หลังบ้านแบบเร็ว</p>
+            <div class="mt-2 grid gap-2 md:grid-cols-4">
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">1.</span> <span x-text="t('adminStepCreate')">สร้างหรือเลือกกิจกรรม</span></div>
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">2.</span> <span x-text="t('adminStepShare')">คัดลอกลิงก์ส่งให้ผู้เล่น</span></div>
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">3.</span> <span x-text="t('adminStepPayment')">ตรวจสลิปและ Mark Paid</span></div>
+                <div class="rounded-lg bg-white/70 p-3"><span class="font-black">4.</span> <span x-text="t('adminStepExport')">ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ</span></div>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
+            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('appearance')">Appearance</p>
+                    <h2 class="text-xl font-black" x-text="t('homeBannerSettings')">Home Banner</h2>
+                    <p class="mt-1 text-sm text-gray-500" x-text="t('homeBannerHelp')">ปรับรูปแบนเนอร์หน้า Home ของแอพ</p>
+                </div>
+                <p class="rounded-full bg-gray-50 px-3 py-1 text-xs font-bold text-gray-600" x-show="settingsMessage" x-text="settingsMessage"></p>
+            </div>
+            <div class="grid gap-4 lg:grid-cols-[1fr_260px]">
+                <div class="space-y-3">
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold uppercase text-gray-500" x-text="t('homeBannerUrl')">Home banner image URL</span>
+                        <input
+                            class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-gdsq focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            type="url"
+                            x-model="appSettings.homeBannerUrl"
+                            :placeholder="t('homeBannerUrlPlaceholder')"
+                        >
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-xs font-bold uppercase text-gray-500" x-text="t('homeBannerSlides')">Banner slider images</span>
+                        <textarea
+                            class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-gdsq focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            rows="4"
+                            x-model="appSettings.homeBannerSlidesText"
+                            :placeholder="t('homeBannerSlidesPlaceholder')"
+                        ></textarea>
+                    </label>
+                    <p class="text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeBannerDriveHelp')"></p>
+                    <div class="flex flex-col gap-2 sm:flex-row">
+                        <button
+                            class="inline-flex items-center justify-center rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                            @click="saveSettings()"
+                            :disabled="isLoading"
+                        >
+                            <i class="fa-solid fa-floppy-disk mr-2"></i><span x-text="t('saveBanner')">Save Banner</span>
+                        </button>
+                        <button
+                            class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold hover:bg-gray-50"
+                            @click="appSettings.homeBannerUrl = '/assets/gdsq-home-banner.png'"
+                        >
+                            <i class="fa-solid fa-rotate-left mr-2"></i><span x-text="t('useDefaultBanner')">Use default</span>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <p class="mb-2 text-xs font-bold uppercase text-gray-500" x-text="t('preview')">Preview</p>
+                    <div class="overflow-hidden rounded-2xl bg-gray-100 shadow-inner">
+                        <img
+                            class="aspect-square w-full object-cover"
+                            :src="imageUrl(appSettings.homeBannerUrl || '/assets/gdsq-home-banner.png')"
+                            alt="Home banner preview"
+                            @error="$event.target.src = '/assets/gdsq-home-banner.png'"
+                        >
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
+            <div class="mb-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('defaults')">Defaults</p>
+                <h2 class="text-xl font-black" x-text="t('defaultSettings')">Default Event Settings</h2>
+                <p class="mt-1 text-sm text-gray-500" x-text="t('defaultSettingsHelp')"></p>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" :placeholder="t('maxPlayers')" x-model="appSettings.defaultEventSettings.maxPlayers">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" :placeholder="t('courtCount')" x-model="appSettings.defaultEventSettings.courtCount">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('priceThb')" x-model="appSettings.defaultEventSettings.priceThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('skillLevel')" x-model="appSettings.defaultEventSettings.skillLevel">
+                <select class="rounded-lg border border-gray-300 px-3 py-2 text-sm" x-model="appSettings.defaultEventSettings.paymentMode">
+                    <option value="none" x-text="t('paymentModeNone')"></option>
+                    <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                    <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                </select>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('depositAmountThb')" x-model="appSettings.defaultEventSettings.depositAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('estimatedTotalThb')" x-model="appSettings.defaultEventSettings.estimatedTotalThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('finalAmountThb')" x-model="appSettings.defaultEventSettings.finalAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('location')" x-model="appSettings.defaultEventSettings.location">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('address')" x-model="appSettings.defaultEventSettings.address">
+                <textarea class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" rows="2" :placeholder="t('paymentNotePublic')" x-model="appSettings.defaultEventSettings.paymentNotePublic"></textarea>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="appSettings.defaultEventSettings.paymentQrUrl">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="appSettings.defaultEventSettings.paymentBankName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="appSettings.defaultEventSettings.paymentAccountName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountNumber')" x-model="appSettings.defaultEventSettings.paymentAccountNumber">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentPromptPayId')" x-model="appSettings.defaultEventSettings.paymentPromptPayId">
+            </div>
+            <div class="mt-3 flex gap-2">
+                <button class="rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50" @click="saveSettings()" :disabled="isLoading">
+                    <i class="fa-solid fa-floppy-disk mr-2"></i><span x-text="t('saveDefaults')">Save defaults</span>
+                </button>
+                <button class="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold hover:bg-gray-50" @click="applyDefaultsToNewSession()" x-text="t('applyToCreateForm')">Apply to form</button>
+            </div>
+        </div>
+
+        <div class="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('event')">Event</label>
+                <select
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    x-model="selectedSessionId"
+                    @change="loadRsvps()"
+                >
+                    <template x-for="session in sessions" :key="session.id">
+                        <option :value="session.id" x-text="`${session.index}. ${session.title} (${formatEventDate(session)})`"></option>
+                    </template>
+                </select>
+            </div>
+
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('export')">Export</label>
+                <a
+                    class="inline-flex w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-black"
+                    :href="selectedSessionId ? `/api/session/${selectedSessionId}/export.csv` : '#'"
+                >
+                    <i class="fa-solid fa-file-csv mr-2"></i><span x-text="t('downloadCsv')">Download CSV</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm">
+            <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('selectedEventLink')">Selected Event Link</label>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <input
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="text"
+                    readonly
+                    :value="selectedSessionId ? `${window.location.origin}/?sessionId=${selectedSessionId}` : ''"
+                >
+                <a
+                    class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50"
+                    :href="selectedSessionId ? `/?sessionId=${selectedSessionId}` : '#'"
+                >
+                    <i class="fa-solid fa-arrow-up-right-from-square mr-2"></i><span x-text="t('open')">Open</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="mb-5 grid gap-3 sm:grid-cols-5">
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('joined')">Joined</p>
+                <p class="mt-1 text-3xl font-black text-gdsq" x-text="summary.joinedCount">0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('waitlist')">Waitlist</p>
+                <p class="mt-1 text-3xl font-black text-gdsqRed" x-text="summary.waitlistCount">0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('spotsLeft')">Spots Left</p>
+                <p class="mt-1 text-3xl font-black" x-text="summary.spotsLeft">0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('capacity')">Capacity</p>
+                <p class="mt-1 text-3xl font-black" x-text="summary.maxPlayers">0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('courts')">Courts</p>
+                <p class="mt-1 text-3xl font-black" x-text="summary.courtCount">1</p>
+            </div>
+        </div>
+
+        <div class="mb-5 grid gap-3 sm:grid-cols-4">
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('expectedRevenue')">Expected</p>
+                <p class="mt-1 text-2xl font-black" x-text="moneyText(financeSummary.expected)">THB 0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('paidRevenue')">Paid</p>
+                <p class="mt-1 text-2xl font-black text-green-700" x-text="moneyText(financeSummary.paid)">THB 0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('unpaidRevenue')">Unpaid</p>
+                <p class="mt-1 text-2xl font-black text-gdsqRed" x-text="moneyText(financeSummary.unpaid)">THB 0</p>
+            </div>
+            <div class="rounded-lg bg-white p-4 shadow-sm">
+                <p class="text-xs font-bold uppercase text-gray-500" x-text="t('submittedSlips')">Submitted</p>
+                <p class="mt-1 text-2xl font-black text-gdsq" x-text="financeSummary.submittedCount">0</p>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-lg font-black" x-text="t('createEvent')">Create Event</h2>
+                <p class="text-xs font-semibold text-gray-500" x-text="formMessage"></p>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_120px_120px_140px_120px]">
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="text"
+                    :placeholder="t('eventTitle')"
+                    x-model="newSession.title"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="number"
+                    min="1"
+                    :placeholder="t('maxPlayers')"
+                    x-model="newSession.maxPlayers"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="number"
+                    min="1"
+                    :placeholder="t('courtCount')"
+                    x-model="newSession.courtCount"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="date"
+                    x-model="newSession.eventDate"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="time"
+                    x-model="newSession.startTime"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="time"
+                    x-model="newSession.endTime"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="number"
+                    min="0"
+                    :placeholder="t('priceThb')"
+                    x-model="newSession.priceThb"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    type="text"
+                    :placeholder="t('location')"
+                    x-model="newSession.location"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    type="text"
+                    :placeholder="t('address')"
+                    x-model="newSession.address"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    type="text"
+                    :placeholder="t('skillLevel')"
+                    x-model="newSession.skillLevel"
+                >
+                <input
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    type="url"
+                    :placeholder="t('posterUrl')"
+                    x-model="newSession.posterUrl"
+                >
+                <select class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" x-model="newSession.paymentMode">
+                    <option value="none" x-text="t('paymentModeNone')"></option>
+                    <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                    <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                </select>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('depositAmountThb')" x-model="newSession.depositAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('estimatedTotalThb')" x-model="newSession.estimatedTotalThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('finalAmountThb')" x-model="newSession.finalAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('paymentNotePublic')" x-model="newSession.paymentNotePublic">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="newSession.paymentQrUrl">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="newSession.paymentBankName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="newSession.paymentAccountName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountNumber')" x-model="newSession.paymentAccountNumber">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentPromptPayId')" x-model="newSession.paymentPromptPayId">
+                <textarea
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2"
+                    rows="3"
+                    :placeholder="t('description')"
+                    x-model="newSession.description"
+                ></textarea>
+                <button
+                    class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                    @click="createSession()"
+                    :disabled="isLoading"
+                >
+                    <i class="fa-solid fa-plus mr-2"></i><span x-text="t('create')">Create</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm" x-show="selectedSession">
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-lg font-black" x-text="t('editSelectedEvent')">Edit Selected Event</h2>
+                <p class="text-xs font-semibold text-gray-500" x-text="editMessage"></p>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-[1fr_120px_120px_140px_120px]">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" x-model="editSession.title">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" x-model="editSession.maxPlayers">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="1" :placeholder="t('courtCount')" x-model="editSession.courtCount">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="date" x-model="editSession.eventDate">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.startTime">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="time" x-model="editSession.endTime">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" x-model="editSession.priceThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('location')" x-model="editSession.location">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('address')" x-model="editSession.address">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('skillLevel')" x-model="editSession.skillLevel">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('posterUrl')" x-model="editSession.posterUrl">
+                <select class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" x-model="editSession.paymentMode">
+                    <option value="none" x-text="t('paymentModeNone')"></option>
+                    <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                    <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                </select>
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('depositAmountThb')" x-model="editSession.depositAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('estimatedTotalThb')" x-model="editSession.estimatedTotalThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" min="0" :placeholder="t('finalAmountThb')" x-model="editSession.finalAmountThb">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="text" :placeholder="t('paymentNotePublic')" x-model="editSession.paymentNotePublic">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" type="url" :placeholder="t('paymentQrUrl')" x-model="editSession.paymentQrUrl">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentBankName')" x-model="editSession.paymentBankName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountName')" x-model="editSession.paymentAccountName">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentAccountNumber')" x-model="editSession.paymentAccountNumber">
+                <input class="rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('paymentPromptPayId')" x-model="editSession.paymentPromptPayId">
+                <textarea class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-2" rows="3" :placeholder="t('description')" x-model="editSession.description"></textarea>
+                <button
+                    class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-black disabled:opacity-50"
+                    @click="updateSession()"
+                    :disabled="isLoading"
+                >
+                    <i class="fa-solid fa-floppy-disk mr-2"></i><span x-text="t('save')">Save</span>
+                </button>
+                <button
+                    class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
+                    @click="duplicateSession()"
+                    :disabled="isLoading"
+                >
+                    <i class="fa-solid fa-copy mr-2"></i><span x-text="t('duplicateEvent')">Duplicate</span>
+                </button>
+                <button
+                    class="rounded-lg bg-gdsqRed px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
+                    @click="deleteSession()"
+                    :disabled="isLoading"
+                >
+                    <i class="fa-solid fa-trash mr-2"></i><span x-text="t('deleteEvent')">Delete Event</span>
+                </button>
+            </div>
+            <p class="mt-3 text-xs font-semibold text-gray-500" x-text="t('posterHelp')"></p>
+            <div class="mt-4 overflow-hidden rounded-lg bg-gray-100" x-show="editSession.posterUrl" x-cloak>
+                <img class="max-h-72 w-full object-contain" :src="imageUrl(editSession.posterUrl)" :alt="editSession.title">
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm">
+            <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('filterPlayers')">Filter players</label>
+            <select class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" x-model="rsvpFilter">
+                <option value="all" x-text="t('filterAll')">All</option>
+                <option value="joined" x-text="t('joined')">Joined</option>
+                <option value="waitlist" x-text="t('waitlist')">Waitlist</option>
+                <option value="paid" x-text="t('paymentPaid')">Paid</option>
+                <option value="pending" x-text="t('paymentPending')">Pending</option>
+                <option value="submitted" x-text="t('paymentSubmitted')">Submitted</option>
+                <option value="guest" x-text="t('guest')">Guest</option>
+            </select>
+        </div>
+
+        <div class="grid gap-5 lg:grid-cols-2">
+            <section class="rounded-lg bg-white shadow-sm">
+                <div class="border-b px-4 py-3">
+                    <h2 class="font-black" x-text="t('joined')">Joined</h2>
+                </div>
+                <div class="divide-y">
+                    <template x-for="rsvp in filteredJoinedRsvps" :key="rsvp.id">
+                        <div class="flex items-center justify-between px-4 py-3">
+                            <div>
+                                <p class="font-bold" x-text="rsvp.user.display_name"></p>
+                                <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
+                                <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`Deposit: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.finalPaymentStatus)" x-show="rsvp.finalPaymentAmountDue > 0" x-text="`Final: ${paymentStatusLabel(rsvp.finalPaymentStatus)} · ${moneyText(rsvp.finalPaymentAmountDue)}`"></p>
+                                <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
+                            </div>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-700" x-text="t('joined')">Joined</span>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.finalPaymentSlipUrl" :href="rsvp.finalPaymentSlipUrl" target="_blank">Final Slip</a>
+                                <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                                <button class="rounded-full bg-green-700 px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.finalPaymentAmountDue > 0 && rsvp.finalPaymentStatus !== 'Paid'" @click="markFinalPaid(rsvp)">Final Paid</button>
+                                <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gray-700" x-show="rsvp.kind === 'member' && rsvp.paymentStatus === 'Paid'" @click="markPaymentPending(rsvp)" x-text="t('markPending')">Mark Pending</button>
+                            </div>
+                        </div>
+                    </template>
+                    <p class="px-4 py-6 text-center text-sm text-gray-500" x-show="filteredJoinedRsvps.length === 0" x-text="t('noJoined')">ยังไม่มีคน Joined</p>
+                </div>
+            </section>
+
+            <section class="rounded-lg bg-white shadow-sm">
+                <div class="border-b px-4 py-3">
+                    <h2 class="font-black" x-text="t('waitlist')">Waitlist</h2>
+                </div>
+                <div class="divide-y">
+                    <template x-for="rsvp in filteredWaitlistRsvps" :key="rsvp.id">
+                        <div class="flex items-center justify-between px-4 py-3">
+                            <div>
+                                <p class="font-bold" x-text="rsvp.user.display_name"></p>
+                                <p class="text-xs font-semibold text-gdsq" x-show="rsvp.kind === 'guest'" x-text="`${t('guestAddedBy')} ${rsvp.addedBy?.display_name || ''}`"></p>
+                                <p class="text-xs text-gray-500" x-show="rsvp.user.phone" x-text="rsvp.user.phone"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.paymentStatus)" x-text="`Deposit: ${paymentStatusLabel(rsvp.paymentStatus)} · ${moneyText(rsvp.paymentAmountDue)}`"></p>
+                                <p class="text-xs font-semibold" :class="paymentStatusClass(rsvp.finalPaymentStatus)" x-show="rsvp.finalPaymentAmountDue > 0" x-text="`Final: ${paymentStatusLabel(rsvp.finalPaymentStatus)} · ${moneyText(rsvp.finalPaymentAmountDue)}`"></p>
+                                <p class="text-xs text-gray-500" x-text="formatDate(rsvp.createdAt)"></p>
+                            </div>
+                            <div class="flex flex-col items-end gap-2">
+                                <span class="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-gdsqRed" x-text="t('waitlist')">Waitlist</span>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.paymentSlipUrl" :href="rsvp.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                <a class="text-xs font-bold text-gdsq" x-show="rsvp.kind === 'member' && rsvp.finalPaymentSlipUrl" :href="rsvp.finalPaymentSlipUrl" target="_blank">Final Slip</a>
+                                <button class="rounded-full bg-gdsq px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.paymentStatus !== 'Paid'" @click="markPaid(rsvp)" x-text="t('markPaid')">Mark Paid</button>
+                                <button class="rounded-full bg-green-700 px-3 py-1 text-xs font-bold text-white" x-show="rsvp.kind === 'member' && rsvp.finalPaymentAmountDue > 0 && rsvp.finalPaymentStatus !== 'Paid'" @click="markFinalPaid(rsvp)">Final Paid</button>
+                                <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gray-700" x-show="rsvp.kind === 'member' && rsvp.paymentStatus === 'Paid'" @click="markPaymentPending(rsvp)" x-text="t('markPending')">Mark Pending</button>
+                            </div>
+                        </div>
+                    </template>
+                    <p class="px-4 py-6 text-center text-sm text-gray-500" x-show="filteredWaitlistRsvps.length === 0" x-text="t('noWaitlist')">ยังไม่มี Waitlist</p>
+                </div>
+            </section>
+        </div>
+
+        <div class="mt-5 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" x-show="errorMessage" x-text="errorMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        function adminDashboard() {
+            return {
+                sessions: [],
+                selectedSessionId: '',
+                rsvps: [],
+                summary: {
+                    joinedCount: 0,
+                    waitlistCount: 0,
+                    spotsLeft: 0,
+                    maxPlayers: 0,
+                    courtCount: 1
+                },
+                newSession: {
+                    title: '',
+                    maxPlayers: 24,
+                    courtCount: 1,
+                    eventDate: '',
+                    startTime: '',
+                    endTime: '',
+                    priceThb: 250,
+                    paymentMode: 'deposit_then_final',
+                    depositAmountThb: 100,
+                    estimatedTotalThb: 250,
+                    finalAmountThb: '',
+                    paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
+                    location: '',
+                    address: '',
+                    skillLevel: '',
+                    description: '',
+                    posterUrl: '',
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
+                },
+                editSession: {
+                    title: '',
+                    maxPlayers: 24,
+                    courtCount: 1,
+                    eventDate: '',
+                    startTime: '',
+                    endTime: '',
+                    priceThb: 250,
+                    paymentMode: 'deposit_then_final',
+                    depositAmountThb: 100,
+                    estimatedTotalThb: 250,
+                    finalAmountThb: '',
+                    paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
+                    location: '',
+                    address: '',
+                    skillLevel: '',
+                    description: '',
+                    posterUrl: '',
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
+                },
+                adminPassword: '',
+                isAuthenticated: false,
+                formMessage: '',
+                editMessage: '',
+                settingsMessage: '',
+                errorMessage: '',
+                isLoading: false,
+                language: localStorage.getItem('gdsqLanguage') || 'th',
+                rsvpFilter: 'all',
+                appSettings: {
+                    homeBannerUrl: '/assets/gdsq-home-banner.png',
+                    homeBannerSlidesText: '/assets/gdsq-home-banner.png',
+                    defaultEventSettings: {
+                        maxPlayers: 24,
+                        courtCount: 1,
+                        priceThb: 250,
+                        paymentMode: 'deposit_then_final',
+                        depositAmountThb: 100,
+                        estimatedTotalThb: 250,
+                        finalAmountThb: '',
+                        paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
+                        location: '',
+                        address: '',
+                        skillLevel: '',
+                        paymentQrUrl: '',
+                        paymentBankName: '',
+                        paymentAccountName: '',
+                        paymentAccountNumber: '',
+                        paymentPromptPayId: ''
+                    }
+                },
+
+                translations: {
+                    th: {
+                        adminLogin: 'เข้าสู่ระบบแอดมิน',
+                        loginHint: 'ใส่รหัสผ่านเพื่อดูรายชื่อ RSVP และจัดการ event',
+                        adminPassword: 'รหัสผ่านแอดมิน',
+                        login: 'เข้าสู่ระบบ',
+                        checking: 'กำลังตรวจสอบ...',
+                        rsvpAdmin: 'จัดการ RSVP',
+                        adminSubtitle: 'ดูรายชื่อผู้เล่น Joined และ Waitlist จาก Supabase แบบ real-time',
+                        upcomingEvents: 'กิจกรรมที่ยังไม่จบ',
+                        endedEvents: 'กิจกรรมที่จบแล้ว',
+                        pendingSlipReview: 'รอตรวจสลิป',
+                        unpaidPlayers: 'ยังไม่จ่าย',
+                        adminWorkflowTitle: 'วิธีใช้หลังบ้านแบบเร็ว',
+                        adminStepCreate: 'สร้างหรือเลือกกิจกรรม',
+                        adminStepShare: 'คัดลอกลิงก์ส่งให้ผู้เล่น',
+                        adminStepPayment: 'ตรวจสลิปและกด Mark Paid',
+                        adminStepExport: 'ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ',
+                        appearance: 'หน้าตาแอพ',
+                        homeBannerSettings: 'แบนเนอร์หน้า Home',
+                        homeBannerHelp: 'เปลี่ยนรูปแบนเนอร์หลักหน้า Home ได้เอง ไม่ต้องแก้โค้ด',
+                        homeBannerUrl: 'ลิงก์รูปแบนเนอร์',
+                        homeBannerUrlPlaceholder: 'วางลิงก์รูป เช่น Google Drive หรือ URL รูปภาพ',
+                        homeBannerSlides: 'รูปสไลด์หน้า Home',
+                        homeBannerSlidesPlaceholder: 'วาง 1 ลิงก์ต่อ 1 บรรทัด',
+                        homeBannerDriveHelp: 'ถ้าใช้ Google Drive: อัปโหลดรูป > Share > Anyone with the link > Copy link > วางที่ช่องนี้',
+                        preview: 'พรีวิว',
+                        saveBanner: 'บันทึกแบนเนอร์',
+                        useDefaultBanner: 'ใช้รูปเริ่มต้น',
+                        defaults: 'ค่าเริ่มต้น',
+                        defaultSettings: 'ค่าเริ่มต้นเวลา Create Event',
+                        defaultSettingsHelp: 'ตั้งค่าประจำไว้ เวลาแอดมินหรือผู้เล่นสร้างกิจกรรมจะกรอกง่ายขึ้น',
+                        saveDefaults: 'บันทึกค่าเริ่มต้น',
+                        applyToCreateForm: 'ใช้กับฟอร์มสร้าง Event',
+                        settingsSaved: 'บันทึกแบนเนอร์แล้ว',
+                        settingsFailed: 'บันทึกแบนเนอร์ไม่สำเร็จ',
+                        eventPage: 'หน้า Event',
+                        refresh: 'รีเฟรช',
+                        logout: 'ออกจากระบบ',
+                        event: 'กิจกรรม',
+                        export: 'ส่งออก',
+                        downloadCsv: 'ดาวน์โหลด CSV',
+                        selectedEventLink: 'ลิงก์ event ที่เลือก',
+                        open: 'เปิด',
+                        joined: 'Joined',
+                        waitlist: 'Waitlist',
+                        spotsLeft: 'ที่ว่าง',
+                        capacity: 'จำนวนรับ',
+                        courts: 'Courts',
+                        createEvent: 'สร้าง Event',
+                        editSelectedEvent: 'แก้ไข Event ที่เลือก',
+                        eventTitle: 'ชื่อ event',
+                        maxPlayers: 'จำนวนผู้เล่นสูงสุด',
+                        courtCount: 'จำนวน Court',
+                        priceThb: 'ราคา THB',
+                        location: 'สถานที่',
+                        address: 'ที่อยู่',
+                        skillLevel: 'ระดับผู้เล่น เช่น Beginner / Intermediate',
+                        description: 'รายละเอียดกิจกรรม',
+                        posterUrl: 'ลิงก์รูปโปสเตอร์กิจกรรม',
+                        paymentQrUrl: 'ลิงก์รูป QR ชำระเงิน',
+                        paymentModeNone: 'ไม่เก็บผ่านแอพ',
+                        paymentModeDepositFinal: 'มัดจำ + ส่วนต่าง',
+                        paymentModeFinalOnly: 'จ่ายหลังจบทีเดียว',
+                        depositAmountThb: 'มัดจำ THB',
+                        estimatedTotalThb: 'ยอดประมาณ THB',
+                        finalAmountThb: 'ยอดจริงหลังจบ THB',
+                        paymentNotePublic: 'หมายเหตุการชำระเงิน',
+                        paymentBankName: 'ชื่อธนาคาร',
+                        paymentAccountName: 'ชื่อบัญชี',
+                        paymentAccountNumber: 'เลขบัญชี',
+                        paymentPromptPayId: 'PromptPay ID',
+                        posterHelp: 'ใช้ลิงก์รูปจาก Google Drive ได้: อัปโหลดรูปใน Drive > Share > Anyone with the link > Copy link > วางช่องนี้',
+                        payment: 'ชำระเงิน',
+                        paymentPending: 'รอชำระ',
+                        paymentSubmitted: 'แจ้งแล้ว',
+                        paymentPaid: 'ชำระแล้ว',
+                        viewSlip: 'ดูสลิป',
+                        markPaid: 'Mark Paid',
+                        markPending: 'Mark Pending',
+                        create: 'สร้าง',
+                        save: 'บันทึก',
+                        deleteEvent: 'ลบ Event',
+                        duplicateEvent: 'Duplicate Event',
+                        duplicated: 'คัดลอก event แล้ว',
+                        duplicateFailed: 'คัดลอก event ไม่สำเร็จ',
+                        deleteConfirm: 'ยืนยันลบ Event นี้ไหม? รายชื่อ RSVP ของ Event นี้จะถูกลบด้วย',
+                        filterPlayers: 'กรองรายชื่อ',
+                        filterAll: 'ทั้งหมด',
+                        guest: 'Guest',
+                        expectedRevenue: 'ยอดที่ควรได้รับ',
+                        paidRevenue: 'จ่ายแล้ว',
+                        unpaidRevenue: 'ยังไม่จ่าย',
+                        submittedSlips: 'รอตรวจสลิป',
+                        guestAddedBy: 'เพิ่มโดย',
+                        noJoined: 'ยังไม่มีคน Joined',
+                        noWaitlist: 'ยังไม่มี Waitlist',
+                        created: 'สร้าง event แล้ว',
+                        saved: 'บันทึกแล้ว',
+                        deleted: 'ลบ event แล้ว',
+                        loadEventsFailed: 'โหลด event ไม่สำเร็จ',
+                        loadRsvpsFailed: 'โหลด RSVP ไม่สำเร็จ',
+                        createFailed: 'สร้าง event ไม่สำเร็จ',
+                        updateFailed: 'แก้ไข event ไม่สำเร็จ',
+                        deleteFailed: 'ลบ event ไม่สำเร็จ'
+                    },
+                    en: {
+                        adminLogin: 'Admin Login',
+                        loginHint: 'Enter the password to manage RSVPs and events.',
+                        adminPassword: 'Admin password',
+                        login: 'Login',
+                        checking: 'Checking...',
+                        rsvpAdmin: 'RSVP Admin',
+                        adminSubtitle: 'View Joined and Waitlist players from Supabase in real time.',
+                        upcomingEvents: 'Upcoming events',
+                        endedEvents: 'Ended events',
+                        pendingSlipReview: 'Slip review',
+                        unpaidPlayers: 'Unpaid',
+                        adminWorkflowTitle: 'Quick admin workflow',
+                        adminStepCreate: 'Create or select an event',
+                        adminStepShare: 'Copy the event link for players',
+                        adminStepPayment: 'Review slips and mark paid',
+                        adminStepExport: 'Download CSV when needed',
+                        appearance: 'Appearance',
+                        homeBannerSettings: 'Home Banner',
+                        homeBannerHelp: 'Change the main Home banner without editing code.',
+                        homeBannerUrl: 'Banner image URL',
+                        homeBannerUrlPlaceholder: 'Paste an image link, Google Drive link, or image URL',
+                        homeBannerSlides: 'Home slider images',
+                        homeBannerSlidesPlaceholder: 'Paste one image link per line',
+                        homeBannerDriveHelp: 'For Google Drive: upload image > Share > Anyone with the link > Copy link > paste here.',
+                        preview: 'Preview',
+                        saveBanner: 'Save Banner',
+                        useDefaultBanner: 'Use default',
+                        defaults: 'Defaults',
+                        defaultSettings: 'Default Event Settings',
+                        defaultSettingsHelp: 'Save common values so new events are easier to create.',
+                        saveDefaults: 'Save defaults',
+                        applyToCreateForm: 'Apply to create form',
+                        settingsSaved: 'Banner saved',
+                        settingsFailed: 'Unable to save banner',
+                        eventPage: 'Event page',
+                        refresh: 'Refresh',
+                        logout: 'Logout',
+                        event: 'Event',
+                        export: 'Export',
+                        downloadCsv: 'Download CSV',
+                        selectedEventLink: 'Selected Event Link',
+                        open: 'Open',
+                        joined: 'Joined',
+                        waitlist: 'Waitlist',
+                        spotsLeft: 'Spots Left',
+                        capacity: 'Capacity',
+                        courts: 'Courts',
+                        createEvent: 'Create Event',
+                        editSelectedEvent: 'Edit Selected Event',
+                        eventTitle: 'Event title',
+                        maxPlayers: 'Max players',
+                        courtCount: 'Court count',
+                        priceThb: 'Price THB',
+                        location: 'Location',
+                        address: 'Address',
+                        skillLevel: 'Skill level, e.g. Beginner / Intermediate',
+                        description: 'Event description',
+                        posterUrl: 'Event poster image URL',
+                        paymentQrUrl: 'Payment QR image URL',
+                        paymentModeNone: 'No in-app payment',
+                        paymentModeDepositFinal: 'Deposit + final',
+                        paymentModeFinalOnly: 'Final only',
+                        depositAmountThb: 'Deposit THB',
+                        estimatedTotalThb: 'Estimated THB',
+                        finalAmountThb: 'Final THB',
+                        paymentNotePublic: 'Payment note',
+                        paymentBankName: 'Bank name',
+                        paymentAccountName: 'Account name',
+                        paymentAccountNumber: 'Account number',
+                        paymentPromptPayId: 'PromptPay ID',
+                        posterHelp: 'Google Drive links work: upload image to Drive > Share > Anyone with the link > Copy link > paste here.',
+                        payment: 'Payment',
+                        paymentPending: 'Pending',
+                        paymentSubmitted: 'Submitted',
+                        paymentPaid: 'Paid',
+                        viewSlip: 'View Slip',
+                        markPaid: 'Mark Paid',
+                        markPending: 'Mark Pending',
+                        create: 'Create',
+                        save: 'Save',
+                        deleteEvent: 'Delete Event',
+                        duplicateEvent: 'Duplicate Event',
+                        duplicated: 'Event duplicated',
+                        duplicateFailed: 'Unable to duplicate event',
+                        deleteConfirm: 'Delete this event? All RSVPs for this event will also be deleted.',
+                        filterPlayers: 'Filter players',
+                        filterAll: 'All',
+                        guest: 'Guest',
+                        expectedRevenue: 'Expected',
+                        paidRevenue: 'Paid',
+                        unpaidRevenue: 'Unpaid',
+                        submittedSlips: 'Submitted slips',
+                        guestAddedBy: 'Added by',
+                        noJoined: 'No Joined players yet',
+                        noWaitlist: 'No Waitlist yet',
+                        created: 'Event created',
+                        saved: 'Saved',
+                        deleted: 'Event deleted',
+                        loadEventsFailed: 'Unable to load events',
+                        loadRsvpsFailed: 'Unable to load RSVPs',
+                        createFailed: 'Unable to create event',
+                        updateFailed: 'Unable to update event',
+                        deleteFailed: 'Unable to delete event'
+                    }
+                },
+
+                t(key) {
+                    return this.translations[this.language][key] || this.translations.en[key] || key;
+                },
+
+                toggleLanguage() {
+                    this.language = this.language === 'th' ? 'en' : 'th';
+                    localStorage.setItem('gdsqLanguage', this.language);
+                },
+
+                imageUrl(url) {
+                    if (!url) return '';
+                    const text = String(url).trim();
+                    const match = text.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
+                    if (match) {
+                        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1200`;
+                    }
+                    return text;
+                },
+
+                get selectedSession() {
+                    return this.sessions.find((session) => session.id === this.selectedSessionId);
+                },
+
+                get joinedRsvps() {
+                    return this.rsvps.filter((rsvp) => rsvp.status === 'Joined');
+                },
+
+                get waitlistRsvps() {
+                    return this.rsvps.filter((rsvp) => rsvp.status === 'Waitlist');
+                },
+
+                get filteredRsvps() {
+                    if (this.rsvpFilter === 'all') return this.rsvps;
+                    if (this.rsvpFilter === 'joined') return this.rsvps.filter((rsvp) => rsvp.status === 'Joined');
+                    if (this.rsvpFilter === 'waitlist') return this.rsvps.filter((rsvp) => rsvp.status === 'Waitlist');
+                    if (this.rsvpFilter === 'paid') return this.rsvps.filter((rsvp) => rsvp.paymentStatus === 'Paid');
+                    if (this.rsvpFilter === 'pending') return this.rsvps.filter((rsvp) => rsvp.paymentStatus === 'Pending');
+                    if (this.rsvpFilter === 'submitted') return this.rsvps.filter((rsvp) => rsvp.paymentStatus === 'Submitted');
+                    if (this.rsvpFilter === 'guest') return this.rsvps.filter((rsvp) => rsvp.kind === 'guest');
+                    return this.rsvps;
+                },
+
+                get filteredJoinedRsvps() {
+                    return this.filteredRsvps.filter((rsvp) => rsvp.status === 'Joined');
+                },
+
+                get filteredWaitlistRsvps() {
+                    return this.filteredRsvps.filter((rsvp) => rsvp.status === 'Waitlist');
+                },
+
+                get financeSummary() {
+                    const members = this.rsvps.filter((rsvp) => rsvp.kind === 'member');
+                    return members.reduce((summary, rsvp) => {
+                        const due = Number(rsvp.paymentAmountDue || 0);
+                        const finalDue = Number(rsvp.finalPaymentAmountDue || 0);
+                        const paid = Number(rsvp.paymentAmountPaid || 0);
+                        const finalPaid = Number(rsvp.finalPaymentAmountPaid || 0);
+                        summary.expected += due + finalDue;
+                        if (rsvp.paymentStatus === 'Paid') summary.paid += paid || due;
+                        if (rsvp.finalPaymentStatus === 'Paid') summary.paid += finalPaid || finalDue;
+                        if (rsvp.paymentStatus !== 'Paid') summary.unpaid += due;
+                        if (rsvp.finalPaymentStatus !== 'Paid') summary.unpaid += finalDue;
+                        if (rsvp.paymentStatus === 'Submitted' || rsvp.finalPaymentStatus === 'Submitted') summary.submittedCount += 1;
+                        return summary;
+                    }, {
+                        expected: 0,
+                        paid: 0,
+                        unpaid: 0,
+                        submittedCount: 0
+                    });
+                },
+
+                get upcomingSessions() {
+                    return this.sessions.filter((session) => !this.isSessionEnded(session));
+                },
+
+                get endedSessions() {
+                    return this.sessions.filter((session) => this.isSessionEnded(session));
+                },
+
+                get submittedPaymentCount() {
+                    return this.rsvps.filter((rsvp) => rsvp.kind === 'member' && (rsvp.paymentStatus === 'Submitted' || rsvp.finalPaymentStatus === 'Submitted')).length;
+                },
+
+                get unpaidCount() {
+                    return this.rsvps.filter((rsvp) => {
+                        if (rsvp.kind !== 'member') return false;
+                        const hasDepositDue = Number(rsvp.paymentAmountDue || 0) > 0 && rsvp.paymentStatus !== 'Paid';
+                        const hasFinalDue = Number(rsvp.finalPaymentAmountDue || 0) > 0 && rsvp.finalPaymentStatus !== 'Paid';
+                        return hasDepositDue || hasFinalDue;
+                    }).length;
+                },
+
+                async init() {
+                    await this.loadAll();
+                },
+
+                async login() {
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch('/api/admin/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                password: this.adminPassword
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Login failed');
+                        }
+
+                        this.adminPassword = '';
+                        this.isAuthenticated = true;
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async logout() {
+                    await fetch('/api/admin/logout', { method: 'POST' });
+                    this.isAuthenticated = false;
+                    this.sessions = [];
+                    this.rsvps = [];
+                    this.errorMessage = '';
+                },
+
+                async loadAll() {
+                    this.errorMessage = '';
+                    await this.loadSessions();
+                    if (this.isAuthenticated) {
+                        await this.loadSettings();
+                    }
+                    if (this.selectedSessionId) {
+                        await this.loadRsvps();
+                    }
+                },
+
+                async loadSettings() {
+                    const response = await fetch('/api/admin/settings');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.settingsMessage = result.message || this.t('settingsFailed');
+                        return;
+                    }
+
+                    const settings = result.settings || {};
+                    this.appSettings.homeBannerUrl = settings.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                    this.appSettings.homeBannerSlidesText = (settings.homeBannerSlides || [this.appSettings.homeBannerUrl]).join('\n');
+                    this.appSettings.defaultEventSettings = {
+                        ...this.appSettings.defaultEventSettings,
+                        ...(settings.defaultEventSettings || {})
+                    };
+                    this.applyDefaultsToNewSession(false);
+                },
+
+                async saveSettings() {
+                    this.isLoading = true;
+                    this.settingsMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch('/api/admin/settings', {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                homeBannerUrl: this.appSettings.homeBannerUrl,
+                                homeBannerSlides: this.appSettings.homeBannerSlidesText
+                                    .split('\n')
+                                    .map((slide) => slide.trim())
+                                    .filter(Boolean),
+                                defaultEventSettings: this.appSettings.defaultEventSettings
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('settingsFailed'));
+                        }
+
+                        this.appSettings.homeBannerUrl = result.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                        this.appSettings.homeBannerSlidesText = (result.settings?.homeBannerSlides || [this.appSettings.homeBannerUrl]).join('\n');
+                        this.appSettings.defaultEventSettings = {
+                            ...this.appSettings.defaultEventSettings,
+                            ...(result.settings?.defaultEventSettings || {})
+                        };
+                        this.settingsMessage = this.t('settingsSaved');
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                applyDefaultsToNewSession(showMessage = true) {
+                    const defaults = this.appSettings.defaultEventSettings || {};
+                    this.newSession.maxPlayers = defaults.maxPlayers || 24;
+                    this.newSession.courtCount = defaults.courtCount || 1;
+                    this.newSession.priceThb = defaults.priceThb ?? 250;
+                    this.newSession.paymentMode = defaults.paymentMode || 'deposit_then_final';
+                    this.newSession.depositAmountThb = defaults.depositAmountThb ?? 100;
+                    this.newSession.estimatedTotalThb = defaults.estimatedTotalThb ?? defaults.priceThb ?? 250;
+                    this.newSession.finalAmountThb = defaults.finalAmountThb ?? '';
+                    this.newSession.paymentNotePublic = defaults.paymentNotePublic || this.newSession.paymentNotePublic || '';
+                    this.newSession.location = defaults.location || '';
+                    this.newSession.address = defaults.address || '';
+                    this.newSession.skillLevel = defaults.skillLevel || '';
+                    this.newSession.paymentQrUrl = defaults.paymentQrUrl || '';
+                    this.newSession.paymentBankName = defaults.paymentBankName || '';
+                    this.newSession.paymentAccountName = defaults.paymentAccountName || '';
+                    this.newSession.paymentAccountNumber = defaults.paymentAccountNumber || '';
+                    this.newSession.paymentPromptPayId = defaults.paymentPromptPayId || '';
+                    if (showMessage) this.formMessage = this.t('applyToCreateForm');
+                },
+
+                async loadSessions() {
+                    const response = await fetch('/api/sessions');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.errorMessage = result.message || this.t('loadEventsFailed');
+                        return;
+                    }
+
+                    this.isAuthenticated = true;
+                    this.sessions = result.sessions;
+                    if (!this.selectedSessionId && this.sessions.length > 0) {
+                        this.selectedSessionId = this.sessions[0].id;
+                    }
+                    this.syncSummary();
+                },
+
+                async loadRsvps() {
+                    if (!this.selectedSessionId) return;
+
+                    const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps`);
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        this.errorMessage = result.message || this.t('loadRsvpsFailed');
+                        return;
+                    }
+
+                    this.rsvps = result.rsvps;
+                    this.syncSummary();
+                    this.syncEditForm();
+                },
+
+                async createSession() {
+                    this.isLoading = true;
+                    this.formMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch('/api/sessions', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.newSession)
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('createFailed'));
+                        }
+
+                        this.formMessage = this.t('created');
+                        this.newSession.title = '';
+                        this.newSession.eventDate = '';
+                        this.newSession.startTime = '';
+                        this.newSession.endTime = '';
+                        this.newSession.description = '';
+                        this.newSession.posterUrl = '';
+                        this.applyDefaultsToNewSession(false);
+                        this.selectedSessionId = result.session.id;
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async updateSession() {
+                    if (!this.selectedSessionId) return;
+
+                    this.isLoading = true;
+                    this.editMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/sessions/${this.selectedSessionId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.editSession)
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('updateFailed'));
+                        }
+
+                        this.editMessage = this.t('saved');
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async duplicateSession() {
+                    if (!this.selectedSessionId) return;
+
+                    this.isLoading = true;
+                    this.editMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/sessions/${this.selectedSessionId}/duplicate`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                title: `${this.editSession.title} (Copy)`
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('duplicateFailed'));
+                        }
+
+                        this.editMessage = this.t('duplicated');
+                        this.selectedSessionId = result.session.id;
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async deleteSession() {
+                    if (!this.selectedSessionId || !confirm(this.t('deleteConfirm'))) return;
+
+                    this.isLoading = true;
+                    this.editMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/sessions/${this.selectedSessionId}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('deleteFailed'));
+                        }
+
+                        this.editMessage = this.t('deleted');
+                        this.selectedSessionId = '';
+                        this.rsvps = [];
+                        this.summary = {
+                            joinedCount: 0,
+                            waitlistCount: 0,
+                            spotsLeft: 0,
+                            maxPlayers: 0,
+                            courtCount: 1
+                        };
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                syncSummary() {
+                    const session = this.sessions.find((item) => item.id === this.selectedSessionId);
+                    if (!session) return;
+
+                    this.summary = {
+                        joinedCount: session.joinedCount,
+                        waitlistCount: session.waitlistCount,
+                        spotsLeft: session.spotsLeft,
+                        maxPlayers: session.maxPlayers,
+                        courtCount: session.courtCount || 1
+                    };
+                    this.syncEditForm();
+                },
+
+                syncEditForm() {
+                    const session = this.selectedSession;
+                    if (!session) return;
+
+                    this.editSession = {
+                        title: session.title,
+                        maxPlayers: session.maxPlayers,
+                        courtCount: session.courtCount || 1,
+                        eventDate: session.eventDate || '',
+                        startTime: session.startTime ? session.startTime.slice(0, 5) : '',
+                        endTime: session.endTime ? session.endTime.slice(0, 5) : '',
+                        priceThb: session.priceThb ?? '',
+                        paymentMode: session.paymentMode || 'deposit_then_final',
+                        depositAmountThb: session.depositAmountThb ?? session.priceThb ?? 0,
+                        estimatedTotalThb: session.estimatedTotalThb ?? session.priceThb ?? 0,
+                        finalAmountThb: session.finalAmountThb ?? '',
+                        paymentNotePublic: session.paymentNotePublic || '',
+                        location: session.location || '',
+                        address: session.address || '',
+                        skillLevel: session.skillLevel || '',
+                        description: session.description || '',
+                        posterUrl: session.posterUrl || '',
+                        paymentQrUrl: session.paymentQrUrl || '',
+                        paymentBankName: session.paymentBankName || '',
+                        paymentAccountName: session.paymentAccountName || '',
+                        paymentAccountNumber: session.paymentAccountNumber || '',
+                        paymentPromptPayId: session.paymentPromptPayId || ''
+                    };
+                },
+
+                moneyText(value) {
+                    return `THB ${Number(value || 0).toLocaleString()}`;
+                },
+
+                paymentStatusLabel(status) {
+                    if (status === 'Paid') return this.t('paymentPaid');
+                    if (status === 'Submitted') return this.t('paymentSubmitted');
+                    if (status === 'NotOpened') return 'Not opened';
+                    return this.t('paymentPending');
+                },
+
+                paymentStatusClass(status) {
+                    if (status === 'Paid') return 'text-green-700';
+                    if (status === 'Submitted') return 'text-gdsq';
+                    return 'text-yellow-700';
+                },
+
+                isSessionEnded(session) {
+                    if (!session?.eventDate) return false;
+                    const endTime = session.endTime || '23:59:59';
+                    return new Date(`${session.eventDate}T${endTime}+07:00`).getTime() < Date.now();
+                },
+
+                async markPaid(rsvp) {
+                    if (!this.selectedSessionId || !rsvp?.parentRsvpId) return;
+
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: 'Paid',
+                                amountPaid: rsvp.paymentAmountPaid || rsvp.paymentAmountDue || 0
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update payment');
+                        }
+
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async markPaymentPending(rsvp) {
+                    if (!this.selectedSessionId || !rsvp?.parentRsvpId) return;
+
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: 'Pending',
+                                amountPaid: rsvp.paymentAmountPaid || null
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update payment');
+                        }
+
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async markFinalPaid(rsvp) {
+                    if (!this.selectedSessionId || !rsvp?.parentRsvpId) return;
+
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/rsvps/${rsvp.parentRsvpId}/final-payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                status: 'Paid',
+                                amountPaid: rsvp.finalPaymentAmountPaid || rsvp.finalPaymentAmountDue || 0
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update final payment');
+                        }
+
+                        await this.loadAll();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                formatDate(value) {
+                    if (!value) return '';
+                    return new Intl.DateTimeFormat('th-TH', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                    }).format(new Date(value));
+                },
+
+                formatEventDate(session) {
+                    if (!session.eventDate && !session.startTime) return this.language === 'th' ? 'ยังไม่ระบุ' : 'TBA';
+                    const dateText = session.eventDate || (this.language === 'th' ? 'ยังไม่ระบุวันที่' : 'Date TBA');
+                    const timeText = session.startTime ? session.startTime.slice(0, 5) : (this.language === 'th' ? 'ยังไม่ระบุเวลา' : 'Time TBA');
+                    return `${dateText} ${timeText}`;
+                }
+            };
+        }
+    </script>
+</body>
+</html>
