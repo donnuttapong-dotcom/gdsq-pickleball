@@ -944,6 +944,37 @@ async function countSessionSeats(sessionId, status) {
   };
 }
 
+async function reserveSessionRsvp({ sessionId, userId, guestNames = [] }) {
+  const normalizedGuestNames = Array.isArray(guestNames)
+    ? guestNames.map((name) => String(name || '').trim()).filter(Boolean).slice(0, 10)
+    : [];
+
+  const { data, error } = await supabase.rpc('reserve_session_rsvp', {
+    p_session_id: sessionId,
+    p_user_id: userId,
+    p_guest_names: normalizedGuestNames
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const reservation = Array.isArray(data) ? data[0] : data;
+
+  if (!reservation?.rsvp_id) {
+    throw new Error('Unable to reserve RSVP.');
+  }
+
+  return {
+    id: reservation.rsvp_id,
+    status: reservation.status,
+    totalJoined: Number(reservation.reservation_joined_count || 0),
+    totalWaitlist: Number(reservation.reservation_waitlist_count || 0),
+    guestCount: Number(reservation.guest_count || 0),
+    alreadyExists: Boolean(reservation.already_exists)
+  };
+}
+
 async function promoteWaitlist(sessionId) {
   const { data: session, error: sessionError } = await findSession(sessionId);
 
@@ -2816,59 +2847,25 @@ app.post('/api/rsvp', async (req, res) => {
       });
     }
 
-    const { count: joinedCount, error: countError } = await countSessionSeats(session.id, 'Joined');
+    const reservation = await reserveSessionRsvp({
+      sessionId: session.id,
+      userId: user.id,
+      guestNames
+    });
 
-    if (countError) {
-      throw countError;
+    if (reservation.alreadyExists) {
+      return res.json({
+        success: true,
+        status: reservation.status,
+        message: reservation.status === 'Joined'
+          ? 'You are already confirmed!'
+          : 'You are already on the waitlist.'
+      });
     }
 
-    let joinedSeats = joinedCount || 0;
-    const nextStatus = () => {
-      if (joinedSeats < session.max_players) {
-        joinedSeats += 1;
-        return 'Joined';
-      }
-
-      return 'Waitlist';
-    };
-    const status = nextStatus();
-
-    const { data: createdRsvp, error: rsvpError } = await supabase
-      .from('rsvps')
-      .insert({
-        session_id: session.id,
-        user_id: user.id,
-        status
-      })
-      .select('id, status')
-      .single();
-
-    if (rsvpError) {
-      throw rsvpError;
-    }
-
-    const guestRows = guestNames.map((guestName) => ({
-      rsvp_id: createdRsvp.id,
-      session_id: session.id,
-      added_by_user_id: user.id,
-      display_name: guestName,
-      status: nextStatus()
-    }));
-
-    if (guestRows.length > 0) {
-      const { error: guestError } = await supabase
-        .from('rsvp_guests')
-        .insert(guestRows);
-
-      if (guestError) {
-        throw guestError;
-      }
-    }
-
-    const joinedGuests = guestRows.filter((guest) => guest.status === 'Joined').length;
-    const waitlistGuests = guestRows.filter((guest) => guest.status === 'Waitlist').length;
-    const totalJoined = (status === 'Joined' ? 1 : 0) + joinedGuests;
-    const totalWaitlist = (status === 'Waitlist' ? 1 : 0) + waitlistGuests;
+    const status = reservation.status;
+    const totalJoined = reservation.totalJoined;
+    const totalWaitlist = reservation.totalWaitlist;
     const amountDue = calculatePaymentDue(session, totalJoined, 'deposit');
     const paymentStatus = amountDue > 0 ? 'Pending' : (totalJoined > 0 ? 'Paid' : 'Pending');
 
@@ -2880,7 +2877,7 @@ app.post('/api/rsvp', async (req, res) => {
         payment_amount_paid: amountDue > 0 ? null : 0,
         payment_paid_at: amountDue > 0 ? null : new Date().toISOString()
       })
-      .eq('id', createdRsvp.id);
+      .eq('id', reservation.id);
 
     if (paymentUpdateError) {
       throw paymentUpdateError;
@@ -2891,11 +2888,11 @@ app.post('/api/rsvp', async (req, res) => {
       status,
       paymentStatus,
       amountDue,
-      guestCount: guestRows.length,
+      guestCount: reservation.guestCount,
       totalJoined,
       totalWaitlist,
       message: status === 'Joined'
-        ? (guestRows.length > 0
+        ? (reservation.guestCount > 0
           ? `Confirmed ${totalJoined} spot${totalJoined === 1 ? '' : 's'}${totalWaitlist > 0 ? `, ${totalWaitlist} on waitlist` : ''}.`
           : 'You are confirmed!')
         : 'You are on the waitlist.'
@@ -2969,54 +2966,44 @@ app.post('/api/rsvp/submit-payment', async (req, res) => {
     let totalWaitlist = status === 'Waitlist' ? 1 : 0;
 
     if (!createdRsvp) {
-      const { count: joinedCount, error: countError } = await countSessionSeats(session.id, 'Joined');
-      if (countError) throw countError;
+      const reservation = await reserveSessionRsvp({
+        sessionId: session.id,
+        userId: user.id,
+        guestNames
+      });
 
-      let joinedSeats = joinedCount || 0;
-      const nextStatus = () => {
-        if (joinedSeats < session.max_players) {
-          joinedSeats += 1;
-          return 'Joined';
-        }
-
-        return 'Waitlist';
+      status = reservation.status;
+      totalJoined = reservation.totalJoined;
+      totalWaitlist = reservation.totalWaitlist;
+      createdRsvp = {
+        id: reservation.id,
+        status: reservation.status,
+        payment_slip_path: null
       };
 
-      status = nextStatus();
-
-      const { data: newRsvp, error: rsvpError } = await supabase
-        .from('rsvps')
-        .insert({
-          session_id: session.id,
-          user_id: user.id,
-          status
-        })
-        .select('id, status, payment_slip_path')
-        .single();
-
-      if (rsvpError) throw rsvpError;
-      createdRsvp = newRsvp;
-
-      guestRows = guestNames.map((guestName) => ({
-        rsvp_id: createdRsvp.id,
-        session_id: session.id,
-        added_by_user_id: user.id,
-        display_name: guestName,
-        status: nextStatus()
-      }));
-
-      if (guestRows.length > 0) {
-        const { error: guestError } = await supabase
+      if (!reservation.alreadyExists) {
+        guestRows = Array.from({ length: reservation.guestCount }, () => ({}));
+      } else {
+        const { count: joinedGuestCount, error: joinedGuestCountError } = await supabase
           .from('rsvp_guests')
-          .insert(guestRows);
+          .select('id', { count: 'exact', head: true })
+          .eq('rsvp_id', createdRsvp.id)
+          .eq('status', 'Joined');
 
-        if (guestError) throw guestError;
+        if (joinedGuestCountError) throw joinedGuestCountError;
+
+        const { count: waitlistGuestCount, error: waitlistGuestCountError } = await supabase
+          .from('rsvp_guests')
+          .select('id', { count: 'exact', head: true })
+          .eq('rsvp_id', createdRsvp.id)
+          .eq('status', 'Waitlist');
+
+        if (waitlistGuestCountError) throw waitlistGuestCountError;
+
+        totalJoined = (status === 'Joined' ? 1 : 0) + (joinedGuestCount || 0);
+        totalWaitlist = (status === 'Waitlist' ? 1 : 0) + (waitlistGuestCount || 0);
+        guestRows = Array.from({ length: (joinedGuestCount || 0) + (waitlistGuestCount || 0) }, () => ({}));
       }
-
-      const joinedGuests = guestRows.filter((guest) => guest.status === 'Joined').length;
-      const waitlistGuests = guestRows.filter((guest) => guest.status === 'Waitlist').length;
-      totalJoined = (status === 'Joined' ? 1 : 0) + joinedGuests;
-      totalWaitlist = (status === 'Waitlist' ? 1 : 0) + waitlistGuests;
     } else {
       const { count: joinedGuestCount, error: joinedGuestCountError } = await supabase
         .from('rsvp_guests')
