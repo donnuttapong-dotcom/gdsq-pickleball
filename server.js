@@ -354,14 +354,39 @@ async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, 
     await supabase.storage.from(paymentSlipBucket).remove([previousSlipPath]);
   }
 
-  const { data: publicData } = supabase.storage
-    .from(paymentSlipBucket)
-    .getPublicUrl(storagePath);
+  return {
+    storagePath
+  };
+}
+
+async function createSignedSlipUrl(storagePath, expiresInSeconds = 60 * 60) {
+  if (!storagePath) return '';
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(paymentSlipBucket)
+      .createSignedUrl(storagePath, expiresInSeconds);
+
+    if (error) throw error;
+    return data?.signedUrl || '';
+  } catch (error) {
+    console.error('Signed slip URL error:', error);
+    return '';
+  }
+}
+
+async function hydrateSlipUrlsForRsvp(rsvp) {
+  if (!rsvp) return rsvp;
 
   return {
-    storagePath,
-    publicUrl: publicData.publicUrl
+    ...rsvp,
+    payment_slip_url: rsvp.payment_slip_path ? await createSignedSlipUrl(rsvp.payment_slip_path) : '',
+    final_payment_slip_url: rsvp.final_payment_slip_path ? await createSignedSlipUrl(rsvp.final_payment_slip_path) : ''
   };
+}
+
+async function hydrateSlipUrlsForRsvps(rsvps) {
+  return Promise.all((rsvps || []).map((rsvp) => hydrateSlipUrlsForRsvp(rsvp)));
 }
 
 async function updatePaymentStatus({ sessionId, rsvpId, status, amountPaid }) {
@@ -742,7 +767,9 @@ async function listSessionRsvps(sessionId) {
     return { data: null, error: rsvpError };
   }
 
-  const userIds = [...new Set((rsvps || []).map((rsvp) => rsvp.user_id))];
+  const signedRsvps = await hydrateSlipUrlsForRsvps(rsvps || []);
+
+  const userIds = [...new Set(signedRsvps.map((rsvp) => rsvp.user_id))];
   let usersById = {};
 
   if (userIds.length > 0) {
@@ -758,7 +785,7 @@ async function listSessionRsvps(sessionId) {
     usersById = Object.fromEntries((users || []).map((user) => [user.id, user]));
   }
 
-  const parentRsvpIds = (rsvps || []).map((rsvp) => rsvp.id);
+  const parentRsvpIds = signedRsvps.map((rsvp) => rsvp.id);
   let guestsByRsvpId = {};
 
   if (parentRsvpIds.length > 0) {
@@ -780,7 +807,7 @@ async function listSessionRsvps(sessionId) {
     }
   }
 
-  for (const rsvp of rsvps || []) {
+  for (const rsvp of signedRsvps) {
     const joinedSeatCount = joinedSeatCountForRsvp(rsvp, guestsByRsvpId[rsvp.id] || []);
     const nextAmountDue = calculatePaymentDue(session, joinedSeatCount, 'deposit');
     const nextFinalAmountDue = calculatePaymentDue(session, joinedSeatCount, 'final');
@@ -794,7 +821,7 @@ async function listSessionRsvps(sessionId) {
 
       if (nextAmountDue > 0) {
         if (nextPaymentStatus === 'Paid' && Number(paidAmount || 0) < nextAmountDue) {
-          nextPaymentStatus = rsvp.payment_slip_url ? 'Submitted' : 'Pending';
+          nextPaymentStatus = rsvp.payment_slip_path ? 'Submitted' : 'Pending';
         }
       } else if (nextPaymentStatus === 'Paid') {
         nextPaymentStatus = 'Pending';
@@ -832,7 +859,7 @@ async function listSessionRsvps(sessionId) {
 
   const rows = [];
 
-  for (const rsvp of rsvps || []) {
+  for (const rsvp of signedRsvps) {
     const owner = usersById[rsvp.user_id] || {
       id: rsvp.user_id,
       line_uid: '',
@@ -3045,7 +3072,7 @@ app.post('/api/rsvp/submit-payment', async (req, res) => {
         payment_status: 'Submitted',
         payment_amount_due: amountDue,
         payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : amountDue,
-        payment_slip_url: slip.publicUrl,
+        payment_slip_url: null,
         payment_slip_path: slip.storagePath,
         payment_slip_deleted: false,
         payment_note: note || null,
@@ -3054,18 +3081,17 @@ app.post('/api/rsvp/submit-payment', async (req, res) => {
         payment_paid_at: null
       })
       .eq('id', createdRsvp.id)
-      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_submitted_at')
+      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_slip_path, payment_submitted_at')
       .single();
 
     if (updateError) throw updateError;
-
     return res.status(existingRsvp ? 200 : 201).json({
       success: true,
       status: updatedRsvp.status,
       paymentStatus: updatedRsvp.payment_status,
       amountDue: updatedRsvp.payment_amount_due,
       amountPaid: updatedRsvp.payment_amount_paid,
-      slipUrl: updatedRsvp.payment_slip_url,
+      slipUrl: '',
       guestCount: guestRows.length,
       totalJoined,
       totalWaitlist,
@@ -3117,7 +3143,7 @@ app.get('/api/payment', async (req, res) => {
 
     const { data: rsvp, error: rsvpError } = await supabase
       .from('rsvps')
-      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at')
+      .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_slip_path, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_slip_path, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at')
       .eq('session_id', session.id)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -3143,7 +3169,7 @@ app.get('/api/payment', async (req, res) => {
         let nextFinalPaymentStatus = rsvp.final_payment_status || 'NotOpened';
 
         if (nextPaymentStatus === 'Paid' && paidAmount < nextAmountDue) {
-          nextPaymentStatus = rsvp.payment_slip_url ? 'Submitted' : 'Pending';
+          nextPaymentStatus = rsvp.payment_slip_path ? 'Submitted' : 'Pending';
         } else if (nextAmountDue <= 0 && nextPaymentStatus === 'Paid') {
           nextPaymentStatus = 'Pending';
         }
@@ -3163,12 +3189,13 @@ app.get('/api/payment', async (req, res) => {
             final_payment_paid_at: nextFinalPaymentStatus === 'Paid' ? rsvp.final_payment_paid_at : null
           })
           .eq('id', rsvp.id)
-          .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at')
+          .select('id, status, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_slip_path, payment_note, payment_payer_name, payment_submitted_at, payment_paid_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_slip_path, final_payment_note, final_payment_payer_name, final_payment_submitted_at, final_payment_paid_at')
           .single();
 
         if (syncError) throw syncError;
         Object.assign(rsvp, syncedRsvp);
       }
+
     }
 
     return res.json({
@@ -3180,7 +3207,7 @@ app.get('/api/payment', async (req, res) => {
         status: rsvp.payment_status || 'Pending',
         amountDue: rsvp.payment_amount_due || 0,
         amountPaid: rsvp.payment_amount_paid || null,
-        slipUrl: rsvp.payment_slip_url || '',
+        slipUrl: '',
         note: rsvp.payment_note || '',
         payerName: rsvp.payment_payer_name || '',
         submittedAt: rsvp.payment_submitted_at,
@@ -3188,7 +3215,7 @@ app.get('/api/payment', async (req, res) => {
         finalStatus: rsvp.final_payment_status || 'NotOpened',
         finalAmountDue: rsvp.final_payment_amount_due || 0,
         finalAmountPaid: rsvp.final_payment_amount_paid || null,
-        finalSlipUrl: rsvp.final_payment_slip_url || '',
+        finalSlipUrl: '',
         finalNote: rsvp.final_payment_note || '',
         finalPayerName: rsvp.final_payment_payer_name || '',
         finalSubmittedAt: rsvp.final_payment_submitted_at,
@@ -3278,7 +3305,7 @@ app.post('/api/payment/submit', async (req, res) => {
       ? {
         final_payment_status: 'Submitted',
         final_payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : null,
-        final_payment_slip_url: slip.publicUrl,
+        final_payment_slip_url: null,
         final_payment_slip_path: slip.storagePath,
         final_payment_note: note || null,
         final_payment_payer_name: payerName || user.display_name || null,
@@ -3287,7 +3314,7 @@ app.post('/api/payment/submit', async (req, res) => {
       : {
         payment_status: 'Submitted',
         payment_amount_paid: Number.isFinite(paidAmount) ? paidAmount : null,
-        payment_slip_url: slip.publicUrl,
+        payment_slip_url: null,
         payment_slip_path: slip.storagePath,
         payment_slip_deleted: false,
         payment_note: note || null,
@@ -3299,11 +3326,10 @@ app.post('/api/payment/submit', async (req, res) => {
       .from('rsvps')
       .update(updatePayload)
       .eq('id', rsvp.id)
-      .select('id, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_submitted_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_submitted_at')
+      .select('id, payment_status, payment_amount_due, payment_amount_paid, payment_slip_url, payment_slip_path, payment_submitted_at, final_payment_status, final_payment_amount_due, final_payment_amount_paid, final_payment_slip_url, final_payment_slip_path, final_payment_submitted_at')
       .single();
 
     if (updateError) throw updateError;
-
     return res.json({
       success: true,
       payment: {
@@ -3312,7 +3338,7 @@ app.post('/api/payment/submit', async (req, res) => {
         status: phase === 'final' ? updatedRsvp.final_payment_status : updatedRsvp.payment_status,
         amountDue: phase === 'final' ? updatedRsvp.final_payment_amount_due : updatedRsvp.payment_amount_due,
         amountPaid: phase === 'final' ? updatedRsvp.final_payment_amount_paid : updatedRsvp.payment_amount_paid,
-        slipUrl: phase === 'final' ? updatedRsvp.final_payment_slip_url : updatedRsvp.payment_slip_url,
+        slipUrl: '',
         submittedAt: phase === 'final' ? updatedRsvp.final_payment_submitted_at : updatedRsvp.payment_submitted_at
       },
       message: 'Payment submitted.'
