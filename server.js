@@ -300,6 +300,63 @@ function getMimeExtension(mimeType = '') {
   return 'jpg';
 }
 
+function decodeJwtPayload(token = '') {
+  try {
+    const payload = String(token).split('.')[1];
+    if (!payload) return null;
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+  } catch (error) {
+    return null;
+  }
+}
+
+function isLikelyServiceRoleKey(key = '') {
+  const value = String(key || '').trim();
+  if (!value) return false;
+  if (value.startsWith('sb_secret_')) return true;
+  if (value.startsWith('sb_publishable_')) return false;
+  const payload = decodeJwtPayload(value);
+  return payload?.role === 'service_role';
+}
+
+function publicPaymentError(error) {
+  const rawMessage = String(error?.message || '').toLowerCase();
+  const rawCode = String(error?.code || '').toLowerCase();
+
+  if (error?.statusCode) {
+    return error.message;
+  }
+
+  if (
+    rawMessage.includes('row-level security')
+    || rawMessage.includes('violates row-level security')
+    || rawMessage.includes('permission denied')
+    || rawMessage.includes('not authorized')
+    || rawCode === '42501'
+  ) {
+    return 'Payment slip upload is blocked by Supabase permissions. Please check that Render has the real SUPABASE_SERVICE_ROLE_KEY secret key.';
+  }
+
+  if (rawMessage.includes('bucket') || rawMessage.includes('storage')) {
+    return 'Payment slip storage is not ready. Please run the payment slip storage SQL and check the payment-slips bucket.';
+  }
+
+  if (
+    rawMessage.includes('schema cache')
+    || rawMessage.includes('column')
+    || rawCode === '42703'
+    || rawCode === '42p01'
+  ) {
+    return 'Payment database setup is missing. Please run all payment migration SQL files in Supabase.';
+  }
+
+  if (rawMessage.includes('reserve_session_rsvp') || rawCode === '42883') {
+    return 'Booking protection is not installed. Please run migration-rsvp-duplicate-capacity.sql in Supabase.';
+  }
+
+  return 'Unable to submit payment and RSVP. Please check Render logs for the exact server error.';
+}
+
 function normalizePaymentMode(mode) {
   return ['none', 'deposit_then_final', 'final_only'].includes(mode) ? mode : 'deposit_then_final';
 }
@@ -336,8 +393,8 @@ function calculatePaymentDue(session, joinedSeatCount, phase = 'deposit') {
 }
 
 async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, slipFileName, previousSlipPath }) {
-  if (!supabaseServiceRoleKey) {
-    const error = new Error('Payment slip storage requires SUPABASE_SERVICE_ROLE_KEY on the server.');
+  if (!isLikelyServiceRoleKey(supabaseServiceRoleKey)) {
+    const error = new Error('Payment slip storage requires the real Supabase service_role/secret key in SUPABASE_SERVICE_ROLE_KEY on Render.');
     error.statusCode = 503;
     throw error;
   }
@@ -365,7 +422,11 @@ async function uploadPaymentSlip({ sessionId, rsvpId, slipBase64, slipMimeType, 
       upsert: true
     });
 
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    const error = new Error(publicPaymentError(uploadError));
+    error.statusCode = uploadError.statusCode || uploadError.status || 502;
+    throw error;
+  }
 
   if (previousSlipPath) {
     await supabase.storage.from(paymentSlipBucket).remove([previousSlipPath]);
@@ -3130,7 +3191,7 @@ app.post('/api/rsvp/submit-payment', async (req, res) => {
 
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : 'Unable to submit payment and RSVP.'
+      message: publicPaymentError(error)
     });
   }
 });
@@ -3372,7 +3433,7 @@ app.post('/api/payment/submit', async (req, res) => {
     console.error('Payment submit error:', error);
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : 'Unable to submit payment.'
+      message: publicPaymentError(error)
     });
   }
 });
