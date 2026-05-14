@@ -83,12 +83,7 @@
         <main x-show="!selectedSessionId" x-cloak>
             <section class="px-5">
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
-                    <img class="aspect-square w-full object-cover" :src="imageUrl(currentHomeBanner)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
-                    <div class="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5" x-show="homeBannerSlides.length > 1">
-                        <template x-for="(slide, index) in homeBannerSlides" :key="`${slide}-${index}`">
-                            <button class="h-2 rounded-full transition-all" :class="currentBannerIndex === index ? 'w-6 bg-gdsq' : 'w-2 bg-white/80'" @click="currentBannerIndex = index"></button>
-                        </template>
-                    </div>
+                    <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
@@ -1036,9 +1031,6 @@
                 displayName: null,
                 activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
                 homeBannerUrl: '/assets/gdsq-home-banner.png',
-                homeBannerSlides: ['/assets/gdsq-home-banner.png'],
-                currentBannerIndex: 0,
-                bannerTimer: null,
                 homeFeedBanners: [],
                 currentHomeFeedIndex: 0,
                 homeFeedTimer: null,
@@ -1202,10 +1194,6 @@
 
                 get profileAvatar() {
                     return this.imageUrl(this.profile.profileImageUrl) || 'https://ui-avatars.com/api/?background=0044CC&color=fff&name=GDSQ';
-                },
-
-                get currentHomeBanner() {
-                    return this.homeBannerSlides[this.currentBannerIndex] || this.homeBannerUrl || '/assets/gdsq-home-banner.png';
                 },
 
                 get homeFeedVisibleCount() {
@@ -1777,12 +1765,7 @@
                         const configResponse = await fetch('/api/config');
                         const config = await configResponse.json();
                         this.homeBannerUrl = config.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
-                        this.homeBannerSlides = (config.settings?.homeBannerSlides || [this.homeBannerUrl])
-                            .map((slide) => String(slide || '').trim())
-                            .filter(Boolean);
-                        if (this.homeBannerSlides.length === 0) this.homeBannerSlides = [this.homeBannerUrl];
                         this.applyDefaultEventSettings(config.settings?.defaultEventSettings || {});
-                        this.startBannerSlider();
                         await this.loadHomeFeedBanners();
                         this.hideAppLoader();
                         window.addEventListener('resize', () => {
@@ -1862,16 +1845,6 @@
                     if (!response.ok) throw new Error(result.message || 'Failed to load past sessions');
 
                     this.pastSessions = result.sessions || [];
-                },
-
-                startBannerSlider() {
-                    if (this.bannerTimer) clearInterval(this.bannerTimer);
-                    this.currentBannerIndex = 0;
-                    if (this.homeBannerSlides.length <= 1) return;
-
-                    this.bannerTimer = setInterval(() => {
-                        this.currentBannerIndex = (this.currentBannerIndex + 1) % this.homeBannerSlides.length;
-                    }, 4500);
                 },
 
                 startHomeFeedCarousel(resetIndex = false) {
