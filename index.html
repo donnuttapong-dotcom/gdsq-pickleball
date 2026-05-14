@@ -1735,6 +1735,16 @@
                     const header = document.querySelector('header.sticky');
                     const headerHeight = header ? header.getBoundingClientRect().height : 0;
                     const extraOffset = 16;
+
+                    if (sectionId === 'home-section') {
+                        window.scrollTo({
+                            top: 0,
+                            behavior: 'smooth'
+                        });
+                        this.flashSection(sectionId);
+                        return;
+                    }
+
                     const absoluteTop = window.scrollY + target.getBoundingClientRect().top - headerHeight - extraOffset;
 
                     window.scrollTo({
@@ -1750,11 +1760,20 @@
                         activeTab: this.activeTab,
                         selectedSessionId: this.selectedSessionId
                     });
-                    requestAnimationFrame(() => {
+                    const runScroll = () => {
                         requestAnimationFrame(() => {
-                            window.setTimeout(() => this.scrollToSection(sectionId), 80);
+                            requestAnimationFrame(() => {
+                                this.scrollToSection(sectionId);
+                            });
                         });
-                    });
+                    };
+
+                    if (typeof this.$nextTick === 'function') {
+                        this.$nextTick(() => runScroll());
+                        return;
+                    }
+
+                    runScroll();
                 },
 
                 homeShortcutClass(sectionName) {
@@ -1800,7 +1819,6 @@
                         this.guestNames = [];
                         this.pendingJoinPayment = false;
                         this.showPaymentPanel = false;
-                        window.history.pushState({}, '', '/');
                     }
 
                     if (nextTab === 'players') this.loadPlayers();
@@ -1817,7 +1835,6 @@
                     }
 
                     this.queueSectionScroll(target.sectionId);
-                    window.setTimeout(() => this.scrollToSection(target.sectionId), 320);
                 },
 
                 goToHomeShortcut(sectionName) {
@@ -1878,8 +1895,8 @@
 
                 visibleSectionId() {
                     const map = {
-                        home: 'home',
-                        events: 'events',
+                        home: 'home-section',
+                        events: 'events-section',
                         players: 'players-section',
                         rankings: 'rankings-section',
                         create: 'create-section',
