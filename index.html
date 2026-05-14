@@ -94,25 +94,25 @@
         </header>
 
         <main x-show="!selectedSessionId" x-cloak>
-            <section id="home" class="public-jump-target px-5" :class="sectionHighlightId === 'home' ? 'public-jump-highlight rounded-2xl' : ''">
+            <section id="home-section" class="public-jump-target px-5" :class="sectionHighlightId === 'home-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home'" x-cloak>
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
                     <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
-                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('events')" @click="goToHomeShortcut('events')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('events')" @click="navigateToSection('events')">
                         <i class="fa-regular fa-calendar text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('events')">Events</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('players')" @click="goToHomeShortcut('players')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('players')" @click="navigateToSection('players')">
                         <i class="fa-solid fa-users text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('players')">Players</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('rankings')" @click="goToHomeShortcut('rankings')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('rankings')" @click="navigateToSection('rankings')">
                         <i class="fa-solid fa-chart-simple text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('rankings')">Rankings</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('shop')" @click="goToHomeShortcut('shop')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('shop')" @click="navigateToSection('shop')">
                         <i class="fa-solid fa-store text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('shop')">Shop</span>
                     </button>
@@ -173,7 +173,7 @@
                 </div>
             </section>
 
-            <section id="events" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'events' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home' || activeTab === 'events'">
+            <section id="events-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'events-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home' || activeTab === 'events'">
                 <div class="mb-4 flex items-center justify-between">
                     <h1 class="text-xl font-black" x-text="eventViewMode === 'past' ? t('pastEvents') : t('upcomingEvents')">Upcoming Events</h1>
                     <button class="text-sm font-black text-gdsq" @click="eventViewMode === 'past' ? loadPastSessions() : loadSessions()" x-text="t('refresh')">Refresh</button>
@@ -240,7 +240,7 @@
                 </div>
             </section>
 
-            <section id="players" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'players' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'players'" x-cloak>
+            <section id="players-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'players-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'players'" x-cloak>
                 <div class="mb-4 flex items-center justify-between">
                     <h1 class="text-xl font-black" x-text="t('players')">Players</h1>
                     <button class="text-sm font-black text-gdsq" @click="loadPlayers()" x-text="t('refresh')">Refresh</button>
@@ -275,7 +275,7 @@
                 <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="players.length === 0" x-text="t('noPlayers')"></p>
             </section>
 
-            <section id="rankings" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'rankings' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'rankings'" x-cloak>
+            <section id="rankings-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'rankings-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'rankings'" x-cloak>
                 <div class="mb-4 flex items-center justify-between">
                     <h1 class="text-xl font-black" x-text="t('rankings')">Rankings</h1>
                     <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
@@ -416,7 +416,7 @@
                 </div>
             </section>
 
-            <section id="create-event" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'create-event' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'create'" x-cloak>
+            <section id="create-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'create-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'create'" x-cloak>
                 <h1 class="text-xl font-black" x-text="t('createEvent')">Create Event</h1>
                 <p class="mt-1 text-sm font-semibold text-gray-500" x-text="t('createEventHelp')">Publish a community event instantly.</p>
 
@@ -491,7 +491,7 @@
                 </div>
             </section>
 
-            <section id="shop" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'shop' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'shop'" x-cloak>
+            <section id="shop-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'shop-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'shop'" x-cloak>
                 <h1 class="text-xl font-black" x-text="t('shop')">Shop</h1>
                 <div class="mt-4 space-y-3">
                     <article class="rounded-2xl bg-white p-5 shadow-sm">
@@ -506,7 +506,7 @@
                 </div>
             </section>
 
-            <section id="profile" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'profile' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'profile'" x-cloak>
+            <section id="profile-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'profile-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'profile'" x-cloak>
                 <h1 class="text-xl font-black" x-text="t('profile')">Profile</h1>
                 <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
                     <div class="mb-4 flex items-center gap-3">
@@ -691,7 +691,7 @@
             </section>
         </main>
 
-        <main id="event-detail" class="public-jump-target" :class="sectionHighlightId === 'event-detail' ? 'public-jump-highlight rounded-2xl' : ''" x-show="selectedSessionId" x-cloak>
+        <main id="event-detail-section" class="public-jump-target" :class="sectionHighlightId === 'event-detail-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="selectedSessionId" x-cloak>
             <section class="px-5">
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100">
                     <img class="aspect-square w-full object-cover" x-show="posterUrl" :src="imageUrl(posterUrl)" :alt="sessionTitle">
@@ -900,7 +900,7 @@
                     <p x-text="statusMessage"></p>
                 </div>
 
-                <div id="payment" class="public-jump-target mt-4 rounded-2xl bg-white p-4 shadow-sm" :class="sectionHighlightId === 'payment' ? 'public-jump-highlight' : ''" x-show="userStatus || pendingJoinPayment">
+                <div id="payment-section" class="public-jump-target mt-4 rounded-2xl bg-white p-4 shadow-sm" :class="sectionHighlightId === 'payment-section' ? 'public-jump-highlight' : ''" x-show="userStatus || pendingJoinPayment">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <h2 class="text-base font-black" x-text="paymentForm.phase === 'final' ? t('finalPayment') : (pendingJoinPayment ? t('depositPayment') : t('payment'))">Payment</h2>
@@ -988,7 +988,7 @@
                         <span x-show="isLoading" x-text="t('confirming')">Confirming...</span>
                         <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
                     </button>
-                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white" x-show="eventEnded" @click="loadVotes(); queueSectionScroll('vote-panel')">
+                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white" x-show="eventEnded" @click="loadVotes(); navigateToSection('vote', { keepSession: true, sessionId: selectedSessionId })">
                         <span x-text="t('voteNow')">โหวต</span>
                         <i class="fa-solid fa-star"></i>
                     </button>
@@ -1002,14 +1002,14 @@
 
         <nav class="fixed bottom-0 left-0 z-40 w-full border-t bg-white px-6 py-3 gdsq-safe-bottom-nav" x-show="!selectedSessionId" x-cloak>
             <div class="mx-auto grid max-w-md grid-cols-5 items-end text-center text-xs font-bold text-gray-500">
-                <button :class="activeTab === 'home' ? 'text-gdsq' : ''" @click="setTab('home', 'home')"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
-                <button :class="activeTab === 'events' ? 'text-gdsq' : ''" @click="setTab('events', 'events')"><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
-                <button class="-mt-8" @click="setTab('create', 'create-event')"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg"><i class="fa-solid fa-plus"></i></span>Create</button>
-                <button class="relative" :class="activeTab === 'players' ? 'text-gdsq' : ''" @click="setTab('players', 'players')">
+                <button :class="activeTab === 'home' ? 'text-gdsq' : ''" @click="navigateToSection('home')"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
+                <button :class="activeTab === 'events' ? 'text-gdsq' : ''" @click="navigateToSection('events')"><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
+                <button class="-mt-8" :class="activeTab === 'create' ? 'text-gdsq' : ''" @click="navigateToSection('create')"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg"><i class="fa-solid fa-plus"></i></span>Create</button>
+                <button class="relative" :class="activeTab === 'players' ? 'text-gdsq' : ''" @click="navigateToSection('players')">
                     <span class="absolute -right-1 -top-2 rounded-full bg-gdsqRed px-1.5 py-0.5 text-[10px] font-black text-white" x-show="players.length > 0" x-text="players.length"></span>
                     <i class="fa-solid fa-users mb-1 block text-xl"></i>Players
                 </button>
-                <button :class="activeTab === 'profile' ? 'text-gdsq' : ''" @click="setTab('profile', 'profile')"><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
+                <button :class="activeTab === 'profile' ? 'text-gdsq' : ''" @click="navigateToSection('profile')"><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
             </div>
         </nav>
     </div>
@@ -1757,37 +1757,75 @@
                     });
                 },
 
-                scrollToEvents() {
-                    this.goToHomeShortcut('events');
-                },
-
                 homeShortcutClass(sectionName) {
                     return this.homeShortcutActive === sectionName ? 'text-gdsq' : 'text-gray-500';
                 },
 
-                goToHomeShortcut(sectionName) {
+                publicSectionTarget(sectionName) {
                     const targetMap = {
-                        events: 'events',
-                        players: 'players',
-                        rankings: 'rankings',
-                        shop: 'shop'
+                        home: { tab: 'home', sectionId: 'home-section' },
+                        events: { tab: 'events', sectionId: 'events-section' },
+                        create: { tab: 'create', sectionId: 'create-section' },
+                        players: { tab: 'players', sectionId: 'players-section' },
+                        rankings: { tab: 'rankings', sectionId: 'rankings-section' },
+                        shop: { tab: 'shop', sectionId: 'shop-section' },
+                        profile: { tab: 'profile', sectionId: 'profile-section' },
+                        eventDetail: { tab: this.activeTab, sectionId: 'event-detail-section', keepSession: true },
+                        payment: { tab: this.activeTab, sectionId: 'payment-section', keepSession: true },
+                        vote: { tab: this.activeTab, sectionId: 'vote-panel', keepSession: true },
+                        playerDetail: { tab: 'playerDetail', sectionId: 'player-detail', keepSession: true }
                     };
-                    const targetSectionId = targetMap[sectionName] || 'events';
+                    return targetMap[sectionName] || targetMap.home;
+                },
 
-                    this.homeShortcutActive = sectionName;
-                    this.activeTab = sectionName;
-                    this.selectedSessionId = '';
-                    this.guestNames = [];
-                    this.pendingJoinPayment = false;
-                    this.showPaymentPanel = false;
-                    window.history.pushState({}, '', '/');
+                navigateToSection(sectionName, options = {}) {
+                    const target = this.publicSectionTarget(sectionName);
+                    const nextTab = options.tab || target.tab;
+                    const shouldKeepSession = Boolean(target.keepSession || options.keepSession);
+                    const previousSessionId = this.selectedSessionId;
 
-                    if (sectionName === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
-                    if (sectionName === 'players') this.loadPlayers();
-                    if (sectionName === 'rankings') this.loadRankings();
+                    this.activeTab = nextTab;
+                    if (['events', 'players', 'rankings', 'shop'].includes(nextTab)) {
+                        this.homeShortcutActive = nextTab;
+                    } else if (nextTab === 'home') {
+                        this.homeShortcutActive = 'events';
+                    }
 
-                    this.queueSectionScroll(targetSectionId);
-                    window.setTimeout(() => this.scrollToSection(targetSectionId), 320);
+                    if (!shouldKeepSession) {
+                        this.selectedSessionId = '';
+                    } else {
+                        this.selectedSessionId = options.sessionId || previousSessionId;
+                    }
+                    if (!shouldKeepSession) {
+                        this.guestNames = [];
+                        this.pendingJoinPayment = false;
+                        this.showPaymentPanel = false;
+                        window.history.pushState({}, '', '/');
+                    }
+
+                    if (nextTab === 'players') this.loadPlayers();
+                    if (nextTab === 'rankings') this.loadRankings();
+                    if (nextTab === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
+                    if (nextTab === 'profile') {
+                        this.loadProfile();
+                        this.loadProfileHistory();
+                        this.loadHostSessions();
+                    }
+                    if (nextTab === 'create' && !this.lineUid) {
+                        this.createMessageType = 'error';
+                        this.createMessage = this.t('lineLoginRequired');
+                    }
+
+                    this.queueSectionScroll(target.sectionId);
+                    window.setTimeout(() => this.scrollToSection(target.sectionId), 320);
+                },
+
+                goToHomeShortcut(sectionName) {
+                    this.navigateToSection(sectionName);
+                },
+
+                scrollToEvents() {
+                    this.navigateToSection('events');
                 },
 
                 handleBack() {
@@ -1801,43 +1839,33 @@
                         return;
                     }
 
-                    this.setTab('home', 'home');
+                    this.navigateToSection('home');
                 },
 
                 setTab(tab, sectionId = '') {
-                    this.activeTab = tab;
-                    if (['events', 'players', 'rankings', 'shop'].includes(tab)) {
-                        this.homeShortcutActive = tab;
-                    } else if (tab === 'home') {
-                        this.homeShortcutActive = 'events';
-                    }
-                    this.selectedSessionId = '';
-                    this.guestNames = [];
-                    this.pendingJoinPayment = false;
-                    this.showPaymentPanel = false;
-                    window.history.pushState({}, '', '/');
-
-                    if (tab === 'players') this.loadPlayers();
-                    if (tab === 'rankings') this.loadRankings();
-                    if (tab === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
-                    if (tab === 'profile') {
-                        this.loadProfile();
-                        this.loadProfileHistory();
-                        this.loadHostSessions();
-                    }
-                    if (tab === 'create' && !this.lineUid) {
-                        this.createMessageType = 'error';
-                        this.createMessage = this.t('lineLoginRequired');
-                    }
-
-                    const targetSectionId = sectionId || (tab === 'home' ? 'home' : tab);
-                    this.queueSectionScroll(targetSectionId);
+                    const sectionMap = {
+                        home: 'home',
+                        events: 'events',
+                        'events-section': 'events',
+                        players: 'players',
+                        'players-section': 'players',
+                        rankings: 'rankings',
+                        'rankings-section': 'rankings',
+                        shop: 'shop',
+                        'shop-section': 'shop',
+                        create: 'create',
+                        'create-event': 'create',
+                        'create-section': 'create',
+                        profile: 'profile',
+                        'profile-section': 'profile'
+                    };
+                    this.navigateToSection(sectionMap[sectionId] || sectionMap[tab] || tab);
                 },
 
                 togglePaymentPanel() {
                     this.showPaymentPanel = !this.showPaymentPanel;
                     if (this.showPaymentPanel) {
-                        this.queueSectionScroll('payment');
+                        this.navigateToSection('payment', { keepSession: true, sessionId: this.selectedSessionId });
                     }
                 },
 
@@ -1845,21 +1873,21 @@
                     this.showPaymentPanel = true;
                     this.paymentForm.amountPaid = this.finalPaymentDueDisplay || '';
                     this.paymentForm.phase = 'final';
-                    this.queueSectionScroll('payment');
+                    this.navigateToSection('payment', { keepSession: true, sessionId: this.selectedSessionId });
                 },
 
                 visibleSectionId() {
                     const map = {
                         home: 'home',
                         events: 'events',
-                        players: 'players',
-                        rankings: 'rankings',
-                        create: 'create-event',
-                        profile: 'profile',
+                        players: 'players-section',
+                        rankings: 'rankings-section',
+                        create: 'create-section',
+                        profile: 'profile-section',
                         playerDetail: 'player-detail',
-                        shop: 'shop'
+                        shop: 'shop-section'
                     };
-                    return map[this.activeTab] || 'home';
+                    return map[this.activeTab] || 'home-section';
                 },
 
                 imageUrl(url) {
@@ -2073,7 +2101,7 @@
                         if (!response.ok) throw new Error(result.message || 'Unable to load player');
                         this.selectedPlayer = result.player || {};
                         window.history.pushState({}, '', `/?playerId=${encodeURIComponent(playerId)}`);
-                        this.queueSectionScroll('player-detail');
+                        this.navigateToSection('playerDetail', { keepSession: true });
                     } catch (error) {
                         this.statusMessage = error.message || 'Unable to load player';
                         this.activeTab = this.previousTab || 'players';
@@ -2494,7 +2522,7 @@
                     window.history.pushState({}, '', `/?sessionId=${encodeURIComponent(sessionId)}`);
                     this.statusMessage = this.t('loadingEvent');
                     await this.loadSession();
-                    this.queueSectionScroll('event-detail');
+                    this.navigateToSection('eventDetail', { keepSession: true, sessionId: this.selectedSessionId });
                 },
 
                 async shareEvent() {
@@ -2877,7 +2905,7 @@
                         this.paymentForm.amountPaid = this.estimatedPaymentAmount || '';
                         this.paymentForm.payerName = this.profile.displayName || this.displayName || '';
                         this.statusMessage = this.t('slipRequiredToJoin');
-                        setTimeout(() => this.scrollToSection('payment'), 50);
+                        setTimeout(() => this.navigateToSection('payment', { keepSession: true, sessionId: this.selectedSessionId }), 50);
                         return;
                     }
 
