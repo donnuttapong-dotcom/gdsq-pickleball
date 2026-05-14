@@ -988,7 +988,7 @@
                         <span x-show="isLoading" x-text="t('confirming')">Confirming...</span>
                         <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
                     </button>
-                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white" x-show="eventEnded" @click="loadVotes(); requestAnimationFrame(() => scrollToSection('vote-panel'))">
+                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white" x-show="eventEnded" @click="loadVotes(); queueSectionScroll('vote-panel')">
                         <span x-text="t('voteNow')">โหวต</span>
                         <i class="fa-solid fa-star"></i>
                     </button>
@@ -1717,17 +1717,36 @@
                 scrollToSection(sectionId, attempt = 0) {
                     const target = document.getElementById(sectionId);
                     if (!target) {
-                        if (attempt < 6) {
+                        if (attempt < 10) {
                             requestAnimationFrame(() => this.scrollToSection(sectionId, attempt + 1));
                         }
                         return;
                     }
 
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
+                    const targetStyle = window.getComputedStyle(target);
+                    if (targetStyle.display === 'none' || targetStyle.visibility === 'hidden') {
+                        if (attempt < 10) {
+                            requestAnimationFrame(() => this.scrollToSection(sectionId, attempt + 1));
+                        }
+                        return;
+                    }
+
+                    const header = document.querySelector('header.sticky');
+                    const headerHeight = header ? header.getBoundingClientRect().height : 0;
+                    const extraOffset = 16;
+                    const absoluteTop = window.scrollY + target.getBoundingClientRect().top - headerHeight - extraOffset;
+
+                    window.scrollTo({
+                        top: Math.max(0, absoluteTop),
+                        behavior: 'smooth'
                     });
                     this.flashSection(sectionId);
+                },
+
+                queueSectionScroll(sectionId) {
+                    this.$nextTick(() => {
+                        window.setTimeout(() => this.scrollToSection(sectionId), 60);
+                    });
                 },
 
                 scrollToEvents() {
@@ -1770,13 +1789,13 @@
                     }
 
                     const targetSectionId = sectionId || (tab === 'home' ? 'home' : tab);
-                    requestAnimationFrame(() => this.scrollToSection(targetSectionId));
+                    this.queueSectionScroll(targetSectionId);
                 },
 
                 togglePaymentPanel() {
                     this.showPaymentPanel = !this.showPaymentPanel;
                     if (this.showPaymentPanel) {
-                        requestAnimationFrame(() => this.scrollToSection('payment'));
+                        this.queueSectionScroll('payment');
                     }
                 },
 
@@ -1784,7 +1803,7 @@
                     this.showPaymentPanel = true;
                     this.paymentForm.amountPaid = this.finalPaymentDueDisplay || '';
                     this.paymentForm.phase = 'final';
-                    requestAnimationFrame(() => this.scrollToSection('payment'));
+                    this.queueSectionScroll('payment');
                 },
 
                 visibleSectionId() {
@@ -2012,7 +2031,7 @@
                         if (!response.ok) throw new Error(result.message || 'Unable to load player');
                         this.selectedPlayer = result.player || {};
                         window.history.pushState({}, '', `/?playerId=${encodeURIComponent(playerId)}`);
-                        requestAnimationFrame(() => this.scrollToSection('player-detail'));
+                        this.queueSectionScroll('player-detail');
                     } catch (error) {
                         this.statusMessage = error.message || 'Unable to load player';
                         this.activeTab = this.previousTab || 'players';
@@ -2433,7 +2452,7 @@
                     window.history.pushState({}, '', `/?sessionId=${encodeURIComponent(sessionId)}`);
                     this.statusMessage = this.t('loadingEvent');
                     await this.loadSession();
-                    requestAnimationFrame(() => this.scrollToSection('event-detail'));
+                    this.queueSectionScroll('event-detail');
                 },
 
                 async shareEvent() {
@@ -2483,7 +2502,7 @@
                     this.showPaymentPanel = false;
                     this.statusMessage = this.lineUid ? `${this.t('loggedIn')}: ${this.displayName}` : '';
                     window.history.pushState({}, '', '/');
-                    requestAnimationFrame(() => this.scrollToSection(this.visibleSectionId()));
+                    this.queueSectionScroll(this.visibleSectionId());
                 },
 
                 addGuest() {
