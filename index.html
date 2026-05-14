@@ -94,32 +94,32 @@
         </header>
 
         <main x-show="!selectedSessionId" x-cloak>
-            <section id="home" class="public-jump-target px-5" :class="sectionHighlightId === 'home' ? 'public-jump-highlight rounded-2xl' : ''">
+            <section id="home" class="public-jump-target px-5" :class="sectionHighlightId === 'home' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home'" x-cloak>
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
                     <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
-                    <button class="flex flex-col items-center gap-2 text-gdsq" @click="setTab('events', 'events')">
+                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'events' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('events', 'events')">
                         <i class="fa-regular fa-calendar text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('events')">Events</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2 text-gray-500" @click="setTab('players', 'players')">
+                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'players' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('players', 'players')">
                         <i class="fa-solid fa-users text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('players')">Players</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2 text-gray-500" @click="setTab('rankings', 'rankings')">
+                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'rankings' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('rankings', 'rankings')">
                         <i class="fa-solid fa-chart-simple text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('rankings')">Rankings</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2 text-gray-500" @click="setTab('shop', 'shop')">
+                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'shop' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('shop', 'shop')">
                         <i class="fa-solid fa-store text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('shop')">Shop</span>
                     </button>
                 </div>
             </section>
 
-            <section class="mt-6 px-5 lg:relative lg:left-1/2 lg:w-[min(calc(100vw-3rem),72rem)] lg:-translate-x-1/2 lg:px-0" x-show="homeFeedBanners.length > 0">
+            <section class="mt-6 px-5 lg:relative lg:left-1/2 lg:w-[min(calc(100vw-3rem),72rem)] lg:-translate-x-1/2 lg:px-0" x-show="activeTab === 'home' && homeFeedBanners.length > 0" x-cloak>
                 <div class="mb-3 flex items-center justify-between">
                     <div>
                         <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('homeUpdates')">Home Updates</p>
@@ -1744,8 +1744,15 @@
                 },
 
                 queueSectionScroll(sectionId) {
-                    this.$nextTick(() => {
-                        window.setTimeout(() => this.scrollToSection(sectionId), 60);
+                    console.debug('public-nav:queue-scroll', {
+                        sectionId,
+                        activeTab: this.activeTab,
+                        selectedSessionId: this.selectedSessionId
+                    });
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            window.setTimeout(() => this.scrollToSection(sectionId), 80);
+                        });
                     });
                 },
 
