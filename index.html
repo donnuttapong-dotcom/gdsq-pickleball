@@ -94,25 +94,25 @@
         </header>
 
         <main x-show="!selectedSessionId" x-cloak>
-            <section id="home" class="public-jump-target px-5" :class="sectionHighlightId === 'home' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home'" x-cloak>
+            <section id="home" class="public-jump-target px-5" :class="sectionHighlightId === 'home' ? 'public-jump-highlight rounded-2xl' : ''">
                 <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
                     <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
-                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'events' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('events', 'events')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('events')" @click="goToHomeShortcut('events')">
                         <i class="fa-regular fa-calendar text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('events')">Events</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'players' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('players', 'players')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('players')" @click="goToHomeShortcut('players')">
                         <i class="fa-solid fa-users text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('players')">Players</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'rankings' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('rankings', 'rankings')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('rankings')" @click="goToHomeShortcut('rankings')">
                         <i class="fa-solid fa-chart-simple text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('rankings')">Rankings</span>
                     </button>
-                    <button class="flex flex-col items-center gap-2" :class="activeTab === 'shop' ? 'text-gdsq' : 'text-gray-500'" @click="setTab('shop', 'shop')">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('shop')" @click="goToHomeShortcut('shop')">
                         <i class="fa-solid fa-store text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('shop')">Shop</span>
                     </button>
@@ -1043,6 +1043,7 @@
                 liffId: '',
                 displayName: null,
                 activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
+                homeShortcutActive: 'events',
                 homeBannerUrl: '/assets/gdsq-home-banner.png',
                 homeFeedBanners: [],
                 currentHomeFeedIndex: 0,
@@ -1757,7 +1758,36 @@
                 },
 
                 scrollToEvents() {
-                    this.setTab('events', 'events');
+                    this.goToHomeShortcut('events');
+                },
+
+                homeShortcutClass(sectionName) {
+                    return this.homeShortcutActive === sectionName ? 'text-gdsq' : 'text-gray-500';
+                },
+
+                goToHomeShortcut(sectionName) {
+                    const targetMap = {
+                        events: 'events',
+                        players: 'players',
+                        rankings: 'rankings',
+                        shop: 'shop'
+                    };
+                    const targetSectionId = targetMap[sectionName] || 'events';
+
+                    this.homeShortcutActive = sectionName;
+                    this.activeTab = sectionName;
+                    this.selectedSessionId = '';
+                    this.guestNames = [];
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
+                    window.history.pushState({}, '', '/');
+
+                    if (sectionName === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
+                    if (sectionName === 'players') this.loadPlayers();
+                    if (sectionName === 'rankings') this.loadRankings();
+
+                    this.queueSectionScroll(targetSectionId);
+                    window.setTimeout(() => this.scrollToSection(targetSectionId), 320);
                 },
 
                 handleBack() {
@@ -1776,6 +1806,11 @@
 
                 setTab(tab, sectionId = '') {
                     this.activeTab = tab;
+                    if (['events', 'players', 'rankings', 'shop'].includes(tab)) {
+                        this.homeShortcutActive = tab;
+                    } else if (tab === 'home') {
+                        this.homeShortcutActive = 'events';
+                    }
                     this.selectedSessionId = '';
                     this.guestNames = [];
                     this.pendingJoinPayment = false;
