@@ -111,6 +111,60 @@
                 </div>
             </section>
 
+            <section class="mt-6 px-5 lg:relative lg:left-1/2 lg:w-[min(calc(100vw-3rem),72rem)] lg:-translate-x-1/2 lg:px-0" x-show="homeFeedBanners.length > 0">
+                <div class="mb-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('homeUpdates')">Home Updates</p>
+                        <h2 class="text-lg font-black" x-text="t('latestNews')">Latest News</h2>
+                    </div>
+                    <div class="flex gap-1.5" x-show="homeFeedPageCount > 1">
+                        <template x-for="page in homeFeedPageCount" :key="`feed-dot-${page}`">
+                            <button
+                                class="h-2 rounded-full transition-all"
+                                :class="homeFeedPageIndex === (page - 1) ? 'w-6 bg-gdsq' : 'w-2 bg-gray-300'"
+                                @click="goToHomeFeedPage(page - 1)"
+                            ></button>
+                        </template>
+                    </div>
+                </div>
+
+                <div
+                    class="overflow-hidden rounded-2xl"
+                    @mouseenter="pauseHomeFeedCarousel()"
+                    @mouseleave="resumeHomeFeedCarousel()"
+                >
+                    <div
+                        class="flex transition-transform duration-700 ease-out"
+                        :style="homeFeedTrackStyle"
+                    >
+                        <template x-for="banner in homeFeedBanners" :key="banner.id">
+                            <div class="shrink-0 px-1.5" :style="homeFeedCardStyle">
+                                <template x-if="banner.linkUrl">
+                                    <a class="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md" :href="banner.linkUrl" target="_blank" rel="noreferrer">
+                                        <div class="aspect-[4/5] bg-gray-100">
+                                            <img class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                        </div>
+                                        <div class="p-3" x-show="banner.title">
+                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
+                                        </div>
+                                    </a>
+                                </template>
+                                <template x-if="!banner.linkUrl">
+                                    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+                                        <div class="aspect-[4/5] bg-gray-100">
+                                            <img class="h-full w-full object-cover" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                        </div>
+                                        <div class="p-3" x-show="banner.title">
+                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </section>
+
             <section id="events" class="mt-7 px-5" x-show="activeTab === 'home' || activeTab === 'events'">
                 <div class="mb-4 flex items-center justify-between">
                     <h1 class="text-xl font-black" x-text="eventViewMode === 'past' ? t('pastEvents') : t('upcomingEvents')">Upcoming Events</h1>
@@ -985,6 +1039,9 @@
                 homeBannerSlides: ['/assets/gdsq-home-banner.png'],
                 currentBannerIndex: 0,
                 bannerTimer: null,
+                homeFeedBanners: [],
+                currentHomeFeedIndex: 0,
+                homeFeedTimer: null,
                 sessions: [],
                 pastSessions: [],
                 eventViewMode: 'upcoming',
@@ -1151,6 +1208,35 @@
                     return this.homeBannerSlides[this.currentBannerIndex] || this.homeBannerUrl || '/assets/gdsq-home-banner.png';
                 },
 
+                get homeFeedVisibleCount() {
+                    if (window.innerWidth >= 1024) return 4;
+                    if (window.innerWidth >= 640) return 2;
+                    return 1;
+                },
+
+                get homeFeedMaxIndex() {
+                    return Math.max(this.homeFeedBanners.length - this.homeFeedVisibleCount, 0);
+                },
+
+                get homeFeedPageCount() {
+                    return this.homeFeedMaxIndex + 1;
+                },
+
+                get homeFeedPageIndex() {
+                    return Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
+                },
+
+                get homeFeedCardStyle() {
+                    const width = 100 / this.homeFeedVisibleCount;
+                    return `width:${width}%`;
+                },
+
+                get homeFeedTrackStyle() {
+                    const safeIndex = Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
+                    const translate = safeIndex * (100 / this.homeFeedVisibleCount);
+                    return `transform: translateX(-${translate}%);`;
+                },
+
                 get eventList() {
                     if (this.activeTab === 'events' && this.eventViewMode === 'past') {
                         return this.pastSessions;
@@ -1245,6 +1331,8 @@
                         eventPublished: 'สร้างกิจกรรมแล้ว',
                         eventPublishFailed: 'สร้างกิจกรรมไม่สำเร็จ',
                         upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
+                        homeUpdates: 'อัปเดตหน้าแรก',
+                        latestNews: 'ข่าวสารและแบนเนอร์',
                         refresh: 'รีเฟรช',
                         noEvents: 'ยังไม่มีกิจกรรม',
                         viewDetails: 'ดูรายละเอียด',
@@ -1446,6 +1534,8 @@
                         eventPublished: 'Event published',
                         eventPublishFailed: 'Unable to publish event',
                         upcomingEvents: 'Upcoming Events',
+                        homeUpdates: 'Home Updates',
+                        latestNews: 'Latest News',
                         refresh: 'Refresh',
                         noEvents: 'No events yet',
                         viewDetails: 'View details',
@@ -1693,7 +1783,11 @@
                         if (this.homeBannerSlides.length === 0) this.homeBannerSlides = [this.homeBannerUrl];
                         this.applyDefaultEventSettings(config.settings?.defaultEventSettings || {});
                         this.startBannerSlider();
+                        await this.loadHomeFeedBanners();
                         this.hideAppLoader();
+                        window.addEventListener('resize', () => {
+                            this.currentHomeFeedIndex = Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
+                        });
 
                         if (!config.liffId) {
                             this.statusMessage = this.t('liffMissing');
@@ -1745,6 +1839,21 @@
                     this.sessions = result.sessions || [];
                 },
 
+                async loadHomeFeedBanners() {
+                    try {
+                        const response = await fetch('/api/public/home-banners');
+                        const result = await response.json();
+
+                        if (!response.ok) throw new Error(result.message || 'Failed to load home banners');
+
+                        this.homeFeedBanners = result.banners || [];
+                        this.startHomeFeedCarousel(true);
+                    } catch (error) {
+                        console.error('Home banners load error:', error);
+                        this.homeFeedBanners = [];
+                    }
+                },
+
                 async loadPastSessions() {
                     const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
                     const response = await fetch(`/api/public/past-sessions${params}`);
@@ -1763,6 +1872,31 @@
                     this.bannerTimer = setInterval(() => {
                         this.currentBannerIndex = (this.currentBannerIndex + 1) % this.homeBannerSlides.length;
                     }, 4500);
+                },
+
+                startHomeFeedCarousel(resetIndex = false) {
+                    if (this.homeFeedTimer) clearInterval(this.homeFeedTimer);
+                    if (resetIndex) this.currentHomeFeedIndex = 0;
+                    if (this.homeFeedBanners.length <= this.homeFeedVisibleCount) return;
+
+                    this.homeFeedTimer = setInterval(() => {
+                        this.currentHomeFeedIndex = this.currentHomeFeedIndex >= this.homeFeedMaxIndex
+                            ? 0
+                            : this.currentHomeFeedIndex + 1;
+                    }, 4000);
+                },
+
+                pauseHomeFeedCarousel() {
+                    if (this.homeFeedTimer) clearInterval(this.homeFeedTimer);
+                },
+
+                resumeHomeFeedCarousel() {
+                    this.startHomeFeedCarousel(false);
+                },
+
+                goToHomeFeedPage(index) {
+                    this.currentHomeFeedIndex = Math.max(0, Math.min(index, this.homeFeedMaxIndex));
+                    this.startHomeFeedCarousel(false);
                 },
 
                 applyDefaultEventSettings(defaults) {

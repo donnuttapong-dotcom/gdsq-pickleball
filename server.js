@@ -42,6 +42,19 @@ const userSelect = 'id, line_uid, display_name, phone, profile_image_url, create
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
 const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
 
+function serializeHomeBanner(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    imageUrl: row.image_url || '',
+    linkUrl: row.link_url || '',
+    displayOrder: Number(row.display_order || 0),
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null
+  };
+}
+
 function parseCookies(cookieHeader = '') {
   return Object.fromEntries(
     cookieHeader
@@ -1404,6 +1417,34 @@ async function getAppSettings() {
   }
 }
 
+async function listHomeBanners({ activeOnly = false } = {}) {
+  try {
+    let query = supabase
+      .from('home_banners')
+      .select('id, title, image_url, link_url, display_order, is_active, created_at, updated_at')
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      if (error.code === '42P01') return { data: [], error: null };
+      throw error;
+    }
+
+    return {
+      data: (data || []).map(serializeHomeBanner),
+      error: null
+    };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
 async function saveAppSettings(settings) {
   const homeBannerUrl = settings.homeBannerUrl || defaultHomeBannerUrl;
   const homeBannerSlides = Array.isArray(settings.homeBannerSlides)
@@ -1471,6 +1512,167 @@ app.get('/api/config', async (req, res) => {
     liffId: process.env.LINE_LIFF_ID || '',
     settings
   });
+});
+
+app.get('/api/public/home-banners', async (req, res) => {
+  try {
+    const { data, error } = await listHomeBanners({ activeOnly: true });
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      banners: data || []
+    });
+  } catch (error) {
+    console.error('Public home banners load error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load home banners.'
+    });
+  }
+});
+
+app.get('/api/admin/home-banners', requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await listHomeBanners();
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      banners: data || []
+    });
+  } catch (error) {
+    console.error('Admin home banners load error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load home banners.'
+    });
+  }
+});
+
+app.post('/api/admin/home-banners', requireAdmin, async (req, res) => {
+  try {
+    const {
+      title,
+      imageUrl,
+      linkUrl,
+      displayOrder,
+      isActive
+    } = req.body;
+
+    if (!String(imageUrl || '').trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'imageUrl is required.'
+      });
+    }
+
+    const payload = {
+      title: String(title || '').trim() || null,
+      image_url: String(imageUrl || '').trim(),
+      link_url: String(linkUrl || '').trim() || null,
+      display_order: Number(displayOrder || 0),
+      is_active: isActive !== false,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('home_banners')
+      .insert(payload)
+      .select('id, title, image_url, link_url, display_order, is_active, created_at, updated_at')
+      .single();
+
+    if (error) throw error;
+
+    return res.status(201).json({
+      success: true,
+      banner: serializeHomeBanner(data),
+      message: 'Banner created.'
+    });
+  } catch (error) {
+    console.error('Create home banner error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to create home banner.'
+    });
+  }
+});
+
+app.patch('/api/admin/home-banners/:bannerId', requireAdmin, async (req, res) => {
+  try {
+    const { bannerId } = req.params;
+    const {
+      title,
+      imageUrl,
+      linkUrl,
+      displayOrder,
+      isActive
+    } = req.body;
+
+    const updatePayload = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (title !== undefined) updatePayload.title = String(title || '').trim() || null;
+    if (imageUrl !== undefined) updatePayload.image_url = String(imageUrl || '').trim();
+    if (linkUrl !== undefined) updatePayload.link_url = String(linkUrl || '').trim() || null;
+    if (displayOrder !== undefined) updatePayload.display_order = Number(displayOrder || 0);
+    if (isActive !== undefined) updatePayload.is_active = Boolean(isActive);
+
+    if (updatePayload.image_url !== undefined && !updatePayload.image_url) {
+      return res.status(400).json({
+        success: false,
+        message: 'imageUrl is required.'
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('home_banners')
+      .update(updatePayload)
+      .eq('id', bannerId)
+      .select('id, title, image_url, link_url, display_order, is_active, created_at, updated_at')
+      .single();
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      banner: serializeHomeBanner(data),
+      message: 'Banner updated.'
+    });
+  } catch (error) {
+    console.error('Update home banner error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to update home banner.'
+    });
+  }
+});
+
+app.delete('/api/admin/home-banners/:bannerId', requireAdmin, async (req, res) => {
+  try {
+    const { bannerId } = req.params;
+
+    const { error } = await supabase
+      .from('home_banners')
+      .delete()
+      .eq('id', bannerId);
+
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      message: 'Banner deleted.'
+    });
+  } catch (error) {
+    console.error('Delete home banner error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to delete home banner.'
+    });
+  }
 });
 
 app.get('/health', (req, res) => {

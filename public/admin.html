@@ -160,6 +160,67 @@
         </div>
 
         <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
+            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('homeFeedSettings')">Home Feed</p>
+                    <h2 class="text-xl font-black" x-text="t('homeFeedManager')">Home Feed Carousel</h2>
+                    <p class="mt-1 text-sm text-gray-500" x-text="t('homeFeedHelp')">จัดการรูปการ์ดที่วิ่งในหน้า Home</p>
+                </div>
+                <p class="rounded-full bg-gray-50 px-3 py-1 text-xs font-bold text-gray-600" x-show="homeBannerMessage" x-text="homeBannerMessage"></p>
+            </div>
+
+            <div class="grid gap-5 lg:grid-cols-[320px_1fr]">
+                <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                    <h3 class="text-sm font-black" x-text="homeBannerForm.id ? t('editBannerItem') : t('addBannerItem')">Add Banner Item</h3>
+                    <div class="mt-3 space-y-3">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('bannerTitle')" x-model="homeBannerForm.title">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="url" :placeholder="t('bannerImageUrl')" x-model="homeBannerForm.imageUrl">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="url" :placeholder="t('bannerLinkUrl')" x-model="homeBannerForm.linkUrl">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="number" :placeholder="t('displayOrder')" x-model="homeBannerForm.displayOrder">
+                        <label class="flex items-center gap-2 text-sm font-bold text-gray-700">
+                            <input type="checkbox" x-model="homeBannerForm.isActive">
+                            <span x-text="t('active')">Active</span>
+                        </label>
+                        <div class="flex gap-2">
+                            <button class="rounded-lg bg-gdsq px-4 py-2 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50" @click="saveHomeBanner()" :disabled="isLoading">
+                                <span x-text="homeBannerForm.id ? t('saveBannerItem') : t('addBannerButton')">Save Banner</span>
+                            </button>
+                            <button class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50" @click="resetHomeBannerForm()" x-text="t('clearForm')">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" x-show="homeBanners.length > 0">
+                        <template x-for="banner in homeBanners" :key="banner.id">
+                            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                                <div class="aspect-[4/3] bg-gray-100">
+                                    <img class="h-full w-full object-cover" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                </div>
+                                <div class="space-y-2 p-4">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-black" x-text="banner.title || t('untitledBanner')"></p>
+                                            <p class="text-xs font-semibold text-gray-500">#<span x-text="banner.displayOrder"></span></p>
+                                        </div>
+                                        <span class="rounded-full px-2.5 py-1 text-[11px] font-black" :class="banner.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="banner.isActive ? t('active') : t('inactive')"></span>
+                                    </div>
+                                    <a class="block truncate text-xs font-semibold text-gdsq" x-show="banner.linkUrl" :href="banner.linkUrl" target="_blank" x-text="banner.linkUrl"></a>
+                                    <div class="flex flex-wrap gap-2 pt-1">
+                                        <button class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold hover:bg-gray-50" @click="editHomeBanner(banner)" x-text="t('edit')">Edit</button>
+                                        <button class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-bold hover:bg-gray-50" @click="toggleHomeBanner(banner)" x-text="banner.isActive ? t('deactivate') : t('activate')"></button>
+                                        <button class="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100" @click="deleteHomeBanner(banner)" x-text="t('delete')">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="rounded-xl bg-gray-50 p-5 text-center text-sm font-semibold text-gray-500" x-show="homeBanners.length === 0" x-text="t('noBannerItems')">No banner items yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
             <div class="mb-4">
                 <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('defaults')">Defaults</p>
                 <h2 class="text-xl font-black" x-text="t('defaultSettings')">Default Event Settings</h2>
@@ -585,10 +646,20 @@
                 formMessage: '',
                 editMessage: '',
                 settingsMessage: '',
+                homeBannerMessage: '',
                 errorMessage: '',
                 isLoading: false,
                 language: localStorage.getItem('gdsqLanguage') || 'th',
                 rsvpFilter: 'all',
+                homeBanners: [],
+                homeBannerForm: {
+                    id: '',
+                    title: '',
+                    imageUrl: '',
+                    linkUrl: '',
+                    displayOrder: 0,
+                    isActive: true
+                },
                 appSettings: {
                     homeBannerUrl: '/assets/gdsq-home-banner.png',
                     homeBannerSlidesText: '/assets/gdsq-home-banner.png',
@@ -638,6 +709,30 @@
                         homeBannerSlides: 'รูปสไลด์หน้า Home',
                         homeBannerSlidesPlaceholder: 'วาง 1 ลิงก์ต่อ 1 บรรทัด',
                         homeBannerDriveHelp: 'ถ้าใช้ Google Drive: อัปโหลดรูป > Share > Anyone with the link > Copy link > วางที่ช่องนี้',
+                        homeFeedSettings: 'โฮมฟีด',
+                        homeFeedManager: 'การ์ดข่าวหน้า Home',
+                        homeFeedHelp: 'เพิ่มรูปสำหรับ carousel แบบเลื่อนอัตโนมัติ',
+                        addBannerItem: 'เพิ่มแบนเนอร์',
+                        editBannerItem: 'แก้แบนเนอร์',
+                        bannerTitle: 'หัวข้อ',
+                        bannerImageUrl: 'ลิงก์รูปภาพ',
+                        bannerLinkUrl: 'ลิงก์ปลายทาง (ไม่ใส่ก็ได้)',
+                        displayOrder: 'ลำดับการแสดง',
+                        active: 'เปิดใช้งาน',
+                        inactive: 'ปิดใช้งาน',
+                        addBannerButton: 'เพิ่มรายการ',
+                        saveBannerItem: 'บันทึกรายการ',
+                        clearForm: 'ล้างฟอร์ม',
+                        noBannerItems: 'ยังไม่มีรายการ banner',
+                        untitledBanner: 'ไม่มีชื่อ',
+                        edit: 'แก้ไข',
+                        delete: 'ลบ',
+                        activate: 'เปิด',
+                        deactivate: 'ปิด',
+                        bannerSaved: 'บันทึก banner แล้ว',
+                        bannerDeleted: 'ลบ banner แล้ว',
+                        bannerSaveFailed: 'บันทึก banner ไม่สำเร็จ',
+                        bannerDeleteConfirm: 'ยืนยันลบ banner นี้ไหม?',
                         preview: 'พรีวิว',
                         saveBanner: 'บันทึกแบนเนอร์',
                         useDefaultBanner: 'ใช้รูปเริ่มต้น',
@@ -743,6 +838,30 @@
                         homeBannerSlides: 'Home slider images',
                         homeBannerSlidesPlaceholder: 'Paste one image link per line',
                         homeBannerDriveHelp: 'For Google Drive: upload image > Share > Anyone with the link > Copy link > paste here.',
+                        homeFeedSettings: 'Home Feed',
+                        homeFeedManager: 'Home Feed Carousel',
+                        homeFeedHelp: 'Manage image cards shown on the Home carousel.',
+                        addBannerItem: 'Add banner',
+                        editBannerItem: 'Edit banner',
+                        bannerTitle: 'Title',
+                        bannerImageUrl: 'Image URL',
+                        bannerLinkUrl: 'Link URL (optional)',
+                        displayOrder: 'Display order',
+                        active: 'Active',
+                        inactive: 'Inactive',
+                        addBannerButton: 'Add item',
+                        saveBannerItem: 'Save item',
+                        clearForm: 'Clear',
+                        noBannerItems: 'No banner items yet.',
+                        untitledBanner: 'Untitled',
+                        edit: 'Edit',
+                        delete: 'Delete',
+                        activate: 'Activate',
+                        deactivate: 'Deactivate',
+                        bannerSaved: 'Banner saved',
+                        bannerDeleted: 'Banner deleted',
+                        bannerSaveFailed: 'Unable to save banner',
+                        bannerDeleteConfirm: 'Delete this banner item?',
                         preview: 'Preview',
                         saveBanner: 'Save Banner',
                         useDefaultBanner: 'Use default',
@@ -965,9 +1084,142 @@
                     await this.loadSessions();
                     if (this.isAuthenticated) {
                         await this.loadSettings();
+                        await this.loadHomeBanners();
                     }
                     if (this.selectedSessionId) {
                         await this.loadRsvps();
+                    }
+                },
+
+                resetHomeBannerForm() {
+                    this.homeBannerForm = {
+                        id: '',
+                        title: '',
+                        imageUrl: '',
+                        linkUrl: '',
+                        displayOrder: 0,
+                        isActive: true
+                    };
+                },
+
+                async loadHomeBanners() {
+                    const response = await fetch('/api/admin/home-banners');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.homeBannerMessage = result.message || this.t('bannerSaveFailed');
+                        return;
+                    }
+
+                    this.homeBanners = result.banners || [];
+                },
+
+                editHomeBanner(banner) {
+                    this.homeBannerForm = {
+                        id: banner.id,
+                        title: banner.title || '',
+                        imageUrl: banner.imageUrl || '',
+                        linkUrl: banner.linkUrl || '',
+                        displayOrder: banner.displayOrder || 0,
+                        isActive: !!banner.isActive
+                    };
+                },
+
+                async saveHomeBanner() {
+                    this.isLoading = true;
+                    this.homeBannerMessage = '';
+                    this.errorMessage = '';
+
+                    try {
+                        const method = this.homeBannerForm.id ? 'PATCH' : 'POST';
+                        const url = this.homeBannerForm.id
+                            ? `/api/admin/home-banners/${this.homeBannerForm.id}`
+                            : '/api/admin/home-banners';
+                        const response = await fetch(url, {
+                            method,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                title: this.homeBannerForm.title,
+                                imageUrl: this.homeBannerForm.imageUrl,
+                                linkUrl: this.homeBannerForm.linkUrl,
+                                displayOrder: this.homeBannerForm.displayOrder,
+                                isActive: this.homeBannerForm.isActive
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('bannerSaveFailed'));
+                        }
+
+                        this.homeBannerMessage = this.t('bannerSaved');
+                        this.resetHomeBannerForm();
+                        await this.loadHomeBanners();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async toggleHomeBanner(banner) {
+                    this.isLoading = true;
+                    this.homeBannerMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/admin/home-banners/${banner.id}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                isActive: !banner.isActive
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('bannerSaveFailed'));
+                        }
+
+                        this.homeBannerMessage = this.t('bannerSaved');
+                        await this.loadHomeBanners();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async deleteHomeBanner(banner) {
+                    if (!confirm(this.t('bannerDeleteConfirm'))) return;
+
+                    this.isLoading = true;
+                    this.homeBannerMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/admin/home-banners/${banner.id}`, {
+                            method: 'DELETE'
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('bannerSaveFailed'));
+                        }
+
+                        this.homeBannerMessage = this.t('bannerDeleted');
+                        if (this.homeBannerForm.id === banner.id) this.resetHomeBannerForm();
+                        await this.loadHomeBanners();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
                     }
                 },
 

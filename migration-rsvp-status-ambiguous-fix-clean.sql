@@ -1,16 +1,5 @@
--- RSVP protection: prevent duplicate RSVP rows per user + session
--- and reserve seats atomically to avoid oversell when users join together.
---
--- If the unique index fails to create, first check whether duplicate rows
--- already exist with:
--- select session_id, user_id, count(*)
--- from rsvps
--- group by session_id, user_id
--- having count(*) > 1;
-
 create unique index if not exists rsvps_session_user_unique_idx
   on public.rsvps (session_id, user_id);
-
 create or replace function public.reserve_session_rsvp(
   p_session_id uuid,
   p_user_id uuid,
@@ -43,19 +32,15 @@ begin
   from public.sessions
   where id = p_session_id
   for update;
-
   if not found then
     raise exception 'Session not found.';
   end if;
-
   v_max_players := greatest(coalesce(v_session.max_players, 0), 0);
-
   select *
   into v_existing
   from public.rsvps
   where rsvps.session_id = p_session_id
     and rsvps.user_id = p_user_id;
-
   if found then
     return query
     select
@@ -83,7 +68,6 @@ begin
       true;
     return;
   end if;
-
   select
     coalesce((
       select count(*)::integer
@@ -98,7 +82,6 @@ begin
         and rg.status = 'Joined'
     ), 0)
   into v_joined_seats;
-
   if v_joined_seats < v_max_players then
     v_status := 'Joined';
     v_joined_seats := v_joined_seats + 1;
@@ -107,7 +90,6 @@ begin
     v_status := 'Waitlist';
     v_waitlist_count := 1;
   end if;
-
   insert into public.rsvps (
     session_id,
     user_id,
@@ -119,16 +101,13 @@ begin
     v_status
   )
   returning id into v_rsvp_id;
-
   if coalesce(array_length(p_guest_names, 1), 0) > 0 then
     foreach v_guest_name in array p_guest_names loop
       v_guest_name := trim(coalesce(v_guest_name, ''));
       if v_guest_name = '' then
         continue;
       end if;
-
       v_guest_total := v_guest_total + 1;
-
       if v_joined_seats < v_max_players then
         insert into public.rsvp_guests (
           rsvp_id,
@@ -144,7 +123,6 @@ begin
           v_guest_name,
           'Joined'
         );
-
         v_joined_seats := v_joined_seats + 1;
         v_joined_count := v_joined_count + 1;
       else
@@ -162,12 +140,10 @@ begin
           v_guest_name,
           'Waitlist'
         );
-
         v_waitlist_count := v_waitlist_count + 1;
       end if;
     end loop;
   end if;
-
   return query
   select
     v_rsvp_id,
@@ -183,7 +159,6 @@ exception
     from public.rsvps
     where rsvps.session_id = p_session_id
       and rsvps.user_id = p_user_id;
-
     if found then
       return query
       select
@@ -211,7 +186,6 @@ exception
         true;
       return;
     end if;
-
     raise;
 end;
 $$;
