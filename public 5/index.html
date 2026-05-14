@@ -1,0 +1,2967 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDSQ Pickleball</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { gdsq: '#0044CC', gdsqRed: '#E32636', gdsqNavy: '#06245A' } } } }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body.app-ready #app-loader {
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+        }
+        #app-loader {
+            transition: opacity 320ms ease, visibility 320ms ease;
+        }
+        @keyframes gdsq-pulse {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.45; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        .gdsq-dot {
+            animation: gdsq-pulse 1.2s infinite ease-in-out;
+        }
+        .gdsq-dot:nth-child(2) {
+            animation-delay: 0.16s;
+        }
+        .gdsq-dot:nth-child(3) {
+            animation-delay: 0.32s;
+        }
+        @keyframes gdsq-progress {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(240%); }
+        }
+        .gdsq-progress {
+            animation: gdsq-progress 1.8s infinite ease-in-out;
+        }
+        .gdsq-safe-bottom {
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+        }
+        .gdsq-safe-bottom-nav {
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+        }
+        .public-jump-target {
+            scroll-margin-top: 96px;
+        }
+        .public-jump-highlight {
+            box-shadow: 0 0 0 3px rgba(0, 68, 204, 0.16);
+            transition: box-shadow 260ms ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex justify-center text-gray-950">
+    <div id="app-loader" class="fixed inset-0 z-[9999] flex items-center justify-center bg-white px-8">
+        <div class="w-full max-w-sm text-center">
+            <div class="mx-auto flex h-28 w-28 items-center justify-center rounded-3xl bg-blue-50 shadow-sm">
+                <img class="h-24 w-24 object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
+            </div>
+            <p class="mt-7 text-xs font-black uppercase tracking-[0.28em] text-gdsq">GDSQ Pickleball</p>
+            <h1 class="mt-2 text-2xl font-black text-gray-950">กำลังโหลดแอพ</h1>
+            <p class="mt-3 text-sm font-semibold leading-6 text-gray-500">
+                ถ้าเปิดครั้งแรก อาจใช้เวลาประมาณ 30-60 วินาที<br>
+                ขอบคุณที่รอนะครับ
+            </p>
+            <div class="mx-auto mt-7 flex justify-center gap-2">
+                <span class="gdsq-dot h-3 w-3 rounded-full bg-gdsq"></span>
+                <span class="gdsq-dot h-3 w-3 rounded-full bg-gdsq"></span>
+                <span class="gdsq-dot h-3 w-3 rounded-full bg-gdsq"></span>
+            </div>
+            <div class="mx-auto mt-6 h-2 w-full max-w-[240px] overflow-hidden rounded-full bg-blue-50">
+                <div class="gdsq-progress h-full w-24 rounded-full bg-gdsq"></div>
+            </div>
+            <p class="mt-5 text-xs font-semibold text-gray-400">กำลังเชื่อมต่อ LINE และโหลดกิจกรรม</p>
+        </div>
+    </div>
+
+    <div class="w-full max-w-md bg-white min-h-screen relative" :class="selectedSessionId ? ((pendingJoinPayment || showPaymentPanel) ? 'pb-64' : 'pb-40') : 'pb-32'" x-data="eventApp()" x-init="init()">
+        <header class="sticky top-0 z-40 bg-white/95 px-5 py-4 backdrop-blur">
+            <div class="flex items-center justify-between">
+                <button class="text-2xl text-gray-900" @click="handleBack()">
+                    <i class="fa-solid" :class="selectedSessionId || activeTab === 'playerDetail' ? 'fa-arrow-left' : 'fa-bars'"></i>
+                </button>
+                <div class="flex items-center justify-center">
+                    <img class="h-14 w-24 object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
+                </div>
+                <button class="relative rounded-full border border-gray-200 px-3 py-2 text-xs font-black text-gray-700" @click="toggleLanguage()" x-text="language === 'th' ? 'EN' : 'ไทย'"></button>
+            </div>
+        </header>
+
+        <main x-show="!selectedSessionId" x-cloak>
+            <section id="home" class="public-jump-target px-5" :class="sectionHighlightId === 'home' ? 'public-jump-highlight rounded-2xl' : ''">
+                <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
+                    <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                </div>
+
+                <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('events')" @click="goToHomeShortcut('events')">
+                        <i class="fa-regular fa-calendar text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('events')">Events</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('players')" @click="goToHomeShortcut('players')">
+                        <i class="fa-solid fa-users text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('players')">Players</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('rankings')" @click="goToHomeShortcut('rankings')">
+                        <i class="fa-solid fa-chart-simple text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('rankings')">Rankings</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2" :class="homeShortcutClass('shop')" @click="goToHomeShortcut('shop')">
+                        <i class="fa-solid fa-store text-2xl"></i>
+                        <span class="text-xs font-black" x-text="t('shop')">Shop</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="mt-6 px-5 lg:relative lg:left-1/2 lg:w-[min(calc(100vw-3rem),72rem)] lg:-translate-x-1/2 lg:px-0" x-show="activeTab === 'home' && homeFeedBanners.length > 0" x-cloak>
+                <div class="mb-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('homeUpdates')">Home Updates</p>
+                        <h2 class="text-lg font-black" x-text="t('latestNews')">Latest News</h2>
+                    </div>
+                    <div class="flex gap-1.5" x-show="homeFeedPageCount > 1">
+                        <template x-for="page in homeFeedPageCount" :key="`feed-dot-${page}`">
+                            <button
+                                class="h-2 rounded-full transition-all"
+                                :class="homeFeedPageIndex === (page - 1) ? 'w-6 bg-gdsq' : 'w-2 bg-gray-300'"
+                                @click="goToHomeFeedPage(page - 1)"
+                            ></button>
+                        </template>
+                    </div>
+                </div>
+
+                <div
+                    class="overflow-hidden rounded-2xl"
+                    @mouseenter="pauseHomeFeedCarousel()"
+                    @mouseleave="resumeHomeFeedCarousel()"
+                >
+                    <div
+                        class="flex transition-transform duration-700 ease-out"
+                        :style="homeFeedTrackStyle"
+                    >
+                        <template x-for="banner in homeFeedBanners" :key="banner.id">
+                            <div class="shrink-0 px-1.5" :style="homeFeedCardStyle">
+                                <template x-if="banner.linkUrl">
+                                    <a class="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md" :href="banner.linkUrl" target="_blank" rel="noreferrer">
+                                        <div class="aspect-[4/5] bg-gray-100">
+                                            <img class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                        </div>
+                                        <div class="p-3" x-show="banner.title">
+                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
+                                        </div>
+                                    </a>
+                                </template>
+                                <template x-if="!banner.linkUrl">
+                                    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+                                        <div class="aspect-[4/5] bg-gray-100">
+                                            <img class="h-full w-full object-cover" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                        </div>
+                                        <div class="p-3" x-show="banner.title">
+                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </section>
+
+            <section id="events" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'events' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home' || activeTab === 'events'">
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 class="text-xl font-black" x-text="eventViewMode === 'past' ? t('pastEvents') : t('upcomingEvents')">Upcoming Events</h1>
+                    <button class="text-sm font-black text-gdsq" @click="eventViewMode === 'past' ? loadPastSessions() : loadSessions()" x-text="t('refresh')">Refresh</button>
+                </div>
+
+                <div class="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1" x-show="activeTab === 'events'">
+                    <button class="rounded-lg px-3 py-2 text-sm font-black" :class="eventViewMode === 'upcoming' ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="eventViewMode = 'upcoming'; loadSessions()" x-text="t('upcomingEvents')"></button>
+                    <button class="rounded-lg px-3 py-2 text-sm font-black" :class="eventViewMode === 'past' ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="eventViewMode = 'past'; loadPastSessions()" x-text="t('pastEvents')"></button>
+                </div>
+
+                <div class="mb-4 rounded-xl bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
+                    <p x-text="statusMessage"></p>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="session in eventList" :key="session.id">
+                        <article class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                            <button class="block w-full text-left" @click="selectSession(session.id)">
+                                <div class="aspect-[16/9] bg-gray-100" x-show="session.posterUrl" x-cloak>
+                                    <img class="h-full w-full object-cover" :src="imageUrl(session.posterUrl)" :alt="session.title">
+                                </div>
+                                <div class="grid w-full grid-cols-[88px_1fr] gap-4 p-4">
+                                    <div class="flex h-full min-h-[112px] flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                        <span class="text-sm font-black uppercase" x-text="monthText(session.eventDate)">MAY</span>
+                                        <span class="text-4xl font-black leading-none" x-text="dayText(session.eventDate)">24</span>
+                                        <span class="text-sm font-black uppercase" x-text="weekdayText(session.eventDate)">SAT</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="min-w-0">
+                                                <h2 class="truncate text-lg font-black" x-text="session.title"></h2>
+                                                <p class="mt-1 text-sm font-semibold text-gray-700" x-text="timeRange(session)"></p>
+                                                <p class="mt-2 truncate text-sm font-semibold text-gray-500">
+                                                    <i class="fa-solid fa-location-dot mr-1"></i><span x-text="session.location || t('locationTba')"></span>
+                                                </p>
+                                                <p class="mt-1 text-xs font-black text-gdsq">
+                                                    <i class="fa-solid fa-table-tennis-paddle-ball mr-1"></i><span x-text="courtText(session)"></span>
+                                                </p>
+                                                <p class="mt-1 truncate text-xs font-semibold text-gray-400" x-show="session.host" x-text="`${t('hostedBy')} ${session.host.displayName}`"></p>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-sm font-black text-gray-700"><span x-text="session.joinedCount"></span> / <span x-text="session.maxPlayers"></span></p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 flex items-center justify-between">
+                                            <span class="rounded-lg px-3 py-1 text-xs font-black" :class="skillClass(session.skillLevel)" x-text="session.skillLevel || t('socialPlay')"></span>
+                                            <span class="rounded-lg px-5 py-2 text-sm font-black text-white" :class="session.isEnded ? 'bg-gray-900' : 'bg-gdsq'" x-text="session.isEnded ? t('viewDetails') : (session.userStatus ? statusLabel(session.userStatus) : 'RSVP')">RSVP</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        </article>
+                    </template>
+                </div>
+
+                <div class="rounded-2xl bg-gray-50 px-5 py-10 text-center text-sm font-semibold text-gray-500" x-show="!isLoading && eventList.length === 0">
+                    <i class="fa-regular fa-calendar mb-3 block text-2xl"></i>
+                    <span x-text="t('noEvents')">ยังไม่มีกิจกรรม</span>
+                </div>
+
+                <div class="mt-5 rounded-2xl bg-gdsqNavy p-5 text-white">
+                    <p class="text-lg font-black uppercase" x-text="t('communityTitle')">Play. Connect. Improve.</p>
+                    <p class="mt-1 text-sm text-blue-100" x-text="t('communityText')">Be part of the GDSQ community!</p>
+                </div>
+            </section>
+
+            <section id="players" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'players' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'players'" x-cloak>
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 class="text-xl font-black" x-text="t('players')">Players</h1>
+                    <button class="text-sm font-black text-gdsq" @click="loadPlayers()" x-text="t('refresh')">Refresh</button>
+                </div>
+                <div class="mb-4 grid grid-cols-2 gap-3">
+                    <div class="rounded-2xl bg-gdsq p-4 text-white shadow-sm">
+                        <p class="text-xs font-black uppercase text-blue-100" x-text="t('totalPlayers')">Total Players</p>
+                        <p class="mt-1 text-3xl font-black" x-text="players.length">0</p>
+                    </div>
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <p class="text-xs font-black uppercase text-gray-500" x-text="t('latestMember')">Latest Member</p>
+                        <p class="mt-1 truncate text-lg font-black" x-text="players[0]?.displayName || '-'">-</p>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="player in players" :key="player.id">
+                        <button class="flex w-full items-center justify-between rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
+                                <div class="min-w-0">
+                                    <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="player.phone || t('phoneNotSet')"></p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-lg font-black text-gdsq" x-text="player.joinedCount"></p>
+                                <p class="text-[10px] font-bold uppercase text-gray-500" x-text="t('joined')"></p>
+                            </div>
+                        </button>
+                    </template>
+                </div>
+                <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="players.length === 0" x-text="t('noPlayers')"></p>
+            </section>
+
+            <section id="rankings" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'rankings' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'rankings'" x-cloak>
+                <div class="mb-4 flex items-center justify-between">
+                    <h1 class="text-xl font-black" x-text="t('rankings')">Rankings</h1>
+                    <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
+                </div>
+                <div class="mb-4 space-y-3">
+                    <div class="grid grid-cols-3 gap-2 rounded-xl bg-gray-100 p-1">
+                        <template x-for="period in rankingPeriods" :key="period">
+                            <button class="rounded-lg px-3 py-2 text-xs font-black" :class="rankingPeriod === period ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
+                        </template>
+                    </div>
+                    <div class="flex gap-2 overflow-x-auto pb-1">
+                        <template x-for="category in rankingCategories" :key="category">
+                            <button class="shrink-0 rounded-full px-3 py-2 text-xs font-black" :class="rankingCategory === category ? 'bg-gdsq text-white' : 'bg-gray-100 text-gray-600'" @click="rankingCategory = category; loadRankings()" x-text="rankingCategoryLabel(category)"></button>
+                        </template>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="(player, index) in rankings" :key="player.id">
+                        <button class="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gdsq text-lg font-black text-white" x-text="index + 1"></div>
+                            <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
+                                <p class="text-xs font-semibold text-gray-500">
+                                    <span x-text="player.categoryAverage ? `${player.categoryAverage}/5 · ` : ''"></span>
+                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votes')"></span> ·
+                                    <span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span>
+                                </p>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-gray-300"></i>
+                        </button>
+                    </template>
+                </div>
+                <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankings.length === 0" x-text="t('noRankings')"></p>
+            </section>
+
+            <section id="player-detail" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'player-detail' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'playerDetail'" x-cloak>
+                <div class="rounded-2xl bg-white p-5 text-center shadow-sm">
+                    <img class="mx-auto h-24 w-24 rounded-full border-4 border-blue-50 object-cover" :src="playerAvatar(selectedPlayer)" alt="">
+                    <h1 class="mt-3 text-2xl font-black" x-text="selectedPlayer.displayName || 'Player'">Player</h1>
+                    <p class="mt-1 text-sm font-semibold text-gray-500" x-text="selectedPlayer.ratingAverage ? `${selectedPlayer.ratingAverage}/5 · ${selectedPlayer.voteCount} ${t('votes')}` : t('noVotesYet')"></p>
+                    <button class="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" @click="shareProfile()">
+                        <i class="fa-solid fa-share-nodes"></i>
+                        <span x-text="t('shareProfile')">Share Profile</span>
+                    </button>
+                    <div class="mt-5 grid grid-cols-3 gap-3">
+                        <div class="rounded-xl bg-blue-50 p-3">
+                            <p class="text-2xl font-black text-gdsq" x-text="selectedPlayer.joinedCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('joined')"></p>
+                        </div>
+                        <div class="rounded-xl bg-red-50 p-3">
+                            <p class="text-2xl font-black text-gdsqRed" x-text="selectedPlayer.voteCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('votes')"></p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-3">
+                            <p class="text-2xl font-black text-gray-900" x-text="selectedPlayer.hostedCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('hosted')"></p>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-2" x-show="(selectedPlayer.badges || []).length > 0">
+                        <template x-for="badge in selectedPlayer.badges" :key="badge.key">
+                            <span class="flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black" :class="badgeClass(badge.key)">
+                                <i class="fa-solid" :class="badgeIcon(badge.key)"></i>
+                                <span x-text="badge.label"></span>
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('scoreBreakdown')">คะแนนแยกหัวข้อ</h2>
+                    <div class="mt-3 space-y-3">
+                        <template x-for="item in playerScoreRows()" :key="item.label">
+                            <div>
+                                <div class="mb-1 flex items-center justify-between text-sm">
+                                    <span class="font-black" x-text="item.label"></span>
+                                    <span class="font-black text-gdsq" x-text="item.value ? `${item.value}/5` : '-'"></span>
+                                </div>
+                                <div class="h-2 overflow-hidden rounded-full bg-gray-100">
+                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.value ? (item.value / 5) * 100 : 0}%`"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('upcomingEvents')">Upcoming Events</h2>
+                    <div class="mt-3 space-y-3" x-show="(selectedPlayer.upcoming || []).length > 0">
+                        <template x-for="session in selectedPlayer.upcoming" :key="session.id">
+                            <button class="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-3 text-left" @click="selectSession(session.id)">
+                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                    <span class="text-[10px] font-black uppercase" x-text="monthText(session.eventDate)"></span>
+                                    <span class="text-xl font-black leading-none" x-text="dayText(session.eventDate)"></span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="`${timeRange(session)} · ${session.location || t('locationTba')}`"></p>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-gray-300"></i>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(selectedPlayer.upcoming || []).length" x-text="t('noUpcomingForPlayer')">ยังไม่มีกิจกรรมที่กำลังจะถึง</p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('playedTogether')">เล่นด้วยกันบ่อย</h2>
+                    <div class="mt-3 grid grid-cols-2 gap-3" x-show="(selectedPlayer.playedTogether || []).length > 0">
+                        <template x-for="player in selectedPlayer.playedTogether" :key="player.id">
+                            <button class="rounded-xl border border-gray-100 p-3 text-center" @click="openPlayerProfile(player.id)">
+                                <img class="mx-auto h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" alt="">
+                                <p class="mt-2 truncate text-xs font-black" x-text="player.displayName || 'Player'"></p>
+                                <p class="text-[10px] font-semibold text-gray-500"><span x-text="player.sharedEventCount"></span> <span x-text="t('eventsTogether')"></span></p>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(selectedPlayer.playedTogether || []).length" x-text="t('noPlayedTogether')">ยังไม่มีข้อมูลคนที่เล่นด้วยกัน</p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('eventHistory')">ประวัติกิจกรรม</h2>
+                    <div class="mt-3 space-y-3" x-show="(selectedPlayer.history || []).length > 0">
+                        <template x-for="session in selectedPlayer.history" :key="session.id">
+                            <button class="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-3 text-left" @click="selectSession(session.id)">
+                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                    <span class="text-[10px] font-black uppercase" x-text="monthText(session.eventDate)"></span>
+                                    <span class="text-xl font-black leading-none" x-text="dayText(session.eventDate)"></span>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="`${timeRange(session)} · ${session.location || t('locationTba')}`"></p>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(selectedPlayer.history || []).length" x-text="t('noHistory')"></p>
+                </div>
+            </section>
+
+            <section id="create-event" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'create-event' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'create'" x-cloak>
+                <h1 class="text-xl font-black" x-text="t('createEvent')">Create Event</h1>
+                <p class="mt-1 text-sm font-semibold text-gray-500" x-text="t('createEventHelp')">Publish a community event instantly.</p>
+
+                <div class="mt-4 space-y-4">
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('eventInfo')">Event info</h2>
+                        <div class="mt-3 space-y-3">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.title" :placeholder="t('eventTitle')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.skillLevel" :placeholder="t('skillLevel')">
+                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="3" x-model="createEventForm.description" :placeholder="t('description')"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('dateTime')">Date & time</h2>
+                        <div class="mt-3 grid grid-cols-2 gap-3">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm col-span-2" type="date" x-model="createEventForm.eventDate">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="createEventForm.startTime">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="createEventForm.endTime">
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('placeAndSpots')">Place & spots</h2>
+                        <div class="mt-3 space-y-3">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.location" :placeholder="t('location')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.address" :placeholder="t('address')">
+                            <div class="grid grid-cols-3 gap-3">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="createEventForm.maxPlayers" :placeholder="t('maxPlayers')">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="createEventForm.courtCount" :placeholder="t('courtCount')">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="createEventForm.priceThb" :placeholder="t('priceThb')">
+                            </div>
+                            <p class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-gdsq" x-text="playersPerCourtText(createEventForm)"></p>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('poster')">Poster</h2>
+                        <input class="mt-3 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" type="url" x-model="createEventForm.posterUrl" :placeholder="t('posterUrl')">
+                        <div class="mt-3 overflow-hidden rounded-xl bg-gray-100" x-show="createEventForm.posterUrl">
+                            <img class="max-h-64 w-full object-cover" :src="imageUrl(createEventForm.posterUrl)" alt="">
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="font-black" x-text="t('paymentSettings')">Payment settings</h2>
+                        <div class="mt-3 space-y-3">
+                            <select class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentMode">
+                                <option value="none" x-text="t('paymentModeNone')">ไม่เก็บผ่านแอพ</option>
+                                <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')">มัดจำ + ส่วนต่าง</option>
+                                <option value="final_only" x-text="t('paymentModeFinalOnly')">จ่ายหลังจบทีเดียว</option>
+                            </select>
+                            <div class="grid grid-cols-3 gap-3">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="createEventForm.depositAmountThb" :placeholder="t('depositAmountThb')">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="createEventForm.estimatedTotalThb" :placeholder="t('estimatedTotalThb')">
+                                <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="createEventForm.finalAmountThb" :placeholder="t('finalAmountThb')">
+                            </div>
+                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="createEventForm.paymentNotePublic" :placeholder="t('paymentNotePublic')"></textarea>
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentQrUrl" :placeholder="t('paymentQrUrl')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentBankName" :placeholder="t('paymentBankName')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentAccountName" :placeholder="t('paymentAccountName')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentAccountNumber" :placeholder="t('paymentAccountNumber')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="createEventForm.paymentPromptPayId" :placeholder="t('paymentPromptPayId')">
+                        </div>
+                    </div>
+
+                    <button class="w-full rounded-xl bg-gdsq px-5 py-4 text-base font-black text-white disabled:opacity-50" @click="publishEvent()" :disabled="isLoading || !lineUid">
+                        <span x-show="!isLoading" x-text="t('publishEvent')">Publish Event</span>
+                        <span x-show="isLoading" x-text="t('publishing')">Publishing...</span>
+                    </button>
+                    <div class="rounded-xl p-3 text-sm font-semibold" x-show="createMessage" :class="createMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="createMessage"></div>
+                </div>
+            </section>
+
+            <section id="shop" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'shop' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'shop'" x-cloak>
+                <h1 class="text-xl font-black" x-text="t('shop')">Shop</h1>
+                <div class="mt-4 space-y-3">
+                    <article class="rounded-2xl bg-white p-5 shadow-sm">
+                        <p class="text-lg font-black">Court Booking</p>
+                        <p class="mt-1 text-sm text-gray-500">Reserve a pickleball court with the GDSQ team.</p>
+                        <a class="mt-4 inline-flex rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" href="https://line.me/R/" target="_blank">Contact on LINE</a>
+                    </article>
+                    <article class="rounded-2xl bg-white p-5 shadow-sm">
+                        <p class="text-lg font-black">GDSQ Merch</p>
+                        <p class="mt-1 text-sm text-gray-500">Coming soon: shirts, paddles, and community drops.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="profile" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'profile' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'profile'" x-cloak>
+                <h1 class="text-xl font-black" x-text="t('profile')">Profile</h1>
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <div class="mb-4 flex items-center gap-3">
+                        <img class="h-16 w-16 rounded-full object-cover" :src="profileAvatar" alt="Profile">
+                        <div>
+                            <p class="font-black" x-text="profile.displayName || displayName || 'LINE User'"></p>
+                            <p class="text-xs font-semibold text-gray-500" x-text="lineUid ? t('lineLinked') : t('lineNotLinked')"></p>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('displayName')" x-model="profile.displayName">
+                        <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('phone')" x-model="profile.phone">
+                        <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" :placeholder="t('profileImageUrl')" x-model="profile.profileImageUrl">
+                        <p class="text-xs font-semibold text-gray-500" x-text="t('profileImageHelp')"></p>
+                        <button class="w-full rounded-xl bg-gdsq px-5 py-3 font-black text-white disabled:opacity-50" @click="saveProfile()" :disabled="isLoading">
+                            <span x-show="!isLoading" x-text="t('saveProfile')">Save Profile</span>
+                            <span x-show="isLoading" x-text="t('saving')">Saving...</span>
+                        </button>
+                        <div class="rounded-xl p-3 text-sm font-semibold" x-show="profileMessage" :class="profileMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="profileMessage"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('myStats')">สถิติของฉัน</h2>
+                    <div class="mt-4 grid grid-cols-3 gap-3">
+                        <div class="rounded-xl bg-blue-50 p-3 text-center">
+                            <p class="text-2xl font-black text-gdsq" x-text="myPlayerStats.joinedCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('joined')"></p>
+                        </div>
+                        <div class="rounded-xl bg-red-50 p-3 text-center">
+                            <p class="text-2xl font-black text-gdsqRed" x-text="myPlayerStats.voteCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('votes')"></p>
+                        </div>
+                        <div class="rounded-xl bg-gray-50 p-3 text-center">
+                            <p class="text-2xl font-black text-gray-900" x-text="myPlayerStats.ratingAverage ? `${myPlayerStats.ratingAverage}` : '-'"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('overall')"></p>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2" x-show="(myPlayerStats.badges || []).length > 0">
+                        <template x-for="badge in myPlayerStats.badges" :key="badge.key">
+                            <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-gdsq" x-text="badge.label"></span>
+                        </template>
+                    </div>
+                    <div class="mt-4 space-y-3">
+                        <template x-for="item in myScoreRows()" :key="item.label">
+                            <div>
+                                <div class="mb-1 flex items-center justify-between text-sm">
+                                    <span class="font-black" x-text="item.label"></span>
+                                    <span class="font-black text-gdsq" x-text="item.value ? `${item.value}/5` : '-'"></span>
+                                </div>
+                                <div class="h-2 overflow-hidden rounded-full bg-gray-100">
+                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.value ? (item.value / 5) * 100 : 0}%`"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <button class="mt-4 w-full rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-black text-gdsq" x-show="currentUserId" @click="openPlayerProfile(currentUserId)" x-text="t('viewPublicProfile')">ดูโปรไฟล์แบบสาธารณะ</button>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-black" x-text="t('pendingVotes')">รอโหวต</h2>
+                        <button class="text-xs font-black text-gdsq" @click="loadProfileHistory()" x-text="t('refresh')">Refresh</button>
+                    </div>
+                    <div class="mt-3 space-y-3" x-show="pendingVotes.length > 0">
+                        <template x-for="session in pendingVotes" :key="session.id">
+                            <button class="flex w-full items-center justify-between rounded-xl bg-blue-50 p-3 text-left" @click="selectSession(session.id)">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="`${dateShort(session.eventDate)} · ${timeRange(session)}`"></p>
+                                </div>
+                                <span class="rounded-lg bg-gdsq px-3 py-2 text-xs font-black text-white" x-text="t('voteNow')">โหวต</span>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="pendingVotes.length === 0" x-text="t('noPendingVotes')">ยังไม่มีกิจกรรมที่รอโหวต</p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="font-black" x-text="t('myHostedEvents')">กิจกรรมที่ฉันสร้าง</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('hostManageHelp')">แก้รายละเอียดและเช็คสลิปของกิจกรรมตัวเอง</p>
+                        </div>
+                        <button class="text-xs font-black text-gdsq" @click="loadHostSessions()" x-text="t('refresh')">Refresh</button>
+                    </div>
+
+                    <div class="mt-4 space-y-3" x-show="myHostSessions.length > 0">
+                        <template x-for="session in myHostSessions" :key="session.id">
+                            <div class="rounded-xl border border-gray-100 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <button class="min-w-0 flex-1 text-left" @click="selectSession(session.id)">
+                                        <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                        <p class="text-xs font-semibold text-gray-500" x-text="`${dateShort(session.eventDate)} · ${timeRange(session)} · ${session.joinedCount || 0}/${session.maxPlayers || 0}`"></p>
+                                    </button>
+                                    <button class="rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-gdsq" @click="editHostedEvent(session)" x-text="t('manage')">Manage</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="myHostSessions.length === 0" x-text="t('noHostedEvents')">ยังไม่มีกิจกรรมที่สร้าง</p>
+
+                    <div class="mt-4 space-y-4 rounded-2xl bg-gray-50 p-4" x-show="hostEditForm.id" x-cloak>
+                        <div class="flex items-center justify-between gap-3">
+                            <h3 class="font-black" x-text="t('editEvent')">แก้กิจกรรม</h3>
+                            <button class="text-xs font-black text-gray-500" @click="hostEditForm.id = ''; hostRsvps = []" x-text="t('cancel')">Cancel</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.title" :placeholder="t('eventTitle')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="date" x-model="hostEditForm.eventDate">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="hostEditForm.startTime">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="time" x-model="hostEditForm.endTime">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="hostEditForm.maxPlayers" :placeholder="t('maxPlayers')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="hostEditForm.courtCount" :placeholder="t('courtCount')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="hostEditForm.priceThb" :placeholder="t('priceThb')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.location" :placeholder="t('location')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.address" :placeholder="t('address')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.posterUrl" :placeholder="t('posterUrl')">
+                            <select class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentMode">
+                                <option value="none" x-text="t('paymentModeNone')"></option>
+                                <option value="deposit_then_final" x-text="t('paymentModeDepositFinal')"></option>
+                                <option value="final_only" x-text="t('paymentModeFinalOnly')"></option>
+                            </select>
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="hostEditForm.depositAmountThb" :placeholder="t('depositAmountThb')">
+                            <input class="rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="hostEditForm.estimatedTotalThb" :placeholder="t('estimatedTotalThb')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="hostEditForm.finalAmountThb" :placeholder="t('finalAmountThb')">
+                            <textarea class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="hostEditForm.paymentNotePublic" :placeholder="t('paymentNotePublic')"></textarea>
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentQrUrl" :placeholder="t('paymentQrUrl')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentBankName" :placeholder="t('paymentBankName')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentAccountName" :placeholder="t('paymentAccountName')">
+                            <input class="col-span-2 rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="hostEditForm.paymentAccountNumber" :placeholder="t('paymentAccountNumber')">
+                        </div>
+                        <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="saveHostedEvent()" :disabled="isLoading" x-text="t('saveEvent')">Save Event</button>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-black" x-text="t('paymentSlips')">สลิปชำระเงิน</h3>
+                                <button class="text-xs font-black text-gdsq" @click="loadHostRsvps(hostEditForm.id)" x-text="t('refresh')">Refresh</button>
+                            </div>
+                            <template x-for="row in hostRsvps.filter((item) => item.kind === 'member')" :key="row.id">
+                                <div class="rounded-xl bg-white p-3">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-black" x-text="row.user.displayName || row.user.display_name || 'GDSQ'"></p>
+                                            <p class="text-xs font-semibold text-gray-500"><span x-text="statusLabel(row.status)"></span> · <span x-text="moneyText(row.paymentAmountPaid || row.paymentAmountDue || 0)"></span></p>
+                                        </div>
+                                        <span class="rounded-full px-2 py-1 text-[10px] font-black" :class="paymentStatusClass(row.paymentStatus)" x-text="paymentStatusLabel(row.paymentStatus)"></span>
+                                    </div>
+                                    <div class="mt-3 grid grid-cols-3 gap-2">
+                                        <a class="rounded-lg border border-gray-200 px-3 py-2 text-center text-xs font-black text-gdsq" x-show="row.paymentSlipUrl" :href="row.paymentSlipUrl" target="_blank" x-text="t('viewSlip')">View Slip</a>
+                                        <button class="rounded-lg bg-green-50 px-3 py-2 text-xs font-black text-green-700" @click="updateHostPaymentStatus(row.id, 'Paid', row.paymentAmountPaid || row.paymentAmountDue)" x-text="t('markPaid')">Paid</button>
+                                        <button class="rounded-lg bg-yellow-50 px-3 py-2 text-xs font-black text-yellow-700" @click="updateHostPaymentStatus(row.id, 'Pending', row.paymentAmountPaid)" x-text="t('markPending')">Pending</button>
+                                    </div>
+                                </div>
+                            </template>
+                            <p class="rounded-xl bg-white p-4 text-center text-sm font-semibold text-gray-500" x-show="hostRsvps.length === 0" x-text="t('noPaymentsYet')">ยังไม่มีรายการชำระเงิน</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 rounded-xl p-3 text-sm font-semibold" x-show="hostMessage" :class="hostMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="hostMessage"></div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-5 shadow-sm">
+                    <h2 class="font-black" x-text="t('eventHistory')">ประวัติกิจกรรม</h2>
+                    <div class="mt-3 space-y-3" x-show="profileHistory.length > 0">
+                        <template x-for="session in profileHistory" :key="session.id">
+                            <button class="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-3 text-left" @click="selectSession(session.id)">
+                                <div class="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-gdsq text-white">
+                                    <span class="text-[10px] font-black uppercase" x-text="monthText(session.eventDate)"></span>
+                                    <span class="text-xl font-black leading-none" x-text="dayText(session.eventDate)"></span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-black" x-text="session.title"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="session.isEnded ? t('endedEvent') : t('upcomingEvent')"></p>
+                                </div>
+                                <span class="rounded-full px-2 py-1 text-[10px] font-black" :class="session.votePending ? 'bg-blue-50 text-gdsq' : 'bg-gray-100 text-gray-500'" x-text="session.votePending ? t('voteNow') : statusLabel(session.rsvpStatus || 'Joined')"></span>
+                            </button>
+                        </template>
+                    </div>
+                    <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="profileHistory.length === 0" x-text="t('noHistory')">ยังไม่มีประวัติ</p>
+                </div>
+            </section>
+        </main>
+
+        <main id="event-detail" class="public-jump-target" :class="sectionHighlightId === 'event-detail' ? 'public-jump-highlight rounded-2xl' : ''" x-show="selectedSessionId" x-cloak>
+            <section class="px-5">
+                <div class="relative overflow-hidden rounded-2xl bg-gray-100">
+                    <img class="aspect-square w-full object-cover" x-show="posterUrl" :src="imageUrl(posterUrl)" :alt="sessionTitle">
+                    <div class="aspect-square w-full bg-gradient-to-br from-orange-50 via-white to-blue-50 p-8" x-show="!posterUrl">
+                        <img class="h-full w-full object-contain" src="/assets/gdsq-logo.png" alt="GDSQ Pickleball">
+                    </div>
+                    <div class="absolute left-4 top-4 rounded-lg bg-gdsq px-4 py-2 text-xs font-black uppercase text-white" x-text="skillLevel || t('socialPlay')">Social Play</div>
+                    <div class="absolute right-4 top-4 rounded-lg bg-white/95 px-4 py-2 text-sm font-black text-gray-800">
+                        <i class="fa-solid fa-users mr-1"></i><span x-text="joinedCount"></span> / <span x-text="maxPlayers"></span>
+                    </div>
+                </div>
+                <button class="mt-3 w-full rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-black text-gdsq" @click="shareEvent()">
+                    <i class="fa-solid fa-share-nodes mr-2"></i><span x-text="t('shareToLine')">Share to LINE</span>
+                </button>
+
+                <div class="mt-6">
+                    <h1 class="text-2xl font-black" x-text="sessionTitle">Weekend Social Play</h1>
+                    <p class="mt-1 text-sm font-bold text-gray-500" x-show="sessionHost" x-text="`${t('hostedBy')} ${sessionHost.displayName}`"></p>
+                    <div class="mt-4 divide-y divide-gray-100 rounded-2xl bg-white shadow-sm">
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-regular fa-calendar mt-1 text-gray-500"></i>
+                            <p class="font-semibold" x-text="eventDateText"></p>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-regular fa-clock mt-1 text-gray-500"></i>
+                            <p class="font-semibold" x-text="timeRange({ startTime, endTime })"></p>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-location-dot mt-1 text-gray-500"></i>
+                            <div>
+                                <p class="font-semibold" x-text="location || t('locationTba')"></p>
+                                <p class="text-sm text-gray-500" x-show="address" x-text="address"></p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-tag mt-1 text-gray-500"></i>
+                            <p class="font-semibold"><span x-text="priceText"></span> <span class="ml-2 rounded-md bg-blue-50 px-2 py-1 text-xs font-black text-gdsq" x-text="t('perPerson')">Per Person</span></p>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-chart-simple mt-1 text-gray-500"></i>
+                            <div>
+                                <p class="font-semibold"><span x-text="t('skillLevel')">Skill Level</span> <span class="ml-2 rounded-md bg-blue-50 px-2 py-1 text-xs font-black text-gdsq" x-text="skillLevel || t('socialPlay')"></span></p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-[32px_1fr] gap-3 px-4 py-3">
+                            <i class="fa-solid fa-table-tennis-paddle-ball mt-1 text-gray-500"></i>
+                            <div>
+                                <p class="font-semibold" x-text="courtText({ courtCount, maxPlayers })"></p>
+                                <p class="text-sm text-gray-500" x-text="playersPerCourtText({ courtCount, maxPlayers })"></p>
+                            </div>
+                        </div>
+                        <div class="px-4 py-4">
+                            <h2 class="font-black" x-text="t('aboutEvent')">About This Event</h2>
+                            <p class="mt-2 text-sm leading-relaxed text-gray-700" x-text="description || t('defaultDescription')"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-2 gap-3">
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <p class="text-sm font-black" x-text="t('joinedPlayers')">Joined Players</p>
+                        <p class="mt-2 text-3xl font-black text-gdsq"><span x-text="joinedCount"></span>/<span x-text="maxPlayers"></span></p>
+                    </div>
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <p class="text-sm font-black" x-text="t('waitlist')">Waitlist</p>
+                        <p class="mt-2 text-3xl font-black text-gdsqRed" x-text="waitlistCount">0</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="!userStatus && !eventEnded">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-black" x-text="t('rsvpGroupTitle')">Join with friends</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('rsvpGroupHelp')">Reserve spots for yourself and friends.</p>
+                        </div>
+                        <div class="rounded-xl bg-blue-50 px-3 py-2 text-center">
+                            <p class="text-[10px] font-black uppercase text-gdsq" x-text="t('totalSpots')">Total spots</p>
+                            <p class="text-xl font-black text-gdsq" x-text="totalRsvpSpots">1</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 space-y-3">
+                        <div class="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
+                            <img class="h-10 w-10 rounded-full object-cover" :src="profileAvatar" alt="">
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-black" x-text="profile.displayName || displayName || t('you')">You</p>
+                                <p class="text-xs font-semibold text-gdsq" x-text="t('yourSpot')">Your spot</p>
+                            </div>
+                            <i class="fa-solid fa-check text-gdsq"></i>
+                        </div>
+
+                        <template x-for="(guest, index) in guestNames" :key="index">
+                            <div class="flex items-center gap-2">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm font-black text-gray-500">
+                                    <i class="fa-solid fa-user-plus"></i>
+                                </div>
+                                <input class="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-3 text-sm font-semibold" :placeholder="`${t('friendName')} ${index + 1}`" x-model="guestNames[index]">
+                                <button class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-gdsqRed" @click="removeGuest(index)" type="button">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <button class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gdsq bg-blue-50 px-4 py-3 text-sm font-black text-gdsq" @click="addGuest()" type="button">
+                        <i class="fa-solid fa-plus"></i>
+                        <span x-text="t('addFriend')">Add friend</span>
+                    </button>
+
+                    <p class="mt-3 rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500">
+                        <span x-text="t('guestSaveNote')">Friends will be saved and counted as real spots.</span>
+                    </p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-black" x-text="t('joinedPlayers')">Joined Players</h2>
+                        <span class="text-sm font-black text-gdsq"><span x-text="joinedPlayers.length"></span>/<span x-text="maxPlayers"></span></span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-4 gap-4 text-center" x-show="joinedPlayers.length > 0">
+                        <template x-for="player in joinedPlayers" :key="player.id">
+                            <div class="min-w-0">
+                                <button class="mx-auto block" @click="player.user.id && openPlayerProfile(player.user.id)">
+                                    <img class="h-14 w-14 rounded-full border-2 border-gdsq object-cover" :src="rsvpAvatar(player)" alt="">
+                                </button>
+                                <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
+                                <p class="truncate text-[10px] font-semibold text-gray-400" x-show="player.kind === 'guest'" x-text="`${t('addedBy')} ${player.addedBy?.displayName || ''}`"></p>
+                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" :class="paymentStatusClass(player.paymentStatus)" x-text="paymentStatusLabel(player.paymentStatus)"></span>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="mt-4 rounded-xl bg-gray-50 py-5 text-center text-sm font-bold text-gray-500" x-show="joinedPlayers.length === 0" x-text="t('noJoinedPlayers')">No joined players yet</p>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="waitlistPlayers.length > 0">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-base font-black" x-text="t('waitlist')">Waitlist</h2>
+                        <span class="text-sm font-black text-gdsqRed" x-text="waitlistPlayers.length">0</span>
+                    </div>
+                    <div class="mt-4 grid grid-cols-4 gap-4 text-center">
+                        <template x-for="player in waitlistPlayers" :key="player.id">
+                            <div class="min-w-0">
+                                <button class="mx-auto block" @click="player.user.id && openPlayerProfile(player.user.id)">
+                                    <img class="h-14 w-14 rounded-full object-cover" :src="rsvpAvatar(player)" alt="">
+                                </button>
+                                <p class="mt-2 truncate text-xs font-bold" x-text="player.user.displayName || 'GDSQ'"></p>
+                                <p class="truncate text-[10px] font-semibold text-gray-400" x-show="player.kind === 'guest'" x-text="`${t('addedBy')} ${player.addedBy?.displayName || ''}`"></p>
+                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-black" :class="paymentStatusClass(player.paymentStatus)" x-text="paymentStatusLabel(player.paymentStatus)"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div id="vote-panel" class="public-jump-target mt-4 rounded-2xl bg-white p-4 shadow-sm" :class="sectionHighlightId === 'vote-panel' ? 'public-jump-highlight' : ''" x-show="eventEnded" x-cloak>
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-black" x-text="t('eventEnded')">กิจกรรมจบแล้ว</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('voteHelp')">ให้คะแนนเพื่อนร่วมกิจกรรมเพื่อทำ Ranking</p>
+                        </div>
+                        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-600" x-text="votePlayers.length + ' ' + t('players')"></span>
+                    </div>
+
+                    <div class="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-gdsq" x-show="!canVote" x-text="t('voteOnlyJoined')"></div>
+
+                    <div class="mt-4 space-y-3" x-show="canVote">
+                        <select class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-black" x-model="selectedVoteUserId" @change="applySelectedVote()">
+                            <option value="" x-text="t('choosePlayerToVote')">เลือกผู้เล่นที่จะโหวต</option>
+                            <template x-for="player in votePlayers.filter((item) => !item.isSelf)" :key="player.id">
+                                <option :value="player.id" x-text="player.displayName"></option>
+                            </template>
+                        </select>
+
+                        <div class="space-y-3" x-show="selectedVoteUserId">
+                            <template x-for="field in voteFields" :key="field.key">
+                                <div class="rounded-xl border border-gray-100 p-3">
+                                    <div class="mb-2 flex items-center justify-between gap-3">
+                                        <p class="text-sm font-black" x-text="t(field.labelKey)"></p>
+                                        <p class="text-sm font-black text-gdsq"><span x-text="voteForm[field.key]"></span>/5</p>
+                                    </div>
+                                    <input class="w-full accent-gdsq" type="range" min="1" max="5" step="1" x-model.number="voteForm[field.key]">
+                                </div>
+                            </template>
+                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="voteForm.note" :placeholder="t('voteNote')"></textarea>
+                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="submitVote()" :disabled="isLoading">
+                                <span x-show="!isLoading" x-text="t('submitVote')">ส่งคะแนน</span>
+                                <span x-show="isLoading" x-text="t('saving')">กำลังบันทึก...</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 space-y-2" x-show="voteSummary.length > 0">
+                        <h3 class="text-sm font-black" x-text="t('voteResults')">ผลโหวต</h3>
+                        <template x-for="summary in sortedVoteSummary()" :key="summary.votedUserId">
+                            <div class="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-black" x-text="votePlayerName(summary.votedUserId)"></p>
+                                    <p class="text-xs font-semibold text-gray-500"><span x-text="summary.voteCount"></span> <span x-text="t('votes')"></span></p>
+                                </div>
+                                <p class="text-lg font-black text-gdsq"><span x-text="summary.totalAverage"></span>/5</p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-lg bg-gray-50 p-3 text-sm text-gray-600" x-show="statusMessage">
+                    <p x-text="statusMessage"></p>
+                </div>
+
+                <div id="payment" class="public-jump-target mt-4 rounded-2xl bg-white p-4 shadow-sm" :class="sectionHighlightId === 'payment' ? 'public-jump-highlight' : ''" x-show="userStatus || pendingJoinPayment">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-black" x-text="paymentForm.phase === 'final' ? t('finalPayment') : (pendingJoinPayment ? t('depositPayment') : t('payment'))">Payment</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500"><span x-text="pendingJoinPayment ? t('paymentRequiredBeforeJoin') : t('amountDue')"></span>: <span class="font-black text-gray-900" x-text="moneyText(currentPaymentDueDisplay)"></span></p>
+                            <p class="mt-2 rounded-xl bg-blue-50 px-3 py-2 text-xs font-semibold text-gdsq" x-show="paymentNotePublic" x-text="paymentNotePublic"></p>
+                        </div>
+                        <span class="rounded-full px-3 py-1 text-xs font-black" :class="paymentStatusClass(payment.status)" x-text="paymentStatusLabel(payment.status)">Pending</span>
+                    </div>
+
+                    <button class="mt-4 w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" x-show="payment.status !== 'Paid'" @click="togglePaymentPanel()">
+                        <i class="fa-solid fa-qrcode mr-2"></i><span x-text="showPaymentPanel ? t('hidePayment') : t('payNow')">Pay Now</span>
+                    </button>
+
+                    <div class="mt-4 space-y-4" x-show="showPaymentPanel || payment.status === 'Submitted' || payment.status === 'Paid'" x-cloak>
+                        <div class="overflow-hidden rounded-xl bg-gray-50 p-3 text-center" x-show="paymentSettings.paymentQrUrl">
+                            <img class="mx-auto max-h-64 rounded-lg object-contain" :src="imageUrl(paymentSettings.paymentQrUrl)" alt="Payment QR">
+                        </div>
+
+                        <div class="divide-y divide-gray-100 rounded-xl border border-gray-100 text-sm">
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500" x-text="t('bank')">Bank</span><span class="text-right font-black" x-text="paymentSettings.paymentBankName || '-'"></span></div>
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500" x-text="t('accountName')">Account</span><span class="text-right font-black" x-text="paymentSettings.paymentAccountName || '-'"></span></div>
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500" x-text="t('accountNumber')">Number</span><span class="text-right font-black" x-text="paymentSettings.paymentAccountNumber || '-'"></span></div>
+                            <div class="flex justify-between gap-3 px-3 py-2"><span class="font-semibold text-gray-500">PromptPay</span><span class="text-right font-black" x-text="paymentSettings.paymentPromptPayId || '-'"></span></div>
+                        </div>
+
+                        <div class="rounded-xl bg-blue-50 px-3 py-3 text-center">
+                            <p class="text-xs font-black text-gdsq" x-text="t('amountDue')">Amount due</p>
+                            <p class="text-2xl font-black text-gdsq" x-text="moneyText(currentPaymentDueDisplay)">THB 0</p>
+                        </div>
+
+                        <div class="space-y-3" x-show="payment.status !== 'Paid'">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="0" x-model="paymentForm.amountPaid" :placeholder="t('amountPaid')">
+                            <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="paymentForm.payerName" :placeholder="t('payerName')">
+                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="paymentForm.note" :placeholder="t('paymentNote')"></textarea>
+                            <label class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gdsq bg-blue-50 px-4 py-6 text-center text-gdsq">
+                                <i class="fa-solid fa-cloud-arrow-up mb-2 text-2xl"></i>
+                                <span class="text-sm font-black" x-text="paymentForm.fileName || t('chooseSlip')">Choose slip</span>
+                                <span class="mt-1 text-xs font-semibold text-blue-700" x-text="t('slipUploadHelp')">Stored securely in Supabase Storage</span>
+                                <input class="hidden" type="file" accept="image/*" @change="handleSlipFile($event)">
+                            </label>
+                            <div class="overflow-hidden rounded-xl bg-gray-100" x-show="paymentForm.previewUrl">
+                                <img class="max-h-72 w-full object-contain" :src="paymentForm.previewUrl" alt="Slip preview">
+                            </div>
+                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click.stop.prevent="console.debug('mobile-payment:submit-click'); submitPayment()" :disabled="isLoading || !paymentForm.slipBase64">
+                                <span x-show="!isLoading" x-text="t('submitPayment')">Submit Payment</span>
+                                <span x-show="isLoading" x-text="t('uploadingSlip')">Uploading...</span>
+                            </button>
+                            <div class="rounded-xl px-3 py-2 text-center text-xs font-bold" x-show="statusMessage" :class="statusMessage.includes('สำเร็จ') || statusMessage.includes('confirmed') || statusMessage.includes('submitted') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                                <span x-text="statusMessage"></span>
+                            </div>
+                        </div>
+
+                        <a class="block rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-black text-gdsq" x-show="payment.slipUrl" :href="payment.slipUrl" target="_blank">
+                            <i class="fa-solid fa-receipt mr-2"></i><span x-text="t('viewSlip')">View Slip</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="userStatus && eventEnded && finalPaymentDueDisplay > 0">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-black" x-text="t('finalPayment')">Post-game payment</h2>
+                            <p class="mt-1 text-xs font-semibold text-gray-500"><span x-text="t('finalAmountDue')"></span>: <span class="font-black text-gray-900" x-text="moneyText(finalPaymentDueDisplay)"></span></p>
+                        </div>
+                        <span class="rounded-full px-3 py-1 text-xs font-black" :class="paymentStatusClass(payment.finalStatus)" x-text="finalPaymentStatusLabel(payment.finalStatus)">Pending</span>
+                    </div>
+                    <button class="mt-4 w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" x-show="payment.finalStatus !== 'Paid'" @click="openFinalPaymentPanel()">
+                        <i class="fa-solid fa-qrcode mr-2"></i><span x-text="t('payNow')">Pay Now</span>
+                    </button>
+                    <a class="mt-3 block rounded-xl border border-gray-300 px-4 py-3 text-center text-sm font-black text-gdsq" x-show="payment.finalSlipUrl" :href="payment.finalSlipUrl" target="_blank">
+                        <i class="fa-solid fa-receipt mr-2"></i><span x-text="t('viewSlip')">View Slip</span>
+                    </a>
+                </div>
+            </section>
+
+            <section class="fixed bottom-0 left-0 w-full border-t bg-white p-4 z-50 gdsq-safe-bottom" x-show="!pendingJoinPayment && !showPaymentPanel" x-cloak>
+                <div class="mx-auto flex max-w-md items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-bold text-gray-500" x-text="t('spotsLeft')">Spots Left</p>
+                        <p class="text-2xl font-black text-gdsq"><span x-text="spotsLeft">0</span> <span class="text-base text-gray-400">/ <span x-text="maxPlayers">0</span></span></p>
+                        <p class="text-[11px] font-bold text-gray-500" x-show="!userStatus && totalRsvpSpots > 1">+ <span x-text="totalRsvpSpots - 1"></span> <span x-text="t('friends')">friends</span></p>
+                    </div>
+                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white disabled:opacity-50" x-show="!userStatus && !eventEnded" @click="console.debug('mobile-cta:confirm-rsvp'); confirmRsvp()" :disabled="isLoading || !lineUid">
+                        <span x-show="!isLoading" x-text="joinButtonText">Confirm RSVP</span>
+                        <span x-show="isLoading" x-text="t('confirming')">Confirming...</span>
+                        <i class="fa-solid fa-arrow-right" x-show="!isLoading"></i>
+                    </button>
+                    <button class="flex min-w-[210px] items-center justify-center gap-3 rounded-xl bg-gdsq px-6 py-4 text-lg font-black text-white" x-show="eventEnded" @click="loadVotes(); queueSectionScroll('vote-panel')">
+                        <span x-text="t('voteNow')">โหวต</span>
+                        <i class="fa-solid fa-star"></i>
+                    </button>
+                    <button class="rounded-xl border border-gray-300 bg-white px-5 py-4 text-sm font-black text-gray-700" x-show="userStatus && !eventEnded" @click="console.debug('mobile-cta:cancel-rsvp'); cancelRsvp()" :disabled="isLoading || !lineUid">
+                        <span x-text="userStatus ? statusLabel(userStatus) : ''"></span>
+                        <span class="ml-2 text-gray-400" x-text="t('cancel')">Cancel</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <nav class="fixed bottom-0 left-0 z-40 w-full border-t bg-white px-6 py-3 gdsq-safe-bottom-nav" x-show="!selectedSessionId" x-cloak>
+            <div class="mx-auto grid max-w-md grid-cols-5 items-end text-center text-xs font-bold text-gray-500">
+                <button :class="activeTab === 'home' ? 'text-gdsq' : ''" @click="setTab('home', 'home')"><i class="fa-solid fa-house mb-1 block text-xl"></i>Home</button>
+                <button :class="activeTab === 'events' ? 'text-gdsq' : ''" @click="setTab('events', 'events')"><i class="fa-regular fa-calendar mb-1 block text-xl"></i>Events</button>
+                <button class="-mt-8" @click="setTab('create', 'create-event')"><span class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gdsq text-2xl text-white shadow-lg"><i class="fa-solid fa-plus"></i></span>Create</button>
+                <button class="relative" :class="activeTab === 'players' ? 'text-gdsq' : ''" @click="setTab('players', 'players')">
+                    <span class="absolute -right-1 -top-2 rounded-full bg-gdsqRed px-1.5 py-0.5 text-[10px] font-black text-white" x-show="players.length > 0" x-text="players.length"></span>
+                    <i class="fa-solid fa-users mb-1 block text-xl"></i>Players
+                </button>
+                <button :class="activeTab === 'profile' ? 'text-gdsq' : ''" @click="setTab('profile', 'profile')"><i class="fa-regular fa-user mb-1 block text-xl"></i>Profile</button>
+            </div>
+        </nav>
+    </div>
+
+    <script>
+        function initialSessionId() {
+            const params = new URLSearchParams(window.location.search);
+            const directSessionId = params.get('sessionId');
+            if (directSessionId) return directSessionId;
+
+            const liffState = params.get('liff.state');
+            if (!liffState) return '';
+
+            try {
+                const stateText = decodeURIComponent(liffState);
+                const queryText = stateText.includes('?') ? stateText.split('?').pop() : stateText.replace(/^\?/, '');
+                return new URLSearchParams(queryText).get('sessionId') || '';
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function initialPlayerId() {
+            return new URLSearchParams(window.location.search).get('playerId') || '';
+        }
+
+        function eventApp() {
+            const initialPlayerProfileId = initialPlayerId();
+            return {
+                lineUid: null,
+                liffId: '',
+                displayName: null,
+                activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
+                homeShortcutActive: 'events',
+                homeBannerUrl: '/assets/gdsq-home-banner.png',
+                homeFeedBanners: [],
+                currentHomeFeedIndex: 0,
+                homeFeedTimer: null,
+                sessions: [],
+                pastSessions: [],
+                eventViewMode: 'upcoming',
+                players: [],
+                rankings: [],
+                rankingPeriod: 'month',
+                rankingCategory: 'overall',
+                rankingPeriods: ['week', 'month', 'all'],
+                rankingCategories: ['overall', 'mvp', 'sportsmanship', 'teamwork', 'skill', 'vibes'],
+                profileHistory: [],
+                pendingVotes: [],
+                currentUserId: '',
+                myPlayerStats: {
+                    joinedCount: 0,
+                    voteCount: 0,
+                    hostedCount: 0,
+                    ratingAverage: null,
+                    badges: [],
+                    history: []
+                },
+                selectedPlayer: {
+                    id: '',
+                    displayName: '',
+                    profileImageUrl: '',
+                    joinedCount: 0,
+                    voteCount: 0,
+                    hostedCount: 0,
+                    badges: [],
+                    upcoming: [],
+                    playedTogether: [],
+                    history: []
+                },
+                previousTab: 'players',
+                sessionPlayers: [],
+                votePlayers: [],
+                voteSummary: [],
+                myVotes: [],
+                canVote: false,
+                selectedVoteUserId: '',
+                voteFields: [
+                    { key: 'mvpScore', labelKey: 'voteMvp' },
+                    { key: 'sportsmanshipScore', labelKey: 'voteSportsmanship' },
+                    { key: 'teamworkScore', labelKey: 'voteTeamwork' },
+                    { key: 'skillScore', labelKey: 'voteSkill' },
+                    { key: 'vibesScore', labelKey: 'voteVibes' }
+                ],
+                voteForm: {
+                    mvpScore: 5,
+                    sportsmanshipScore: 5,
+                    teamworkScore: 5,
+                    skillScore: 5,
+                    vibesScore: 5,
+                    note: ''
+                },
+                guestNames: [],
+                selectedSessionId: initialSessionId(),
+                initialPlayerProfileId,
+                profile: {
+                    displayName: '',
+                    phone: '',
+                    profileImageUrl: ''
+                },
+                createEventForm: {
+                    title: '',
+                    skillLevel: 'Social Play',
+                    description: '',
+                    eventDate: '',
+                    startTime: '',
+                    endTime: '',
+                    location: '',
+                    address: '',
+                    maxPlayers: 16,
+                    courtCount: 2,
+                    priceThb: 250,
+                    paymentMode: 'deposit_then_final',
+                    depositAmountThb: 100,
+                    estimatedTotalThb: 250,
+                    finalAmountThb: '',
+                    paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
+                    posterUrl: '',
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
+                },
+                createMessage: '',
+                createMessageType: 'success',
+                payment: {
+                    status: 'Pending',
+                    amountDue: 0,
+                    amountPaid: null,
+                    slipUrl: '',
+                    finalStatus: 'NotOpened',
+                    finalAmountDue: 0,
+                    finalAmountPaid: null,
+                    finalSlipUrl: ''
+                },
+                paymentSettings: {
+                    paymentQrUrl: '',
+                    paymentBankName: '',
+                    paymentAccountName: '',
+                    paymentAccountNumber: '',
+                    paymentPromptPayId: ''
+                },
+                paymentForm: {
+                    amountPaid: '',
+                    payerName: '',
+                    note: '',
+                    fileName: '',
+                    fileType: '',
+                    slipBase64: '',
+                    previewUrl: '',
+                    phase: 'deposit'
+                },
+                showPaymentPanel: false,
+                pendingJoinPayment: false,
+                sectionHighlightId: '',
+                sectionHighlightTimer: null,
+                myHostSessions: [],
+                hostRsvps: [],
+                hostEditForm: {
+                    id: ''
+                },
+                hostMessage: '',
+                hostMessageType: 'success',
+                profileMessage: '',
+                profileMessageType: 'success',
+                sessionTitle: '',
+                eventDate: null,
+                startTime: null,
+                endTime: null,
+                priceThb: null,
+                paymentMode: 'deposit_then_final',
+                depositAmountThb: null,
+                estimatedTotalThb: null,
+                finalAmountThb: null,
+                paymentNotePublic: '',
+                location: '',
+                address: '',
+                skillLevel: '',
+                description: '',
+                posterUrl: '',
+                sessionHost: null,
+                paymentQrUrl: '',
+                paymentBankName: '',
+                paymentAccountName: '',
+                paymentAccountNumber: '',
+                paymentPromptPayId: '',
+                courtCount: 1,
+                eventEnded: false,
+                maxPlayers: 0,
+                joinedCount: 0,
+                waitlistCount: 0,
+                spotsLeft: 0,
+                userStatus: null,
+                isLoading: false,
+                language: localStorage.getItem('gdsqLanguage') || 'th',
+                statusMessage: '',
+
+                get profileAvatar() {
+                    return this.imageUrl(this.profile.profileImageUrl) || 'https://ui-avatars.com/api/?background=0044CC&color=fff&name=GDSQ';
+                },
+
+                get homeFeedVisibleCount() {
+                    if (window.innerWidth >= 1024) return 4;
+                    if (window.innerWidth >= 640) return 2;
+                    return 1;
+                },
+
+                get homeFeedMaxIndex() {
+                    return Math.max(this.homeFeedBanners.length - this.homeFeedVisibleCount, 0);
+                },
+
+                get homeFeedPageCount() {
+                    return this.homeFeedMaxIndex + 1;
+                },
+
+                get homeFeedPageIndex() {
+                    return Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
+                },
+
+                get homeFeedCardStyle() {
+                    const width = 100 / this.homeFeedVisibleCount;
+                    return `width:${width}%`;
+                },
+
+                get homeFeedTrackStyle() {
+                    const safeIndex = Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
+                    const translate = safeIndex * (100 / this.homeFeedVisibleCount);
+                    return `transform: translateX(-${translate}%);`;
+                },
+
+                get eventList() {
+                    if (this.activeTab === 'events' && this.eventViewMode === 'past') {
+                        return this.pastSessions;
+                    }
+
+                    return this.sessions;
+                },
+
+                get joinedPlayers() {
+                    return this.sessionPlayers.filter((player) => player.status === 'Joined');
+                },
+
+                get waitlistPlayers() {
+                    return this.sessionPlayers.filter((player) => player.status === 'Waitlist');
+                },
+
+                get cleanGuestNames() {
+                    return this.guestNames.map((name) => name.trim()).filter(Boolean);
+                },
+
+                get totalRsvpSpots() {
+                    return 1 + this.cleanGuestNames.length;
+                },
+
+                get estimatedPaymentAmount() {
+                    return Math.max(Number(this.depositAmountThb ?? this.priceThb ?? 0), 0) * this.totalRsvpSpots;
+                },
+
+                get paymentAmountDueDisplay() {
+                    return this.payment.amountDue || this.estimatedPaymentAmount || 0;
+                },
+
+                get finalPaymentDueDisplay() {
+                    return this.payment.finalAmountDue || 0;
+                },
+
+                get currentPaymentDueDisplay() {
+                    return this.paymentForm.phase === 'final' ? this.finalPaymentDueDisplay : this.paymentAmountDueDisplay;
+                },
+
+                get joinButtonText() {
+                    const needsDeposit = (this.paymentMode || 'deposit_then_final') === 'deposit_then_final'
+                        && Number(this.depositAmountThb ?? this.priceThb ?? 0) > 0;
+                    const baseText = needsDeposit ? this.t('payDepositJoin') : this.t('confirmRsvp');
+                    return this.totalRsvpSpots > 1 ? `${baseText} (${this.totalRsvpSpots})` : baseText;
+                },
+
+                translations: {
+                    th: {
+                        heroLine1: 'Good Game.',
+                        heroLine2: 'Good People.',
+                        joinFun: 'Join the Fun!',
+                        events: 'Events',
+                        pastEvents: 'กิจกรรมที่ผ่านมา',
+                        players: 'Players',
+                        rankings: 'Rankings',
+                        shop: 'Shop',
+                        profile: 'Profile',
+                        createEvent: 'สร้างกิจกรรม',
+                        createEventHelp: 'สร้างกิจกรรมแล้วขึ้นหน้าแอพทันที',
+                        eventInfo: 'ข้อมูลกิจกรรม',
+                        date: 'วันที่',
+                        time: 'เวลา',
+                        price: 'ราคา',
+                        eventTitle: 'ชื่อกิจกรรม',
+                        description: 'รายละเอียดกิจกรรม',
+                        dateTime: 'วันและเวลา',
+                        placeAndSpots: 'สถานที่และจำนวน',
+                        location: 'ชื่อสนาม / สถานที่',
+                        address: 'ที่อยู่ หรือ Google Map link',
+                        maxPlayers: 'จำนวนคน',
+                        courtCount: 'Court',
+                        priceThb: 'ราคา',
+                        poster: 'รูปโปสเตอร์',
+                        posterUrl: 'ลิงก์รูปโปสเตอร์',
+                        paymentSettings: 'ตั้งค่าการชำระเงิน',
+                        paymentModeNone: 'ไม่เก็บผ่านแอพ',
+                        paymentModeDepositFinal: 'มัดจำ + จ่ายส่วนต่างหลังจบ',
+                        paymentModeFinalOnly: 'จ่ายหลังจบทีเดียว',
+                        depositAmountThb: 'มัดจำ',
+                        estimatedTotalThb: 'ยอดประมาณ',
+                        finalAmountThb: 'ยอดจริงหลังจบ',
+                        paymentNotePublic: 'หมายเหตุการชำระเงินที่โชว์ผู้เล่น',
+                        paymentQrUrl: 'ลิงก์รูป QR ชำระเงิน',
+                        paymentBankName: 'ชื่อธนาคาร',
+                        paymentAccountName: 'ชื่อบัญชี',
+                        paymentAccountNumber: 'เลขบัญชี',
+                        paymentPromptPayId: 'PromptPay ID',
+                        hostedBy: 'จัดโดย',
+                        publishEvent: 'Publish Event',
+                        publishing: 'กำลังสร้าง...',
+                        eventPublished: 'สร้างกิจกรรมแล้ว',
+                        eventPublishFailed: 'สร้างกิจกรรมไม่สำเร็จ',
+                        upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
+                        homeUpdates: 'อัปเดตหน้าแรก',
+                        latestNews: 'ข่าวสารและแบนเนอร์',
+                        refresh: 'รีเฟรช',
+                        noEvents: 'ยังไม่มีกิจกรรม',
+                        viewDetails: 'ดูรายละเอียด',
+                        communityTitle: 'Play. Connect. Improve.',
+                        communityText: 'เป็นส่วนหนึ่งของ GDSQ community!',
+                        back: 'กลับ',
+                        viewDetails: 'ดูรายละเอียด',
+                        spotsLeft: 'ที่ว่าง',
+                        spots: 'ที่',
+                        full: 'เต็มแล้ว',
+                        joined: 'เข้าร่วมแล้ว',
+                        waitlist: 'Waitlist',
+                        joinedPlayers: 'Joined Players',
+                        noJoinedPlayers: 'ยังไม่มีผู้เข้าร่วม',
+                        courts: 'คอร์ท',
+                        playersPerCourt: 'คนต่อคอร์ทโดยประมาณ',
+                        rsvpGroupTitle: 'เข้าร่วมพร้อมเพื่อน',
+                        rsvpGroupHelp: 'จองที่ให้ตัวเองและเพื่อนที่มาด้วยกัน',
+                        totalSpots: 'จำนวนที่',
+                        you: 'คุณ',
+                        yourSpot: 'ที่ของคุณ',
+                        friendName: 'ชื่อเพื่อน',
+                        addFriend: 'เพิ่มเพื่อน',
+                        friends: 'เพื่อน',
+                        addedBy: 'เพิ่มโดย',
+                        guestSaveNote: 'ชื่อเพื่อนจะถูกบันทึกและนับเป็นที่นั่งจริง',
+                        confirmRsvp: 'Confirm RSVP',
+                        payDepositJoin: 'จ่ายมัดจำและเข้าร่วม',
+                        confirming: 'กำลังยืนยัน...',
+                        confirmed: 'Confirmed',
+                        waitlisted: 'Waitlisted',
+                        cancel: 'Cancel',
+                        cancelling: 'กำลังยกเลิก...',
+                        loadingEvent: 'กำลังโหลดข้อมูลกิจกรรม...',
+                        loadingEvents: 'กำลังโหลดรายการกิจกรรม...',
+                        dateTba: 'ยังไม่ระบุวันที่',
+                        timeTba: 'ยังไม่ระบุเวลา',
+                        priceTba: 'ยังไม่ระบุราคา',
+                        locationTba: 'ยังไม่ระบุสถานที่',
+                        socialPlay: 'Social Play',
+                        perPerson: 'Per Person',
+                        skillLevel: 'Skill Level',
+                        aboutEvent: 'About This Event',
+                        defaultDescription: 'Join us for a fun and friendly pickleball session. Good rallies, good people, and great vibes.',
+                        liffMissing: 'ยังไม่ได้ตั้งค่า LINE LIFF ID ในไฟล์ .env',
+                        loggedIn: 'เข้าสู่ระบบ LINE แล้ว',
+                        waitingLine: 'กรุณารอให้ LINE โหลดข้อมูลผู้ใช้ให้เสร็จก่อน',
+                        confirmingRsvp: 'กำลังยืนยัน RSVP...',
+                        rsvpFailed: 'ยืนยัน RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+                        cancellingRsvp: 'กำลังยกเลิก RSVP...',
+                        cancelFailed: 'ยกเลิก RSVP ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+                        waitlistPromoted: 'ระบบเลื่อนคนใน Waitlist ขึ้นให้อัตโนมัติแล้ว',
+                        lineFailed: 'เชื่อมต่อ LINE ไม่สำเร็จ'
+                        ,
+                        phoneNotSet: 'ยังไม่ได้ใส่เบอร์',
+                        noPlayers: 'ยังไม่มีผู้เล่น',
+                        noRankings: 'ยังไม่มี ranking',
+                        eventsJoined: 'กิจกรรมที่เข้าร่วม',
+                        totalPlayers: 'ผู้เล่นทั้งหมด',
+                        latestMember: 'สมาชิกล่าสุด',
+                        displayName: 'ชื่อที่แสดง',
+                        phone: 'เบอร์โทร',
+                        profileImageUrl: 'ลิงก์รูปโปรไฟล์',
+                        profileImageHelp: 'ใช้รูปจาก LINE อัตโนมัติ หรือวางลิงก์รูปจาก Google Drive/เว็บฝากรูปได้',
+                        saveProfile: 'บันทึกโปรไฟล์',
+                        saving: 'กำลังบันทึก...',
+                        profileSaved: 'บันทึกโปรไฟล์แล้ว',
+                        profileSaveFailed: 'บันทึกโปรไฟล์ไม่สำเร็จ',
+                        lineLoginRequired: 'กรุณาเชื่อมต่อ LINE ก่อนบันทึกโปรไฟล์',
+                        lineLinked: 'เชื่อมกับ LINE แล้ว',
+                        lineNotLinked: 'ยังไม่ได้เชื่อม LINE',
+                        shareToLine: 'แชร์ไป LINE',
+                        shareText: 'ชวนมาเล่น Pickleball ด้วยกัน',
+                        copiedLink: 'คัดลอกลิงก์แล้ว'
+                        ,
+                        payment: 'การชำระเงิน',
+                        amountDue: 'ยอดที่ต้องชำระ',
+                        depositPayment: 'มัดจำเพื่อยืนยันที่นั่ง',
+                        finalPayment: 'ชำระหลังจบกิจกรรม',
+                        finalAmountDue: 'ยอดที่ต้องจ่ายหลังจบ',
+                        finalPaymentNotOpened: 'ยังไม่เปิดชำระหลังจบ',
+                        finalPaymentSubmitted: 'ส่งสลิปส่วนต่างแล้ว',
+                        finalPaymentPaid: 'จ่ายครบแล้ว',
+                        amountPaid: 'ยอดที่โอน',
+                        payerName: 'ชื่อผู้โอน',
+                        paymentNote: 'หมายเหตุ',
+                        payNow: 'ชำระเงิน',
+                        hidePayment: 'ซ่อนการชำระเงิน',
+                        bank: 'ธนาคาร',
+                        accountName: 'ชื่อบัญชี',
+                        accountNumber: 'เลขบัญชี',
+                        chooseSlip: 'เลือกรูปสลิป',
+                        slipUploadHelp: 'สลิปจะถูกเก็บใน Supabase Storage',
+                        submitPayment: 'แจ้งชำระเงินแล้ว',
+                        uploadingSlip: 'กำลังอัปโหลด...',
+                        viewSlip: 'ดูสลิป',
+                        paymentPending: 'รอชำระเงิน',
+                        paymentSubmitted: 'แจ้งชำระแล้ว',
+                        paymentPaid: 'ชำระแล้ว',
+                        paymentSubmitFailed: 'แจ้งชำระเงินไม่สำเร็จ',
+                        slipTooLarge: 'ไฟล์สลิปต้องไม่เกิน 10 MB',
+                        paymentSubmittedMessage: 'ส่งสลิปแล้ว ระบบยืนยันที่ให้เรียบร้อย เจ้าของกิจกรรมจะเช็คสลิปย้อนหลัง',
+                        paymentRequiredBeforeJoin: 'ต้องชำระก่อนยืนยันที่',
+                        slipRequiredToJoin: 'กรุณาอัปโหลดสลิปเพื่อยืนยันการเข้าร่วม',
+                        paymentThenConfirmed: 'ส่งสลิปแล้ว ยืนยันการเข้าร่วมเรียบร้อย',
+                        myHostedEvents: 'กิจกรรมที่ฉันสร้าง',
+                        hostManageHelp: 'แก้รายละเอียดและเช็คสลิปของกิจกรรมตัวเอง',
+                        manage: 'จัดการ',
+                        noHostedEvents: 'ยังไม่มีกิจกรรมที่สร้าง',
+                        editEvent: 'แก้กิจกรรม',
+                        saveEvent: 'บันทึกกิจกรรม',
+                        eventSaved: 'บันทึกกิจกรรมแล้ว',
+                        eventSaveFailed: 'บันทึกกิจกรรมไม่สำเร็จ',
+                        paymentSlips: 'สลิปชำระเงิน',
+                        markPaid: 'ชำระแล้ว',
+                        markPending: 'รอตรวจ',
+                        noPaymentsYet: 'ยังไม่มีรายการชำระเงิน',
+                        hostPaymentUpdated: 'อัปเดตสถานะชำระเงินแล้ว',
+                        pendingVotes: 'กิจกรรมที่รอโหวต',
+                        voteNow: 'ให้คะแนน',
+                        noPendingVotes: 'ยังไม่มีกิจกรรมที่รอโหวต',
+                        eventHistory: 'ประวัติกิจกรรม',
+                        noHistory: 'ยังไม่มีประวัติกิจกรรม',
+                        hosted: 'จัดงาน',
+                        scoreBreakdown: 'คะแนนแยกหัวข้อ',
+                        noVotesYet: 'ยังไม่มีคะแนนโหวต',
+                        shareProfile: 'แชร์โปรไฟล์',
+                        noUpcomingForPlayer: 'ยังไม่มีกิจกรรมที่กำลังจะถึง',
+                        playedTogether: 'เล่นด้วยกันบ่อย',
+                        eventsTogether: 'กิจกรรมร่วมกัน',
+                        noPlayedTogether: 'ยังไม่มีข้อมูลคนที่เล่นด้วยกัน',
+                        thisWeek: 'สัปดาห์นี้',
+                        thisMonth: 'เดือนนี้',
+                        allTime: 'ทั้งหมด',
+                        overall: 'รวม',
+                        myStats: 'สถิติของฉัน',
+                        viewPublicProfile: 'ดูโปรไฟล์แบบสาธารณะ',
+                        endedEvent: 'จบแล้ว',
+                        upcomingEvent: 'กำลังจะมาถึง',
+                        eventEnded: 'กิจกรรมจบแล้ว',
+                        voteHelp: 'ให้คะแนนเพื่อนร่วมกิจกรรมเพื่อทำ Ranking',
+                        voteOnlyJoined: 'โหวตได้เฉพาะผู้เล่นที่เข้าร่วมกิจกรรมนี้ และหลังจบกิจกรรมเท่านั้น',
+                        choosePlayerToVote: 'เลือกผู้เล่นที่จะโหวต',
+                        voteMvp: 'MVP / ผู้เล่นยอดเยี่ยม',
+                        voteSportsmanship: 'น้ำใจนักกีฬา',
+                        voteTeamwork: 'เล่นเป็นทีม',
+                        voteSkill: 'ฝีมือ',
+                        voteVibes: 'Good Vibes',
+                        voteNote: 'คอมเมนต์สั้นๆ (ไม่บังคับ)',
+                        submitVote: 'ส่งคะแนน',
+                        voteSaved: 'บันทึกคะแนนแล้ว',
+                        voteFailed: 'บันทึกคะแนนไม่สำเร็จ',
+                        voteResults: 'ผลโหวต',
+                        votes: 'โหวต'
+                    },
+                    en: {
+                        heroLine1: 'Good Game.',
+                        heroLine2: 'Good People.',
+                        joinFun: 'Join the Fun!',
+                        events: 'Events',
+                        pastEvents: 'Past Events',
+                        players: 'Players',
+                        rankings: 'Rankings',
+                        shop: 'Shop',
+                        profile: 'Profile',
+                        createEvent: 'Create Event',
+                        createEventHelp: 'Publish a community event instantly.',
+                        eventInfo: 'Event info',
+                        date: 'Date',
+                        time: 'Time',
+                        price: 'Price',
+                        eventTitle: 'Event title',
+                        description: 'Event description',
+                        dateTime: 'Date & time',
+                        placeAndSpots: 'Place & spots',
+                        location: 'Venue / location',
+                        address: 'Address or Google Map link',
+                        maxPlayers: 'Players',
+                        courtCount: 'Courts',
+                        priceThb: 'Price',
+                        poster: 'Poster',
+                        posterUrl: 'Poster image URL',
+                        paymentSettings: 'Payment settings',
+                        paymentModeNone: 'No in-app payment',
+                        paymentModeDepositFinal: 'Deposit + final balance',
+                        paymentModeFinalOnly: 'Final payment only',
+                        depositAmountThb: 'Deposit',
+                        estimatedTotalThb: 'Estimated total',
+                        finalAmountThb: 'Final total',
+                        paymentNotePublic: 'Payment note shown to players',
+                        paymentQrUrl: 'Payment QR image URL',
+                        paymentBankName: 'Bank name',
+                        paymentAccountName: 'Account name',
+                        paymentAccountNumber: 'Account number',
+                        paymentPromptPayId: 'PromptPay ID',
+                        hostedBy: 'Hosted by',
+                        publishEvent: 'Publish Event',
+                        publishing: 'Publishing...',
+                        eventPublished: 'Event published',
+                        eventPublishFailed: 'Unable to publish event',
+                        upcomingEvents: 'Upcoming Events',
+                        homeUpdates: 'Home Updates',
+                        latestNews: 'Latest News',
+                        refresh: 'Refresh',
+                        noEvents: 'No events yet',
+                        viewDetails: 'View details',
+                        communityTitle: 'Play. Connect. Improve.',
+                        communityText: 'Be part of the GDSQ community!',
+                        back: 'Back',
+                        viewDetails: 'View details',
+                        spotsLeft: 'Spots Left',
+                        spots: 'spots',
+                        full: 'Full',
+                        joined: 'joined',
+                        waitlist: 'Waitlist',
+                        joinedPlayers: 'Joined Players',
+                        noJoinedPlayers: 'No joined players yet',
+                        courts: 'courts',
+                        playersPerCourt: 'players per court approx.',
+                        rsvpGroupTitle: 'Join with friends',
+                        rsvpGroupHelp: 'Reserve spots for yourself and friends.',
+                        totalSpots: 'Total spots',
+                        you: 'You',
+                        yourSpot: 'Your spot',
+                        friendName: 'Friend name',
+                        addFriend: 'Add friend',
+                        friends: 'friends',
+                        addedBy: 'by',
+                        guestSaveNote: 'Friends will be saved and counted as real spots.',
+                        confirmRsvp: 'Confirm RSVP',
+                        payDepositJoin: 'Pay deposit & join',
+                        confirming: 'Confirming...',
+                        confirmed: 'Confirmed',
+                        waitlisted: 'Waitlisted',
+                        cancel: 'Cancel',
+                        cancelling: 'Cancelling...',
+                        loadingEvent: 'Loading event details...',
+                        loadingEvents: 'Loading events...',
+                        dateTba: 'Date TBA',
+                        timeTba: 'Time TBA',
+                        priceTba: 'Price TBA',
+                        locationTba: 'Location TBA',
+                        socialPlay: 'Social Play',
+                        perPerson: 'Per Person',
+                        skillLevel: 'Skill Level',
+                        aboutEvent: 'About This Event',
+                        defaultDescription: 'Join us for a fun and friendly pickleball session. Good rallies, good people, and great vibes.',
+                        liffMissing: 'LINE LIFF ID is not configured.',
+                        loggedIn: 'Logged in with LINE',
+                        waitingLine: 'Please wait while LINE loads your profile.',
+                        confirmingRsvp: 'Confirming RSVP...',
+                        rsvpFailed: 'Unable to confirm RSVP. Please try again.',
+                        cancellingRsvp: 'Cancelling RSVP...',
+                        cancelFailed: 'Unable to cancel RSVP. Please try again.',
+                        waitlistPromoted: 'The first waitlist player was promoted automatically.',
+                        lineFailed: 'LINE connection failed',
+                        phoneNotSet: 'Phone not set',
+                        noPlayers: 'No players yet',
+                        noRankings: 'No rankings yet',
+                        eventsJoined: 'joined events',
+                        totalPlayers: 'Total Players',
+                        latestMember: 'Latest Member',
+                        displayName: 'Display name',
+                        phone: 'Phone',
+                        profileImageUrl: 'Profile image URL',
+                        profileImageHelp: 'Use your LINE image automatically, or paste a Google Drive/image URL.',
+                        saveProfile: 'Save Profile',
+                        saving: 'Saving...',
+                        profileSaved: 'Profile saved',
+                        profileSaveFailed: 'Unable to save profile',
+                        lineLoginRequired: 'Please connect LINE before saving your profile',
+                        lineLinked: 'Linked with LINE',
+                        lineNotLinked: 'LINE not linked',
+                        shareToLine: 'Share to LINE',
+                        shareText: 'Join this pickleball event with me',
+                        copiedLink: 'Link copied'
+                        ,
+                        payment: 'Payment',
+                        amountDue: 'Amount due',
+                        depositPayment: 'Deposit to confirm your spot',
+                        finalPayment: 'Post-game payment',
+                        finalAmountDue: 'Final amount due',
+                        finalPaymentNotOpened: 'Final payment not opened',
+                        finalPaymentSubmitted: 'Final slip submitted',
+                        finalPaymentPaid: 'Fully paid',
+                        amountPaid: 'Amount paid',
+                        payerName: 'Payer name',
+                        paymentNote: 'Note',
+                        payNow: 'Pay Now',
+                        hidePayment: 'Hide payment',
+                        bank: 'Bank',
+                        accountName: 'Account name',
+                        accountNumber: 'Account number',
+                        chooseSlip: 'Choose slip image',
+                        slipUploadHelp: 'Stored in Supabase Storage',
+                        submitPayment: 'Submit Payment',
+                        uploadingSlip: 'Uploading...',
+                        viewSlip: 'View Slip',
+                        paymentPending: 'Pending',
+                        paymentSubmitted: 'Submitted',
+                        paymentPaid: 'Paid',
+                        paymentSubmitFailed: 'Unable to submit payment',
+                        slipTooLarge: 'Slip image must be under 10 MB',
+                        paymentSubmittedMessage: 'Slip submitted. Your spot is confirmed. The host can review it later.',
+                        paymentRequiredBeforeJoin: 'Payment required before joining',
+                        slipRequiredToJoin: 'Please upload your payment slip to confirm your RSVP.',
+                        paymentThenConfirmed: 'Slip submitted. RSVP confirmed.',
+                        myHostedEvents: 'My hosted events',
+                        hostManageHelp: 'Edit your own events and review payment slips.',
+                        manage: 'Manage',
+                        noHostedEvents: 'No hosted events yet',
+                        editEvent: 'Edit event',
+                        saveEvent: 'Save Event',
+                        eventSaved: 'Event saved',
+                        eventSaveFailed: 'Unable to save event',
+                        paymentSlips: 'Payment slips',
+                        markPaid: 'Paid',
+                        markPending: 'Pending',
+                        noPaymentsYet: 'No payments yet',
+                        hostPaymentUpdated: 'Payment status updated',
+                        pendingVotes: 'Pending Votes',
+                        voteNow: 'Vote',
+                        noPendingVotes: 'No pending votes',
+                        eventHistory: 'Event History',
+                        noHistory: 'No event history yet',
+                        hosted: 'Hosted',
+                        scoreBreakdown: 'Score breakdown',
+                        noVotesYet: 'No votes yet',
+                        shareProfile: 'Share Profile',
+                        noUpcomingForPlayer: 'No upcoming events',
+                        playedTogether: 'Played together',
+                        eventsTogether: 'events together',
+                        noPlayedTogether: 'No played-together data yet',
+                        thisWeek: 'This Week',
+                        thisMonth: 'This Month',
+                        allTime: 'All Time',
+                        overall: 'Overall',
+                        myStats: 'My stats',
+                        viewPublicProfile: 'View public profile',
+                        endedEvent: 'Ended',
+                        upcomingEvent: 'Upcoming',
+                        eventEnded: 'Event ended',
+                        voteHelp: 'Rate players from this event for rankings.',
+                        voteOnlyJoined: 'Only joined players can vote after the event ends.',
+                        choosePlayerToVote: 'Choose a player to vote',
+                        voteMvp: 'MVP / Best Player',
+                        voteSportsmanship: 'Sportsmanship',
+                        voteTeamwork: 'Team Player',
+                        voteSkill: 'Skill',
+                        voteVibes: 'Good Vibes',
+                        voteNote: 'Short note (optional)',
+                        submitVote: 'Submit Vote',
+                        voteSaved: 'Vote saved',
+                        voteFailed: 'Unable to save vote',
+                        voteResults: 'Vote Results',
+                        votes: 'votes'
+                    }
+                },
+
+                t(key) {
+                    return this.translations[this.language][key] || this.translations.en[key] || key;
+                },
+
+                toggleLanguage() {
+                    this.language = this.language === 'th' ? 'en' : 'th';
+                    localStorage.setItem('gdsqLanguage', this.language);
+                },
+
+                flashSection(sectionId) {
+                    this.sectionHighlightId = sectionId;
+                    window.clearTimeout(this.sectionHighlightTimer);
+                    this.sectionHighlightTimer = window.setTimeout(() => {
+                        if (this.sectionHighlightId === sectionId) {
+                            this.sectionHighlightId = '';
+                        }
+                    }, 1800);
+                },
+
+                scrollToSection(sectionId, attempt = 0) {
+                    const target = document.getElementById(sectionId);
+                    if (!target) {
+                        if (attempt < 10) {
+                            requestAnimationFrame(() => this.scrollToSection(sectionId, attempt + 1));
+                        }
+                        return;
+                    }
+
+                    const targetStyle = window.getComputedStyle(target);
+                    if (targetStyle.display === 'none' || targetStyle.visibility === 'hidden') {
+                        if (attempt < 10) {
+                            requestAnimationFrame(() => this.scrollToSection(sectionId, attempt + 1));
+                        }
+                        return;
+                    }
+
+                    const header = document.querySelector('header.sticky');
+                    const headerHeight = header ? header.getBoundingClientRect().height : 0;
+                    const extraOffset = 16;
+                    const absoluteTop = window.scrollY + target.getBoundingClientRect().top - headerHeight - extraOffset;
+
+                    window.scrollTo({
+                        top: Math.max(0, absoluteTop),
+                        behavior: 'smooth'
+                    });
+                    this.flashSection(sectionId);
+                },
+
+                queueSectionScroll(sectionId) {
+                    console.debug('public-nav:queue-scroll', {
+                        sectionId,
+                        activeTab: this.activeTab,
+                        selectedSessionId: this.selectedSessionId
+                    });
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            window.setTimeout(() => this.scrollToSection(sectionId), 80);
+                        });
+                    });
+                },
+
+                scrollToEvents() {
+                    this.goToHomeShortcut('events');
+                },
+
+                homeShortcutClass(sectionName) {
+                    return this.homeShortcutActive === sectionName ? 'text-gdsq' : 'text-gray-500';
+                },
+
+                goToHomeShortcut(sectionName) {
+                    const targetMap = {
+                        events: 'events',
+                        players: 'players',
+                        rankings: 'rankings',
+                        shop: 'shop'
+                    };
+                    const targetSectionId = targetMap[sectionName] || 'events';
+
+                    this.homeShortcutActive = sectionName;
+                    this.activeTab = sectionName;
+                    this.selectedSessionId = '';
+                    this.guestNames = [];
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
+                    window.history.pushState({}, '', '/');
+
+                    if (sectionName === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
+                    if (sectionName === 'players') this.loadPlayers();
+                    if (sectionName === 'rankings') this.loadRankings();
+
+                    this.queueSectionScroll(targetSectionId);
+                    window.setTimeout(() => this.scrollToSection(targetSectionId), 320);
+                },
+
+                handleBack() {
+                    if (this.selectedSessionId) {
+                        this.showEventList();
+                        return;
+                    }
+
+                    if (this.activeTab === 'playerDetail') {
+                        this.setTab(this.previousTab || 'players', this.previousTab === 'profile' ? 'profile' : 'players');
+                        return;
+                    }
+
+                    this.setTab('home', 'home');
+                },
+
+                setTab(tab, sectionId = '') {
+                    this.activeTab = tab;
+                    if (['events', 'players', 'rankings', 'shop'].includes(tab)) {
+                        this.homeShortcutActive = tab;
+                    } else if (tab === 'home') {
+                        this.homeShortcutActive = 'events';
+                    }
+                    this.selectedSessionId = '';
+                    this.guestNames = [];
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
+                    window.history.pushState({}, '', '/');
+
+                    if (tab === 'players') this.loadPlayers();
+                    if (tab === 'rankings') this.loadRankings();
+                    if (tab === 'events' && this.eventViewMode === 'past') this.loadPastSessions();
+                    if (tab === 'profile') {
+                        this.loadProfile();
+                        this.loadProfileHistory();
+                        this.loadHostSessions();
+                    }
+                    if (tab === 'create' && !this.lineUid) {
+                        this.createMessageType = 'error';
+                        this.createMessage = this.t('lineLoginRequired');
+                    }
+
+                    const targetSectionId = sectionId || (tab === 'home' ? 'home' : tab);
+                    this.queueSectionScroll(targetSectionId);
+                },
+
+                togglePaymentPanel() {
+                    this.showPaymentPanel = !this.showPaymentPanel;
+                    if (this.showPaymentPanel) {
+                        this.queueSectionScroll('payment');
+                    }
+                },
+
+                openFinalPaymentPanel() {
+                    this.showPaymentPanel = true;
+                    this.paymentForm.amountPaid = this.finalPaymentDueDisplay || '';
+                    this.paymentForm.phase = 'final';
+                    this.queueSectionScroll('payment');
+                },
+
+                visibleSectionId() {
+                    const map = {
+                        home: 'home',
+                        events: 'events',
+                        players: 'players',
+                        rankings: 'rankings',
+                        create: 'create-event',
+                        profile: 'profile',
+                        playerDetail: 'player-detail',
+                        shop: 'shop'
+                    };
+                    return map[this.activeTab] || 'home';
+                },
+
+                imageUrl(url) {
+                    if (!url) return '';
+                    const text = String(url).trim();
+                    const match = text.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([^/?&]+)/);
+                    if (match) {
+                        return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1200`;
+                    }
+                    return text;
+                },
+
+                get eventDateText() {
+                    if (!this.eventDate) return this.t('dateTba');
+                    return new Intl.DateTimeFormat(this.language === 'th' ? 'th-TH' : 'en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }).format(new Date(`${this.eventDate}T00:00:00`));
+                },
+
+                get priceText() {
+                    if (this.priceThb === null || this.priceThb === undefined) return this.t('priceTba');
+                    return `THB ${this.priceThb}`;
+                },
+
+                async init() {
+                    this.statusMessage = this.selectedSessionId ? this.t('loadingEvent') : this.t('loadingEvents');
+
+                    try {
+                        await this.loadSessions();
+                        if (this.selectedSessionId) await this.loadSession();
+                        if (this.initialPlayerProfileId) await this.openPlayerProfile(this.initialPlayerProfileId);
+
+                        const configResponse = await fetch('/api/config');
+                        const config = await configResponse.json();
+                        this.homeBannerUrl = config.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
+                        this.applyDefaultEventSettings(config.settings?.defaultEventSettings || {});
+                        await this.loadHomeFeedBanners();
+                        this.hideAppLoader();
+                        window.addEventListener('resize', () => {
+                            this.currentHomeFeedIndex = Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
+                        });
+
+                        if (!config.liffId) {
+                            this.statusMessage = this.t('liffMissing');
+                            return;
+                        }
+
+                        this.liffId = config.liffId;
+                        await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: true });
+
+                        if (!liff.isLoggedIn()) {
+                            liff.login({ redirectUri: window.location.origin + window.location.pathname + window.location.search });
+                            return;
+                        }
+
+                        const profile = await liff.getProfile();
+                        this.lineUid = profile.userId;
+                        this.displayName = profile.displayName;
+                        this.profile.displayName = profile.displayName || '';
+                        this.profile.profileImageUrl = profile.pictureUrl || '';
+                        this.statusMessage = `${this.t('loggedIn')}: ${this.displayName}`;
+                        await this.saveProfile(true);
+                        await this.loadProfile();
+                        await this.loadProfileHistory();
+                        await this.loadMyPlayerStats();
+                        await this.loadHostSessions();
+                        await this.loadPlayers();
+                        await this.loadSessions();
+                        if (this.selectedSessionId) await this.loadSession();
+                        this.startAutoRefresh();
+                    } catch (error) {
+                        console.error('LIFF initialization error:', error);
+                        this.statusMessage = `${this.t('lineFailed')}: ${error.message || ''}`;
+                    } finally {
+                        this.hideAppLoader();
+                    }
+                },
+
+                hideAppLoader() {
+                    document.body.classList.add('app-ready');
+                },
+
+                async loadSessions() {
+                    const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
+                    const response = await fetch(`/api/public/sessions${params}`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load sessions');
+
+                    this.sessions = result.sessions || [];
+                },
+
+                async loadHomeFeedBanners() {
+                    try {
+                        const response = await fetch('/api/public/home-banners');
+                        const result = await response.json();
+
+                        if (!response.ok) throw new Error(result.message || 'Failed to load home banners');
+
+                        this.homeFeedBanners = result.banners || [];
+                        this.startHomeFeedCarousel(true);
+                    } catch (error) {
+                        console.error('Home banners load error:', error);
+                        this.homeFeedBanners = [];
+                    }
+                },
+
+                async loadPastSessions() {
+                    const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
+                    const response = await fetch(`/api/public/past-sessions${params}`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load past sessions');
+
+                    this.pastSessions = result.sessions || [];
+                },
+
+                startHomeFeedCarousel(resetIndex = false) {
+                    if (this.homeFeedTimer) clearInterval(this.homeFeedTimer);
+                    if (resetIndex) this.currentHomeFeedIndex = 0;
+                    if (this.homeFeedBanners.length <= this.homeFeedVisibleCount) return;
+
+                    this.homeFeedTimer = setInterval(() => {
+                        this.currentHomeFeedIndex = this.currentHomeFeedIndex >= this.homeFeedMaxIndex
+                            ? 0
+                            : this.currentHomeFeedIndex + 1;
+                    }, 4000);
+                },
+
+                pauseHomeFeedCarousel() {
+                    if (this.homeFeedTimer) clearInterval(this.homeFeedTimer);
+                },
+
+                resumeHomeFeedCarousel() {
+                    this.startHomeFeedCarousel(false);
+                },
+
+                goToHomeFeedPage(index) {
+                    this.currentHomeFeedIndex = Math.max(0, Math.min(index, this.homeFeedMaxIndex));
+                    this.startHomeFeedCarousel(false);
+                },
+
+                applyDefaultEventSettings(defaults) {
+                    this.createEventForm.maxPlayers = defaults.maxPlayers ?? this.createEventForm.maxPlayers;
+                    this.createEventForm.courtCount = defaults.courtCount ?? this.createEventForm.courtCount;
+                    this.createEventForm.priceThb = defaults.priceThb ?? this.createEventForm.priceThb;
+                    this.createEventForm.paymentMode = defaults.paymentMode || this.createEventForm.paymentMode;
+                    this.createEventForm.depositAmountThb = defaults.depositAmountThb ?? this.createEventForm.depositAmountThb;
+                    this.createEventForm.estimatedTotalThb = defaults.estimatedTotalThb ?? this.createEventForm.estimatedTotalThb;
+                    this.createEventForm.finalAmountThb = defaults.finalAmountThb ?? this.createEventForm.finalAmountThb;
+                    this.createEventForm.paymentNotePublic = defaults.paymentNotePublic || this.createEventForm.paymentNotePublic;
+                    this.createEventForm.location = defaults.location || this.createEventForm.location;
+                    this.createEventForm.address = defaults.address || this.createEventForm.address;
+                    this.createEventForm.skillLevel = defaults.skillLevel || this.createEventForm.skillLevel;
+                    this.createEventForm.paymentQrUrl = defaults.paymentQrUrl || this.createEventForm.paymentQrUrl;
+                    this.createEventForm.paymentBankName = defaults.paymentBankName || this.createEventForm.paymentBankName;
+                    this.createEventForm.paymentAccountName = defaults.paymentAccountName || this.createEventForm.paymentAccountName;
+                    this.createEventForm.paymentAccountNumber = defaults.paymentAccountNumber || this.createEventForm.paymentAccountNumber;
+                    this.createEventForm.paymentPromptPayId = defaults.paymentPromptPayId || this.createEventForm.paymentPromptPayId;
+                },
+
+                async loadPlayers() {
+                    const response = await fetch('/api/players');
+                    const result = await response.json();
+                    if (response.ok) this.players = result.players || [];
+                },
+
+                async loadRankings() {
+                    const params = new URLSearchParams({
+                        period: this.rankingPeriod,
+                        category: this.rankingCategory
+                    });
+                    const response = await fetch(`/api/rankings?${params.toString()}`);
+                    const result = await response.json();
+                    if (response.ok) this.rankings = result.rankings || [];
+                },
+
+                rankingPeriodLabel(period) {
+                    if (period === 'week') return this.t('thisWeek');
+                    if (period === 'month') return this.t('thisMonth');
+                    return this.t('allTime');
+                },
+
+                rankingCategoryLabel(category) {
+                    const labels = {
+                        overall: this.t('overall'),
+                        mvp: 'MVP',
+                        sportsmanship: this.t('voteSportsmanship'),
+                        teamwork: this.t('voteTeamwork'),
+                        skill: this.t('voteSkill'),
+                        vibes: this.t('voteVibes')
+                    };
+                    return labels[category] || category;
+                },
+
+                async openPlayerProfile(playerId) {
+                    if (!playerId) return;
+
+                    this.previousTab = this.selectedSessionId ? 'events' : (this.activeTab === 'playerDetail' ? this.previousTab : this.activeTab);
+                    this.selectedSessionId = '';
+                    this.activeTab = 'playerDetail';
+                    this.isLoading = true;
+                    this.statusMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/players/${encodeURIComponent(playerId)}`);
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || 'Unable to load player');
+                        this.selectedPlayer = result.player || {};
+                        window.history.pushState({}, '', `/?playerId=${encodeURIComponent(playerId)}`);
+                        this.queueSectionScroll('player-detail');
+                    } catch (error) {
+                        this.statusMessage = error.message || 'Unable to load player';
+                        this.activeTab = this.previousTab || 'players';
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                playerScoreRows() {
+                    return [
+                        { label: this.t('voteMvp'), value: this.selectedPlayer.mvpAverage },
+                        { label: this.t('voteSportsmanship'), value: this.selectedPlayer.sportsmanshipAverage },
+                        { label: this.t('voteTeamwork'), value: this.selectedPlayer.teamworkAverage },
+                        { label: this.t('voteSkill'), value: this.selectedPlayer.skillAverage },
+                        { label: this.t('voteVibes'), value: this.selectedPlayer.vibesAverage }
+                    ];
+                },
+
+                badgeIcon(key) {
+                    const icons = {
+                        mvp: 'fa-trophy',
+                        fairPlay: 'fa-handshake',
+                        teamPlayer: 'fa-users',
+                        goodVibes: 'fa-face-smile',
+                        regular: 'fa-calendar-check',
+                        host: 'fa-bullhorn'
+                    };
+                    return icons[key] || 'fa-star';
+                },
+
+                badgeClass(key) {
+                    const classes = {
+                        mvp: 'bg-yellow-50 text-yellow-700',
+                        fairPlay: 'bg-green-50 text-green-700',
+                        teamPlayer: 'bg-blue-50 text-gdsq',
+                        goodVibes: 'bg-pink-50 text-pink-700',
+                        regular: 'bg-purple-50 text-purple-700',
+                        host: 'bg-red-50 text-gdsqRed'
+                    };
+                    return classes[key] || 'bg-gray-100 text-gray-700';
+                },
+
+                async shareProfile() {
+                    if (!this.selectedPlayer?.id) return;
+                    const url = `${window.location.origin}/?playerId=${encodeURIComponent(this.selectedPlayer.id)}&v=${Date.now()}`;
+                    const text = `${this.t('shareProfile')}: ${this.selectedPlayer.displayName || 'GDSQ Player'}`;
+
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: this.selectedPlayer.displayName || 'GDSQ Player',
+                            text,
+                            url
+                        });
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                myScoreRows() {
+                    return [
+                        { label: this.t('voteMvp'), value: this.myPlayerStats.mvpAverage },
+                        { label: this.t('voteSportsmanship'), value: this.myPlayerStats.sportsmanshipAverage },
+                        { label: this.t('voteTeamwork'), value: this.myPlayerStats.teamworkAverage },
+                        { label: this.t('voteSkill'), value: this.myPlayerStats.skillAverage },
+                        { label: this.t('voteVibes'), value: this.myPlayerStats.vibesAverage }
+                    ];
+                },
+
+                async loadProfileHistory() {
+                    if (!this.lineUid) return;
+                    const response = await fetch(`/api/profile/history?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+                    if (!response.ok) return;
+                    this.profileHistory = result.attended || [];
+                    this.pendingVotes = result.pendingVotes || [];
+                },
+
+                resetCreateEventForm() {
+                    this.createEventForm = {
+                        title: '',
+                        skillLevel: 'Social Play',
+                        description: '',
+                        eventDate: '',
+                        startTime: '',
+                        endTime: '',
+                        location: '',
+                        address: '',
+                        maxPlayers: 16,
+                        courtCount: 2,
+                        priceThb: 250,
+                        paymentMode: 'deposit_then_final',
+                        depositAmountThb: 100,
+                        estimatedTotalThb: 250,
+                        finalAmountThb: '',
+                        paymentNotePublic: 'มัดจำเพื่อกัน no-show ส่วนต่างชำระหลังจบกิจกรรม',
+                        posterUrl: '',
+                        paymentQrUrl: '',
+                        paymentBankName: '',
+                        paymentAccountName: '',
+                        paymentAccountNumber: '',
+                        paymentPromptPayId: ''
+                    };
+                },
+
+                async publishEvent() {
+                    if (!this.lineUid) {
+                        this.createMessageType = 'error';
+                        this.createMessage = this.t('lineLoginRequired');
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.createMessage = '';
+                    this.createMessageType = 'success';
+
+                    try {
+                        const response = await fetch('/api/public/sessions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...this.createEventForm,
+                                lineUid: this.lineUid,
+                                displayName: this.profile.displayName || this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('eventPublishFailed'));
+                        }
+
+                        this.createMessage = this.t('eventPublished');
+                        this.resetCreateEventForm();
+                        await this.loadSessions();
+                        await this.selectSession(result.session.id);
+                    } catch (error) {
+                        this.createMessageType = 'error';
+                        this.createMessage = error.message || this.t('eventPublishFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async loadHostSessions() {
+                    if (!this.lineUid) return;
+                    const response = await fetch(`/api/host/sessions?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+                    if (response.ok) {
+                        this.myHostSessions = result.sessions || [];
+                    }
+                },
+
+                editHostedEvent(session) {
+                    this.hostMessage = '';
+                    this.hostEditForm = {
+                        id: session.id,
+                        title: session.title || '',
+                        skillLevel: session.skillLevel || 'Social Play',
+                        description: session.description || '',
+                        eventDate: session.eventDate || '',
+                        startTime: session.startTime ? session.startTime.slice(0, 5) : '',
+                        endTime: session.endTime ? session.endTime.slice(0, 5) : '',
+                        location: session.location || '',
+                        address: session.address || '',
+                        maxPlayers: session.maxPlayers || 16,
+                        courtCount: session.courtCount || 1,
+                        priceThb: session.priceThb ?? 0,
+                        paymentMode: session.paymentMode || 'deposit_then_final',
+                        depositAmountThb: session.depositAmountThb ?? session.priceThb ?? 0,
+                        estimatedTotalThb: session.estimatedTotalThb ?? session.priceThb ?? 0,
+                        finalAmountThb: session.finalAmountThb ?? '',
+                        paymentNotePublic: session.paymentNotePublic || '',
+                        posterUrl: session.posterUrl || '',
+                        paymentQrUrl: session.paymentQrUrl || '',
+                        paymentBankName: session.paymentBankName || '',
+                        paymentAccountName: session.paymentAccountName || '',
+                        paymentAccountNumber: session.paymentAccountNumber || '',
+                        paymentPromptPayId: session.paymentPromptPayId || ''
+                    };
+                    this.loadHostRsvps(session.id);
+                },
+
+                async saveHostedEvent() {
+                    if (!this.lineUid || !this.hostEditForm.id) return;
+                    this.isLoading = true;
+                    this.hostMessage = '';
+                    this.hostMessageType = 'success';
+
+                    try {
+                        const response = await fetch(`/api/host/sessions/${encodeURIComponent(this.hostEditForm.id)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ...this.hostEditForm,
+                                lineUid: this.lineUid
+                            })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('eventSaveFailed'));
+
+                        this.hostMessage = this.t('eventSaved');
+                        await this.loadHostSessions();
+                        await this.loadSessions();
+                        if (this.selectedSessionId === this.hostEditForm.id) await this.loadSession();
+                    } catch (error) {
+                        this.hostMessageType = 'error';
+                        this.hostMessage = error.message || this.t('eventSaveFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async loadHostRsvps(sessionId) {
+                    if (!this.lineUid || !sessionId) return;
+                    const response = await fetch(`/api/host/session/${encodeURIComponent(sessionId)}/rsvps?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+                    if (response.ok) {
+                        this.hostRsvps = result.rsvps || [];
+                    }
+                },
+
+                async updateHostPaymentStatus(rsvpId, status, amountPaid) {
+                    if (!this.lineUid || !this.hostEditForm.id) return;
+                    this.hostMessage = '';
+                    this.hostMessageType = 'success';
+
+                    try {
+                        const response = await fetch(`/api/host/session/${encodeURIComponent(this.hostEditForm.id)}/rsvps/${encodeURIComponent(rsvpId)}/payment`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                status,
+                                amountPaid
+                            })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('paymentSubmitFailed'));
+
+                        this.hostMessage = this.t('hostPaymentUpdated');
+                        await this.loadHostRsvps(this.hostEditForm.id);
+                        await this.loadHostSessions();
+                    } catch (error) {
+                        this.hostMessageType = 'error';
+                        this.hostMessage = error.message || this.t('paymentSubmitFailed');
+                    }
+                },
+
+                async loadProfile() {
+                    if (!this.lineUid) return;
+
+                    const response = await fetch(`/api/profile?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+
+                    if (response.ok && result.user) {
+                        this.currentUserId = result.user.id || '';
+                        this.profile.displayName = result.user.displayName || this.displayName || '';
+                        this.profile.phone = result.user.phone || '';
+                        this.profile.profileImageUrl = result.user.profileImageUrl || this.profile.profileImageUrl || '';
+                        await this.loadMyPlayerStats();
+                    }
+                },
+
+                async loadMyPlayerStats() {
+                    if (!this.currentUserId) return;
+                    const response = await fetch(`/api/players/${encodeURIComponent(this.currentUserId)}`);
+                    const result = await response.json();
+                    if (response.ok && result.player) {
+                        this.myPlayerStats = result.player;
+                    }
+                },
+
+                async saveProfile(silent = false) {
+                    if (!this.lineUid) {
+                        if (!silent) {
+                            this.profileMessageType = 'error';
+                            this.profileMessage = this.t('lineLoginRequired');
+
+                            if (window.liff && !liff.isLoggedIn()) {
+                                liff.login({ redirectUri: window.location.href });
+                            }
+                        }
+                        return;
+                    }
+
+                    if (!silent) {
+                        this.isLoading = true;
+                        this.profileMessage = '';
+                    }
+
+                    try {
+                        const response = await fetch('/api/profile', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                displayName: this.profile.displayName || this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || this.t('profileSaveFailed'));
+                        }
+
+                        this.displayName = result.user.displayName || this.displayName;
+                        this.currentUserId = result.user.id || this.currentUserId;
+                        if (!silent) {
+                            this.profileMessageType = 'success';
+                            this.profileMessage = this.t('profileSaved');
+                        }
+                        await this.loadMyPlayerStats();
+                        await this.loadPlayers();
+                        await this.loadRankings();
+                    } catch (error) {
+                        if (!silent) {
+                            this.profileMessageType = 'error';
+                            this.profileMessage = error.message || this.t('profileSaveFailed');
+                        }
+                    } finally {
+                        if (!silent) {
+                            this.isLoading = false;
+                        }
+                    }
+                },
+
+                startAutoRefresh() {
+                    if (this.refreshTimer) return;
+                    this.refreshTimer = setInterval(async () => {
+                        if (document.hidden) return;
+                        if (this.isLoading) return;
+                        if (this.pendingJoinPayment || this.showPaymentPanel) return;
+                        if (this.activeTab === 'create' || this.activeTab === 'profile' || this.activeTab === 'playerDetail') return;
+                        await this.loadSessions();
+                        if (this.selectedSessionId) await this.loadSession();
+                    }, 10000);
+                },
+
+                async loadSession() {
+                    const params = this.lineUid ? `?lineUid=${encodeURIComponent(this.lineUid)}` : '';
+                    const response = await fetch(`/api/session/${this.selectedSessionId}${params}`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load session');
+
+                    this.applySession(result.session);
+                    await this.loadSessionPlayers();
+                },
+
+                async loadSessionPlayers() {
+                    if (!this.selectedSessionId) {
+                        this.sessionPlayers = [];
+                        return;
+                    }
+
+                    const response = await fetch(`/api/public/session/${this.selectedSessionId}/players`);
+                    const result = await response.json();
+
+                    if (!response.ok) throw new Error(result.message || 'Failed to load players');
+
+                    this.sessionPlayers = result.players || [];
+                },
+
+                applySession(session) {
+                    this.selectedSessionId = session.id;
+                    this.sessionTitle = session.title;
+                    this.eventDate = session.eventDate;
+                    this.startTime = session.startTime;
+                    this.endTime = session.endTime;
+                    this.priceThb = session.priceThb;
+                    this.paymentMode = session.paymentMode || 'deposit_then_final';
+                    this.depositAmountThb = session.depositAmountThb ?? session.priceThb ?? 0;
+                    this.estimatedTotalThb = session.estimatedTotalThb ?? session.priceThb ?? 0;
+                    this.finalAmountThb = session.finalAmountThb ?? null;
+                    this.paymentNotePublic = session.paymentNotePublic || '';
+                    this.location = session.location || '';
+                    this.address = session.address || '';
+                    this.skillLevel = session.skillLevel || '';
+                    this.description = session.description || '';
+                    this.posterUrl = session.posterUrl || '';
+                    this.sessionHost = session.host || null;
+                    this.paymentSettings = {
+                        paymentQrUrl: session.paymentQrUrl || '',
+                        paymentBankName: session.paymentBankName || '',
+                        paymentAccountName: session.paymentAccountName || '',
+                        paymentAccountNumber: session.paymentAccountNumber || '',
+                        paymentPromptPayId: session.paymentPromptPayId || ''
+                    };
+                    this.paymentQrUrl = session.paymentQrUrl || '';
+                    this.paymentBankName = session.paymentBankName || '';
+                    this.paymentAccountName = session.paymentAccountName || '';
+                    this.paymentAccountNumber = session.paymentAccountNumber || '';
+                    this.paymentPromptPayId = session.paymentPromptPayId || '';
+                    this.courtCount = session.courtCount || 1;
+                    this.maxPlayers = session.maxPlayers;
+                    this.joinedCount = session.joinedCount;
+                    this.waitlistCount = session.waitlistCount;
+                    this.spotsLeft = session.spotsLeft;
+                    this.userStatus = session.userStatus;
+                    if (this.userStatus) this.pendingJoinPayment = false;
+                    this.eventEnded = this.isEventEnded(session);
+                    this.selectedVoteUserId = '';
+                    this.resetVoteForm();
+                    if (this.userStatus && this.lineUid) this.loadPayment();
+                    if (this.eventEnded && this.lineUid) this.loadVotes();
+                },
+
+                async selectSession(sessionId) {
+                    this.selectedSessionId = sessionId;
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
+                    window.history.pushState({}, '', `/?sessionId=${encodeURIComponent(sessionId)}`);
+                    this.statusMessage = this.t('loadingEvent');
+                    await this.loadSession();
+                    this.queueSectionScroll('event-detail');
+                },
+
+                async shareEvent() {
+                    const version = Date.now();
+                    const webUrl = `${window.location.origin}/?sessionId=${encodeURIComponent(this.selectedSessionId)}&v=${version}`;
+                    const url = this.liffId
+                        ? `https://liff.line.me/${encodeURIComponent(this.liffId)}?sessionId=${encodeURIComponent(this.selectedSessionId)}&v=${version}`
+                        : webUrl;
+                    const details = [
+                        `${this.t('shareText')}: ${this.sessionTitle}`,
+                        `${this.t('date') || 'Date'}: ${this.eventDateText}`,
+                        `${this.t('time') || 'Time'}: ${this.timeRange({
+                            startTime: this.startTime,
+                            endTime: this.endTime
+                        })}`,
+                        `${this.t('price') || 'Price'}: ${this.priceText}`,
+                        `${this.t('spotsLeft')}: ${this.spotsLeft}/${this.maxPlayers}`
+                    ];
+                    const text = details.filter(Boolean).join('\n');
+
+                    if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                        await liff.shareTargetPicker([{
+                            type: 'text',
+                            text: `${text}\n${url}`
+                        }]);
+                        return;
+                    }
+
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: this.sessionTitle,
+                            text,
+                            url
+                        });
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                showEventList() {
+                    this.selectedSessionId = '';
+                    this.sessionPlayers = [];
+                    this.guestNames = [];
+                    this.pendingJoinPayment = false;
+                    this.showPaymentPanel = false;
+                    this.statusMessage = this.lineUid ? `${this.t('loggedIn')}: ${this.displayName}` : '';
+                    window.history.pushState({}, '', '/');
+                    this.queueSectionScroll(this.visibleSectionId());
+                },
+
+                addGuest() {
+                    this.guestNames.push('');
+                },
+
+                removeGuest(index) {
+                    this.guestNames.splice(index, 1);
+                },
+
+                monthText(value) {
+                    if (!value) return 'TBA';
+                    return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(`${value}T00:00:00`));
+                },
+
+                dayText(value) {
+                    if (!value) return '--';
+                    return new Intl.DateTimeFormat('en-US', { day: '2-digit' }).format(new Date(`${value}T00:00:00`));
+                },
+
+                weekdayText(value) {
+                    if (!value) return '';
+                    return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date(`${value}T00:00:00`));
+                },
+
+                dateShort(value) {
+                    if (!value) return this.t('dateTba');
+                    return new Intl.DateTimeFormat(this.language === 'th' ? 'th-TH' : 'en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                    }).format(new Date(`${value}T00:00:00`));
+                },
+
+                timeRange(session) {
+                    const start = session.startTime ? session.startTime.slice(0, 5) : this.t('timeTba');
+                    const end = session.endTime ? ` - ${session.endTime.slice(0, 5)}` : '';
+                    return `${start}${end}`;
+                },
+
+                isEventEnded(session) {
+                    if (!session?.eventDate) return false;
+                    const endTime = session.endTime || '23:59:59';
+                    return new Date(`${session.eventDate}T${endTime}+07:00`).getTime() < Date.now();
+                },
+
+                courtText(session) {
+                    const count = Number(session.courtCount || 1);
+                    return `${count} ${this.t('courts')}`;
+                },
+
+                playersPerCourtText(session) {
+                    const courtCount = Number(session.courtCount || 1);
+                    const maxPlayers = Number(session.maxPlayers || 0);
+                    if (!courtCount || !maxPlayers) return '';
+                    return `${Math.ceil(maxPlayers / courtCount)} ${this.t('playersPerCourt')}`;
+                },
+
+                moneyText(value) {
+                    const amount = Number(value || 0);
+                    return `THB ${amount.toLocaleString()}`;
+                },
+
+                paymentStatusLabel(status) {
+                    if (status === 'Paid') return this.t('paymentPaid');
+                    if (status === 'Submitted') return this.t('paymentSubmitted');
+                    return this.t('paymentPending');
+                },
+
+                finalPaymentStatusLabel(status) {
+                    if (status === 'Paid') return this.t('finalPaymentPaid');
+                    if (status === 'Submitted') return this.t('finalPaymentSubmitted');
+                    if (status === 'NotOpened') return this.t('finalPaymentNotOpened');
+                    return this.t('paymentPending');
+                },
+
+                paymentStatusClass(status) {
+                    if (status === 'Paid') return 'bg-green-50 text-green-700';
+                    if (status === 'Submitted') return 'bg-blue-50 text-gdsq';
+                    return 'bg-yellow-50 text-yellow-700';
+                },
+
+                skillClass(level) {
+                    const text = String(level || '').toLowerCase();
+                    if (text.includes('beginner')) return 'bg-green-50 text-green-700';
+                    if (text.includes('advanced') || text.includes('competitive')) return 'bg-red-50 text-gdsqRed';
+                    return 'bg-blue-50 text-gdsq';
+                },
+
+                playerAvatar(player) {
+                    return this.imageUrl(player.profileImageUrl) || `https://ui-avatars.com/api/?background=0044CC&color=fff&name=${encodeURIComponent(player.displayName || 'GDSQ')}`;
+                },
+
+                rsvpAvatar(player) {
+                    const user = player.user || {};
+                    return this.imageUrl(user.profileImageUrl) || `https://ui-avatars.com/api/?background=0044CC&color=fff&name=${encodeURIComponent(user.displayName || 'GDSQ')}`;
+                },
+
+                statusLabel(status) {
+                    return status === 'Joined' ? this.t('confirmed') : this.t('waitlisted');
+                },
+
+                resetVoteForm() {
+                    this.voteForm = {
+                        mvpScore: 5,
+                        sportsmanshipScore: 5,
+                        teamworkScore: 5,
+                        skillScore: 5,
+                        vibesScore: 5,
+                        note: ''
+                    };
+                },
+
+                applySelectedVote() {
+                    this.resetVoteForm();
+                    const existingVote = this.myVotes.find((vote) => vote.votedUserId === this.selectedVoteUserId);
+                    if (!existingVote) return;
+
+                    this.voteForm = {
+                        mvpScore: existingVote.mvpScore || 5,
+                        sportsmanshipScore: existingVote.sportsmanshipScore || 5,
+                        teamworkScore: existingVote.teamworkScore || 5,
+                        skillScore: existingVote.skillScore || 5,
+                        vibesScore: existingVote.vibesScore || 5,
+                        note: existingVote.note || ''
+                    };
+                },
+
+                votePlayerName(userId) {
+                    return this.votePlayers.find((player) => player.id === userId)?.displayName || 'Player';
+                },
+
+                sortedVoteSummary() {
+                    return [...this.voteSummary].sort((a, b) => b.totalAverage - a.totalAverage || b.voteCount - a.voteCount);
+                },
+
+                async loadVotes() {
+                    if (!this.lineUid || !this.selectedSessionId) return;
+                    const response = await fetch(`/api/session/${this.selectedSessionId}/votes?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const result = await response.json();
+                    if (!response.ok) return;
+
+                    this.canVote = Boolean(result.canVote);
+                    this.votePlayers = result.players || [];
+                    this.myVotes = result.myVotes || [];
+                    this.voteSummary = result.voteSummary || [];
+                },
+
+                async submitVote() {
+                    if (!this.lineUid || !this.selectedSessionId || !this.selectedVoteUserId) return;
+
+                    this.isLoading = true;
+                    this.statusMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/session/${this.selectedSessionId}/votes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                votedUserId: this.selectedVoteUserId,
+                                ...this.voteForm
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) throw new Error(result.message || this.t('voteFailed'));
+
+                        this.statusMessage = this.t('voteSaved');
+                        await this.loadVotes();
+                        await this.loadProfileHistory();
+                    } catch (error) {
+                        this.statusMessage = error.message || this.t('voteFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                resetPaymentForm() {
+                    this.paymentForm = {
+                        amountPaid: this.estimatedPaymentAmount || this.payment.amountDue || '',
+                        payerName: this.profile.displayName || this.displayName || '',
+                        note: '',
+                        fileName: '',
+                        fileType: '',
+                        slipBase64: '',
+                        previewUrl: '',
+                        phase: 'deposit'
+                    };
+                },
+
+                async loadPayment() {
+                    if (!this.lineUid || !this.selectedSessionId) return;
+                    const response = await fetch(`/api/payment?lineUid=${encodeURIComponent(this.lineUid)}&sessionId=${encodeURIComponent(this.selectedSessionId)}`);
+                    const result = await response.json();
+                    if (!response.ok || !result.payment) return;
+
+                    this.payment = {
+                        status: result.payment.status || 'Pending',
+                        amountDue: result.payment.amountDue || 0,
+                        amountPaid: result.payment.amountPaid || null,
+                        slipUrl: result.payment.slipUrl || '',
+                        finalStatus: result.payment.finalStatus || 'NotOpened',
+                        finalAmountDue: result.payment.finalAmountDue || 0,
+                        finalAmountPaid: result.payment.finalAmountPaid || null,
+                        finalSlipUrl: result.payment.finalSlipUrl || ''
+                    };
+                    if (!this.paymentForm.amountPaid) {
+                        this.paymentForm.amountPaid = this.payment.amountDue || '';
+                    }
+                    if (!this.paymentForm.payerName) {
+                        this.paymentForm.payerName = this.profile.displayName || this.displayName || '';
+                    }
+                },
+
+                handleSlipFile(event) {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+
+                    if (file.size > 10 * 1024 * 1024) {
+                        this.statusMessage = this.t('slipTooLarge');
+                        event.target.value = '';
+                        this.paymentForm.fileName = '';
+                        this.paymentForm.fileType = '';
+                        this.paymentForm.slipBase64 = '';
+                        this.paymentForm.previewUrl = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        this.paymentForm.fileName = file.name;
+                        this.paymentForm.fileType = file.type || 'image/jpeg';
+                        this.paymentForm.slipBase64 = reader.result;
+                        this.paymentForm.previewUrl = reader.result;
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                async submitPayment() {
+                    if (!this.lineUid || !this.selectedSessionId || !this.paymentForm.slipBase64) return;
+
+                    console.debug('submitPayment:start', {
+                        selectedSessionId: this.selectedSessionId,
+                        pendingJoinPayment: this.pendingJoinPayment,
+                        phase: this.paymentForm.phase,
+                        hasSlip: Boolean(this.paymentForm.slipBase64)
+                    });
+                    this.isLoading = true;
+                    this.statusMessage = '';
+
+                    try {
+                        const endpoint = this.pendingJoinPayment && !this.userStatus
+                            ? '/api/rsvp/submit-payment'
+                            : '/api/payment/submit';
+                        const response = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                sessionId: this.selectedSessionId,
+                                displayName: this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl,
+                                guestNames: this.cleanGuestNames,
+                                amountPaid: this.paymentForm.amountPaid,
+                                payerName: this.paymentForm.payerName,
+                                note: this.paymentForm.note,
+                                slipFileName: this.paymentForm.fileName,
+                                slipMimeType: this.paymentForm.fileType,
+                                slipBase64: this.paymentForm.slipBase64,
+                                phase: this.paymentForm.phase || 'deposit'
+                            })
+                        });
+                        const result = await this.readJsonResponse(response);
+
+                        if (!response.ok) throw new Error(result.message || this.t('paymentSubmitFailed'));
+
+                        this.statusMessage = this.pendingJoinPayment ? (result.message || this.t('paymentThenConfirmed')) : this.t('paymentSubmittedMessage');
+                        if (result.status) this.userStatus = result.status;
+                        if (result.paymentStatus) this.payment.status = result.paymentStatus;
+                        if (result.amountDue !== undefined) this.payment.amountDue = result.amountDue || 0;
+                        if (result.amountPaid !== undefined) this.payment.amountPaid = result.amountPaid || null;
+                        if (result.payment?.status) this.payment.status = result.payment.status;
+                        if (result.payment?.amountDue !== undefined) this.payment.amountDue = result.payment.amountDue || 0;
+                        if (result.payment?.amountPaid !== undefined) this.payment.amountPaid = result.payment.amountPaid || null;
+                        this.pendingJoinPayment = false;
+                        this.showPaymentPanel = false;
+                        this.guestNames = [];
+                        this.resetPaymentForm();
+                        await this.loadSessions();
+                        await this.loadSession();
+                        await this.loadPayment();
+                        await this.loadSessionPlayers();
+                    } catch (error) {
+                        this.statusMessage = error.message || this.t('paymentSubmitFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async readJsonResponse(response) {
+                    try {
+                        return await response.json();
+                    } catch (error) {
+                        return {
+                            success: false,
+                            message: response.ok ? '' : this.t('paymentSubmitFailed')
+                        };
+                    }
+                },
+
+                async confirmRsvp() {
+                    if (!this.lineUid) {
+                        this.statusMessage = this.t('waitingLine');
+                        return;
+                    }
+
+                    console.debug('confirmRsvp:start', {
+                        selectedSessionId: this.selectedSessionId,
+                        paymentMode: this.paymentMode,
+                        depositAmountThb: this.depositAmountThb,
+                        totalRsvpSpots: this.totalRsvpSpots
+                    });
+                    if ((this.paymentMode || 'deposit_then_final') === 'deposit_then_final' && Number(this.depositAmountThb ?? this.priceThb ?? 0) > 0) {
+                        this.pendingJoinPayment = true;
+                        this.showPaymentPanel = true;
+                        this.paymentForm.phase = 'deposit';
+                        this.payment.status = 'Pending';
+                        this.payment.amountDue = this.estimatedPaymentAmount;
+                        this.paymentForm.amountPaid = this.estimatedPaymentAmount || '';
+                        this.paymentForm.payerName = this.profile.displayName || this.displayName || '';
+                        this.statusMessage = this.t('slipRequiredToJoin');
+                        setTimeout(() => this.scrollToSection('payment'), 50);
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.statusMessage = this.t('confirmingRsvp');
+
+                    try {
+                        const response = await fetch('/api/rsvp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                displayName: this.displayName,
+                                phone: this.profile.phone,
+                                profileImageUrl: this.profile.profileImageUrl,
+                                guestNames: this.cleanGuestNames,
+                                sessionId: this.selectedSessionId
+                            })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) throw new Error(result.message || 'Failed to confirm RSVP');
+
+                        this.statusMessage = (result.promoted || []).length > 0
+                            ? `${result.message} ${this.t('waitlistPromoted')}`
+                            : result.message;
+                        this.userStatus = result.status;
+                        this.guestNames = [];
+                        this.resetPaymentForm();
+                        await this.loadSessions();
+                        await this.loadSession();
+                        await this.loadPayment();
+                    } catch (error) {
+                        console.error('RSVP error:', error);
+                        this.statusMessage = this.t('rsvpFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async cancelRsvp() {
+                    if (!this.lineUid) {
+                        this.statusMessage = this.t('waitingLine');
+                        return;
+                    }
+
+                    console.debug('cancelRsvp:start', {
+                        selectedSessionId: this.selectedSessionId,
+                        userStatus: this.userStatus
+                    });
+                    this.isLoading = true;
+                    this.statusMessage = this.t('cancellingRsvp');
+
+                    try {
+                        const response = await fetch('/api/rsvp', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ lineUid: this.lineUid, sessionId: this.selectedSessionId })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) throw new Error(result.message || 'Failed to cancel RSVP');
+
+                        this.userStatus = null;
+                        this.payment = {
+                            status: 'Pending',
+                            amountDue: 0,
+                            amountPaid: null,
+                            slipUrl: ''
+                        };
+                        this.showPaymentPanel = false;
+                        this.resetPaymentForm();
+                        this.statusMessage = result.message;
+                        await this.loadSessions();
+                        await this.loadSession();
+                    } catch (error) {
+                        console.error('Cancel RSVP error:', error);
+                        this.statusMessage = this.t('cancelFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
