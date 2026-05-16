@@ -1350,7 +1350,6 @@ async function cleanupOldPaymentSlips() {
 async function getAppSettings() {
   const fallbackSettings = {
     homeBannerUrl: defaultHomeBannerUrl,
-    homeBannerSlides: [defaultHomeBannerUrl],
     defaultEventSettings: {
       maxPlayers: 24,
       courtCount: 1,
@@ -1385,15 +1384,6 @@ async function getAppSettings() {
     for (const row of data || []) {
       if (row.key === 'home_banner_url') {
         settings.homeBannerUrl = row.value || defaultHomeBannerUrl;
-      } else if (row.key === 'home_banner_slides') {
-        try {
-          const slides = JSON.parse(row.value || '[]');
-          settings.homeBannerSlides = Array.isArray(slides) && slides.length > 0
-            ? slides.map((slide) => String(slide || '').trim()).filter(Boolean)
-            : [settings.homeBannerUrl || defaultHomeBannerUrl];
-        } catch (parseError) {
-          settings.homeBannerSlides = [settings.homeBannerUrl || defaultHomeBannerUrl];
-        }
       } else if (row.key === 'default_event_settings') {
         try {
           settings.defaultEventSettings = {
@@ -1406,10 +1396,6 @@ async function getAppSettings() {
       }
     }
 
-    if (!settings.homeBannerSlides || settings.homeBannerSlides.length === 0) {
-      settings.homeBannerSlides = [settings.homeBannerUrl || defaultHomeBannerUrl];
-    }
-
     return settings;
   } catch (error) {
     console.error('App settings load error:', error);
@@ -1417,16 +1403,20 @@ async function getAppSettings() {
   }
 }
 
-async function listHomeBanners({ activeOnly = false } = {}) {
+async function listHomeBanners({ activeOnly = false, limit = null } = {}) {
   try {
     let query = supabase
       .from('home_banners')
       .select('id, title, image_url, link_url, display_order, is_active, created_at, updated_at')
       .order('display_order', { ascending: true })
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false });
 
     if (activeOnly) {
       query = query.eq('is_active', true);
+    }
+
+    if (limit) {
+      query = query.limit(limit);
     }
 
     const { data, error } = await query;
@@ -1447,12 +1437,6 @@ async function listHomeBanners({ activeOnly = false } = {}) {
 
 async function saveAppSettings(settings) {
   const homeBannerUrl = settings.homeBannerUrl || defaultHomeBannerUrl;
-  const homeBannerSlides = Array.isArray(settings.homeBannerSlides)
-    ? settings.homeBannerSlides.map((slide) => String(slide || '').trim()).filter(Boolean)
-    : String(settings.homeBannerSlides || '')
-      .split('\n')
-      .map((slide) => slide.trim())
-      .filter(Boolean);
   const defaultEventSettings = {
     maxPlayers: Number(settings.defaultEventSettings?.maxPlayers || 24),
     courtCount: Number(settings.defaultEventSettings?.courtCount || 1),
@@ -1483,11 +1467,6 @@ async function saveAppSettings(settings) {
         updated_at: new Date().toISOString()
       },
       {
-        key: 'home_banner_slides',
-        value: JSON.stringify(homeBannerSlides.length > 0 ? homeBannerSlides : [homeBannerUrl]),
-        updated_at: new Date().toISOString()
-      },
-      {
         key: 'default_event_settings',
         value: JSON.stringify(defaultEventSettings),
         updated_at: new Date().toISOString()
@@ -1500,7 +1479,6 @@ async function saveAppSettings(settings) {
 
   return {
     homeBannerUrl,
-    homeBannerSlides: homeBannerSlides.length > 0 ? homeBannerSlides : [homeBannerUrl],
     defaultEventSettings
   };
 }
@@ -1516,13 +1494,32 @@ app.get('/api/config', async (req, res) => {
 
 app.get('/api/public/home-banners', async (req, res) => {
   try {
-    const { data, error } = await listHomeBanners({ activeOnly: true });
+    const { data, error } = await listHomeBanners({ activeOnly: true, limit: 6 });
 
     if (error) throw error;
 
+    let banners = data || [];
+    if (banners.length === 0) {
+      const settings = await getAppSettings();
+      const legacyBannerUrl = settings.homeBannerUrl || defaultHomeBannerUrl;
+
+      if (legacyBannerUrl) {
+        banners = [{
+          id: 'legacy-home-banner',
+          title: '',
+          imageUrl: legacyBannerUrl,
+          linkUrl: '',
+          displayOrder: 0,
+          isActive: true,
+          createdAt: null,
+          updatedAt: null
+        }];
+      }
+    }
+
     return res.json({
       success: true,
-      banners: data || []
+      banners
     });
   } catch (error) {
     console.error('Public home banners load error:', error);
@@ -1535,13 +1532,15 @@ app.get('/api/public/home-banners', async (req, res) => {
 
 app.get('/api/admin/home-banners', requireAdmin, async (req, res) => {
   try {
+    const settings = await getAppSettings();
     const { data, error } = await listHomeBanners();
 
     if (error) throw error;
 
     return res.json({
       success: true,
-      banners: data || []
+      banners: data || [],
+      legacyBannerUrl: settings.homeBannerUrl || defaultHomeBannerUrl
     });
   } catch (error) {
     console.error('Admin home banners load error:', error);
