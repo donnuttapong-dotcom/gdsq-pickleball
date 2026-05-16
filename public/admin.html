@@ -10,7 +10,16 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+        [x-cloak] { display: none !important; }
+        .admin-jump-target {
+            scroll-margin-top: 96px;
+        }
+        .admin-jump-highlight {
+            box-shadow: 0 0 0 3px rgba(0, 68, 204, 0.18);
+            transition: box-shadow 240ms ease;
+        }
+    </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
     <div class="mx-auto min-h-screen max-w-6xl px-4 py-6" x-data="adminDashboard()" x-init="init()">
@@ -51,7 +60,7 @@
         </div>
 
         <div x-show="isAuthenticated">
-        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div id="dashboard" class="admin-jump-target mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" :class="sectionHighlightId === 'dashboard' ? 'admin-jump-highlight rounded-2xl' : ''">
             <div>
                 <p class="text-xs font-bold uppercase tracking-wide text-gdsq">GDSQ Pickleball</p>
                 <h1 class="text-3xl font-black" x-text="t('rsvpAdmin')">RSVP Admin</h1>
@@ -66,6 +75,42 @@
                 </button>
                 <button class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50" @click="logout()">
                     <i class="fa-solid fa-right-from-bracket mr-2"></i><span x-text="t('logout')">Logout</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="home-banner" class="admin-jump-target mb-5 rounded-xl bg-white p-4 shadow-sm" :class="sectionHighlightId === 'home-banner' ? 'admin-jump-highlight' : ''">
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('quickJump')">Quick Jump</p>
+                    <h2 class="text-lg font-black" x-text="t('quickJumpHelp')">ไปยังส่วนที่ต้องการได้ทันที</h2>
+                </div>
+                <p class="text-xs font-semibold text-gray-500" x-show="jumpMessage" x-text="jumpMessage"></p>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('dashboard')">
+                    <i class="fa-solid fa-chart-line mr-2 text-gdsq"></i><span x-text="t('jumpDashboard')">Dashboard</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('event-selector')">
+                    <i class="fa-solid fa-list-check mr-2 text-gdsq"></i><span x-text="t('jumpEventSelector')">Event Selector</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('edit-event', true)">
+                    <i class="fa-solid fa-pen-to-square mr-2 text-gdsq"></i><span x-text="t('jumpEditEvent')">Edit Event</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('participants', true)">
+                    <i class="fa-solid fa-users mr-2 text-gdsq"></i><span x-text="t('jumpParticipants')">Participants</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('payment-review', true)">
+                    <i class="fa-solid fa-money-check-dollar mr-2 text-gdsq"></i><span x-text="t('jumpPaymentReview')">Payment Review</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('create-event')">
+                    <i class="fa-solid fa-plus mr-2 text-gdsq"></i><span x-text="t('jumpCreateEvent')">Create Event</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('home-banner')">
+                    <i class="fa-solid fa-image mr-2 text-gdsq"></i><span x-text="t('jumpHomeBanner')">Home Banner</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('default-settings')">
+                    <i class="fa-solid fa-sliders mr-2 text-gdsq"></i><span x-text="t('jumpDefaultSettings')">Default Settings</span>
                 </button>
             </div>
         </div>
@@ -103,75 +148,17 @@
             <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('appearance')">Appearance</p>
-                    <h2 class="text-xl font-black" x-text="t('homeBannerSettings')">Home Banner</h2>
-                    <p class="mt-1 text-sm text-gray-500" x-text="t('homeBannerHelp')">ปรับรูปแบนเนอร์หน้า Home ของแอพ</p>
-                </div>
-                <p class="rounded-full bg-gray-50 px-3 py-1 text-xs font-bold text-gray-600" x-show="settingsMessage" x-text="settingsMessage"></p>
-            </div>
-            <div class="grid gap-4 lg:grid-cols-[1fr_260px]">
-                <div class="space-y-3">
-                    <label class="block">
-                        <span class="mb-1 block text-xs font-bold uppercase text-gray-500" x-text="t('homeBannerUrl')">Home banner image URL</span>
-                        <input
-                            class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-gdsq focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            type="url"
-                            x-model="appSettings.homeBannerUrl"
-                            :placeholder="t('homeBannerUrlPlaceholder')"
-                        >
-                    </label>
-                    <label class="block">
-                        <span class="mb-1 block text-xs font-bold uppercase text-gray-500" x-text="t('homeBannerSlides')">Banner slider images</span>
-                        <textarea
-                            class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:border-gdsq focus:outline-none focus:ring-2 focus:ring-blue-100"
-                            rows="4"
-                            x-model="appSettings.homeBannerSlidesText"
-                            :placeholder="t('homeBannerSlidesPlaceholder')"
-                        ></textarea>
-                    </label>
-                    <p class="text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeBannerDriveHelp')"></p>
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                        <button
-                            class="inline-flex items-center justify-center rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50"
-                            @click="saveSettings()"
-                            :disabled="isLoading"
-                        >
-                            <i class="fa-solid fa-floppy-disk mr-2"></i><span x-text="t('saveBanner')">Save Banner</span>
-                        </button>
-                        <button
-                            class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold hover:bg-gray-50"
-                            @click="appSettings.homeBannerUrl = '/assets/gdsq-home-banner.png'"
-                        >
-                            <i class="fa-solid fa-rotate-left mr-2"></i><span x-text="t('useDefaultBanner')">Use default</span>
-                        </button>
-                    </div>
-                </div>
-                <div>
-                    <p class="mb-2 text-xs font-bold uppercase text-gray-500" x-text="t('preview')">Preview</p>
-                    <div class="overflow-hidden rounded-2xl bg-gray-100 shadow-inner">
-                        <img
-                            class="aspect-square w-full object-cover"
-                            :src="imageUrl(appSettings.homeBannerUrl || '/assets/gdsq-home-banner.png')"
-                            alt="Home banner preview"
-                            @error="$event.target.src = '/assets/gdsq-home-banner.png'"
-                        >
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
-            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('homeFeedSettings')">Home Feed</p>
-                    <h2 class="text-xl font-black" x-text="t('homeFeedManager')">Home Feed Carousel</h2>
-                    <p class="mt-1 text-sm text-gray-500" x-text="t('homeFeedHelp')">จัดการรูปการ์ดที่วิ่งในหน้า Home</p>
+                    <h2 class="text-xl font-black" x-text="t('homeBannerSettings')">Home Updates Slider</h2>
+                    <p class="mt-1 text-sm text-gray-500" x-text="t('homeBannerHelp')">รวมแบนเนอร์หน้า Home และข่าวอัปเดตไว้ในสไลด์เดียว</p>
                 </div>
                 <p class="rounded-full bg-gray-50 px-3 py-1 text-xs font-bold text-gray-600" x-show="homeBannerMessage" x-text="homeBannerMessage"></p>
             </div>
-
             <div class="grid gap-5 lg:grid-cols-[320px_1fr]">
                 <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <h3 class="text-sm font-black" x-text="homeBannerForm.id ? t('editBannerItem') : t('addBannerItem')">Add Banner Item</h3>
+                    <h3 class="text-sm font-black" x-text="homeBannerForm.id ? t('editBannerItem') : t('addBannerItem')">Add Update Item</h3>
+                    <p class="mt-2 text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeFeedHelp')">Recommended image size: 16:9 or 4:5</p>
+                    <p class="mt-1 text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeFeedMaxHelp')">Maximum active updates shown on Home: 6</p>
+                    <p class="mt-1 text-xs font-semibold leading-relaxed text-amber-700" x-show="appSettings.homeBannerUrl" x-text="t('homeBannerLegacyHelp')">Legacy main banner is kept as a fallback until you add active updates.</p>
                     <div class="mt-3 space-y-3">
                         <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('bannerTitle')" x-model="homeBannerForm.title">
                         <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="url" :placeholder="t('bannerImageUrl')" x-model="homeBannerForm.imageUrl">
@@ -220,7 +207,7 @@
             </div>
         </div>
 
-        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
+        <div id="default-settings" class="admin-jump-target mb-5 rounded-xl bg-white p-4 shadow-sm" :class="sectionHighlightId === 'default-settings' ? 'admin-jump-highlight' : ''">
             <div class="mb-4">
                 <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('defaults')">Defaults</p>
                 <h2 class="text-xl font-black" x-text="t('defaultSettings')">Default Event Settings</h2>
@@ -256,7 +243,7 @@
             </div>
         </div>
 
-        <div class="mb-5 grid gap-3 md:grid-cols-[1fr_auto]">
+        <div id="event-selector" class="admin-jump-target mb-5 grid gap-3 md:grid-cols-[1fr_auto]" :class="sectionHighlightId === 'event-selector' ? 'admin-jump-highlight rounded-2xl' : ''">
             <div class="rounded-lg bg-white p-4 shadow-sm">
                 <label class="mb-2 block text-xs font-bold uppercase text-gray-500" x-text="t('event')">Event</label>
                 <select
@@ -341,7 +328,7 @@
             </div>
         </div>
 
-        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm">
+        <div id="create-event" class="admin-jump-target mb-5 rounded-lg bg-white p-4 shadow-sm" :class="sectionHighlightId === 'create-event' ? 'admin-jump-highlight' : ''">
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="text-lg font-black" x-text="t('createEvent')">Create Event</h2>
                 <p class="text-xs font-semibold text-gray-500" x-text="formMessage"></p>
@@ -443,7 +430,7 @@
             </div>
         </div>
 
-        <div class="mb-5 rounded-lg bg-white p-4 shadow-sm" x-show="selectedSession">
+        <div id="edit-event" class="admin-jump-target mb-5 rounded-lg bg-white p-4 shadow-sm" x-show="selectedSession" :class="sectionHighlightId === 'edit-event' ? 'admin-jump-highlight' : ''">
             <div class="mb-3 flex items-center justify-between">
                 <h2 class="text-lg font-black" x-text="t('editSelectedEvent')">Edit Selected Event</h2>
                 <p class="text-xs font-semibold text-gray-500" x-text="editMessage"></p>
@@ -516,7 +503,7 @@
             </select>
         </div>
 
-        <div class="grid gap-5 lg:grid-cols-2">
+        <div id="participants" class="admin-jump-target grid gap-5 lg:grid-cols-2" :class="sectionHighlightId === 'participants' ? 'admin-jump-highlight rounded-2xl' : ''">
             <section class="rounded-lg bg-white shadow-sm">
                 <div class="border-b px-4 py-3">
                     <h2 class="font-black" x-text="t('joined')">Joined</h2>
@@ -546,7 +533,7 @@
                 </div>
             </section>
 
-            <section class="rounded-lg bg-white shadow-sm">
+            <section id="payment-review" class="admin-jump-target rounded-lg bg-white shadow-sm" :class="sectionHighlightId === 'payment-review' ? 'admin-jump-highlight' : ''">
                 <div class="border-b px-4 py-3">
                     <h2 class="font-black" x-text="t('waitlist')">Waitlist</h2>
                 </div>
@@ -648,8 +635,11 @@
                 settingsMessage: '',
                 homeBannerMessage: '',
                 errorMessage: '',
+                jumpMessage: '',
                 isLoading: false,
                 language: localStorage.getItem('gdsqLanguage') || 'th',
+                sectionHighlightId: '',
+                sectionHighlightTimer: null,
                 rsvpFilter: 'all',
                 homeBanners: [],
                 homeBannerForm: {
@@ -662,7 +652,6 @@
                 },
                 appSettings: {
                     homeBannerUrl: '/assets/gdsq-home-banner.png',
-                    homeBannerSlidesText: '/assets/gdsq-home-banner.png',
                     defaultEventSettings: {
                         maxPlayers: 24,
                         courtCount: 1,
@@ -697,21 +686,30 @@
                         pendingSlipReview: 'รอตรวจสลิป',
                         unpaidPlayers: 'ยังไม่จ่าย',
                         adminWorkflowTitle: 'วิธีใช้หลังบ้านแบบเร็ว',
+                        quickJump: 'ปุ่มลัด',
+                        quickJumpHelp: 'กดเพื่อไปยังส่วนที่ต้องการทันที',
+                        jumpDashboard: 'ภาพรวม',
+                        jumpEventSelector: 'เลือกกิจกรรม',
+                        jumpEditEvent: 'แก้กิจกรรม',
+                        jumpParticipants: 'รายชื่อผู้เล่น',
+                        jumpPaymentReview: 'ตรวจชำระเงิน',
+                        jumpCreateEvent: 'สร้างกิจกรรม',
+                        jumpHomeBanner: 'อัปเดตหน้า Home',
+                        jumpDefaultSettings: 'ค่าเริ่มต้น',
+                        selectEventFirst: 'กรุณาเลือกกิจกรรมก่อน',
+                        jumpedToSection: 'เลื่อนไปยังส่วนที่เลือกแล้ว',
                         adminStepCreate: 'สร้างหรือเลือกกิจกรรม',
                         adminStepShare: 'คัดลอกลิงก์ส่งให้ผู้เล่น',
                         adminStepPayment: 'ตรวจสลิปและกด Mark Paid',
                         adminStepExport: 'ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ',
                         appearance: 'หน้าตาแอพ',
-                        homeBannerSettings: 'แบนเนอร์หน้า Home',
-                        homeBannerHelp: 'เปลี่ยนรูปแบนเนอร์หลักหน้า Home ได้เอง ไม่ต้องแก้โค้ด',
-                        homeBannerUrl: 'ลิงก์รูปแบนเนอร์',
-                        homeBannerUrlPlaceholder: 'วางลิงก์รูป เช่น Google Drive หรือ URL รูปภาพ',
-                        homeBannerSlides: 'รูปสไลด์หน้า Home',
-                        homeBannerSlidesPlaceholder: 'วาง 1 ลิงก์ต่อ 1 บรรทัด',
-                        homeBannerDriveHelp: 'ถ้าใช้ Google Drive: อัปโหลดรูป > Share > Anyone with the link > Copy link > วางที่ช่องนี้',
-                        homeFeedSettings: 'โฮมฟีด',
-                        homeFeedManager: 'การ์ดข่าวหน้า Home',
-                        homeFeedHelp: 'เพิ่มรูปสำหรับ carousel แบบเลื่อนอัตโนมัติ',
+                        homeBannerSettings: 'Home Updates Slider',
+                        homeBannerHelp: 'รวมแบนเนอร์หน้า Home และข่าวอัปเดตไว้ในสไลด์เดียว',
+                        homeFeedSettings: 'Home Updates',
+                        homeFeedManager: 'Home Updates Slider',
+                        homeFeedHelp: 'Recommended image size: 16:9 or 4:5',
+                        homeFeedMaxHelp: 'Maximum active updates shown on Home: 6',
+                        homeBannerLegacyHelp: 'รูปแบนเนอร์หลักเดิมจะถูกใช้เป็น fallback จนกว่าจะมีรายการอัปเดตที่เปิดใช้งาน',
                         addBannerItem: 'เพิ่มแบนเนอร์',
                         editBannerItem: 'แก้แบนเนอร์',
                         bannerTitle: 'หัวข้อ',
@@ -723,26 +721,24 @@
                         addBannerButton: 'เพิ่มรายการ',
                         saveBannerItem: 'บันทึกรายการ',
                         clearForm: 'ล้างฟอร์ม',
-                        noBannerItems: 'ยังไม่มีรายการ banner',
+                        noBannerItems: 'ยังไม่มีรายการอัปเดต',
                         untitledBanner: 'ไม่มีชื่อ',
                         edit: 'แก้ไข',
                         delete: 'ลบ',
                         activate: 'เปิด',
                         deactivate: 'ปิด',
-                        bannerSaved: 'บันทึก banner แล้ว',
-                        bannerDeleted: 'ลบ banner แล้ว',
-                        bannerSaveFailed: 'บันทึก banner ไม่สำเร็จ',
-                        bannerDeleteConfirm: 'ยืนยันลบ banner นี้ไหม?',
+                        bannerSaved: 'บันทึก Home update แล้ว',
+                        bannerDeleted: 'ลบ Home update แล้ว',
+                        bannerSaveFailed: 'บันทึก Home update ไม่สำเร็จ',
+                        bannerDeleteConfirm: 'ยืนยันลบ Home update นี้ไหม?',
                         preview: 'พรีวิว',
-                        saveBanner: 'บันทึกแบนเนอร์',
-                        useDefaultBanner: 'ใช้รูปเริ่มต้น',
                         defaults: 'ค่าเริ่มต้น',
                         defaultSettings: 'ค่าเริ่มต้นเวลา Create Event',
                         defaultSettingsHelp: 'ตั้งค่าประจำไว้ เวลาแอดมินหรือผู้เล่นสร้างกิจกรรมจะกรอกง่ายขึ้น',
                         saveDefaults: 'บันทึกค่าเริ่มต้น',
                         applyToCreateForm: 'ใช้กับฟอร์มสร้าง Event',
-                        settingsSaved: 'บันทึกแบนเนอร์แล้ว',
-                        settingsFailed: 'บันทึกแบนเนอร์ไม่สำเร็จ',
+                        settingsSaved: 'บันทึกค่าเริ่มต้นแล้ว',
+                        settingsFailed: 'บันทึกค่าเริ่มต้นไม่สำเร็จ',
                         eventPage: 'หน้า Event',
                         refresh: 'รีเฟรช',
                         logout: 'ออกจากระบบ',
@@ -826,21 +822,30 @@
                         pendingSlipReview: 'Slip review',
                         unpaidPlayers: 'Unpaid',
                         adminWorkflowTitle: 'Quick admin workflow',
+                        quickJump: 'Quick Jump',
+                        quickJumpHelp: 'Jump straight to the section you need',
+                        jumpDashboard: 'Dashboard',
+                        jumpEventSelector: 'Event Selector',
+                        jumpEditEvent: 'Edit Event',
+                        jumpParticipants: 'Participants',
+                        jumpPaymentReview: 'Payment Review',
+                        jumpCreateEvent: 'Create Event',
+                        jumpHomeBanner: 'Home Updates',
+                        jumpDefaultSettings: 'Default Settings',
+                        selectEventFirst: 'Please select an event first',
+                        jumpedToSection: 'Jumped to the selected section',
                         adminStepCreate: 'Create or select an event',
                         adminStepShare: 'Copy the event link for players',
                         adminStepPayment: 'Review slips and mark paid',
                         adminStepExport: 'Download CSV when needed',
                         appearance: 'Appearance',
-                        homeBannerSettings: 'Home Banner',
-                        homeBannerHelp: 'Change the main Home banner without editing code.',
-                        homeBannerUrl: 'Banner image URL',
-                        homeBannerUrlPlaceholder: 'Paste an image link, Google Drive link, or image URL',
-                        homeBannerSlides: 'Home slider images',
-                        homeBannerSlidesPlaceholder: 'Paste one image link per line',
-                        homeBannerDriveHelp: 'For Google Drive: upload image > Share > Anyone with the link > Copy link > paste here.',
-                        homeFeedSettings: 'Home Feed',
-                        homeFeedManager: 'Home Feed Carousel',
-                        homeFeedHelp: 'Manage image cards shown on the Home carousel.',
+                        homeBannerSettings: 'Home Updates Slider',
+                        homeBannerHelp: 'Use one slider for both the old Home banner and club updates.',
+                        homeFeedSettings: 'Home Updates',
+                        homeFeedManager: 'Home Updates Slider',
+                        homeFeedHelp: 'Recommended image size: 16:9 or 4:5',
+                        homeFeedMaxHelp: 'Maximum active updates shown on Home: 6',
+                        homeBannerLegacyHelp: 'The legacy main banner stays as a fallback until you add active updates.',
                         addBannerItem: 'Add banner',
                         editBannerItem: 'Edit banner',
                         bannerTitle: 'Title',
@@ -852,26 +857,24 @@
                         addBannerButton: 'Add item',
                         saveBannerItem: 'Save item',
                         clearForm: 'Clear',
-                        noBannerItems: 'No banner items yet.',
+                        noBannerItems: 'No home updates yet.',
                         untitledBanner: 'Untitled',
                         edit: 'Edit',
                         delete: 'Delete',
                         activate: 'Activate',
                         deactivate: 'Deactivate',
-                        bannerSaved: 'Banner saved',
-                        bannerDeleted: 'Banner deleted',
-                        bannerSaveFailed: 'Unable to save banner',
-                        bannerDeleteConfirm: 'Delete this banner item?',
+                        bannerSaved: 'Home update saved',
+                        bannerDeleted: 'Home update deleted',
+                        bannerSaveFailed: 'Unable to save home update',
+                        bannerDeleteConfirm: 'Delete this home update?',
                         preview: 'Preview',
-                        saveBanner: 'Save Banner',
-                        useDefaultBanner: 'Use default',
                         defaults: 'Defaults',
                         defaultSettings: 'Default Event Settings',
                         defaultSettingsHelp: 'Save common values so new events are easier to create.',
                         saveDefaults: 'Save defaults',
                         applyToCreateForm: 'Apply to create form',
-                        settingsSaved: 'Banner saved',
-                        settingsFailed: 'Unable to save banner',
+                        settingsSaved: 'Defaults saved',
+                        settingsFailed: 'Unable to save defaults',
                         eventPage: 'Event page',
                         refresh: 'Refresh',
                         logout: 'Logout',
@@ -951,6 +954,39 @@
                 toggleLanguage() {
                     this.language = this.language === 'th' ? 'en' : 'th';
                     localStorage.setItem('gdsqLanguage', this.language);
+                },
+
+                flashSection(sectionId) {
+                    this.sectionHighlightId = sectionId;
+                    window.clearTimeout(this.sectionHighlightTimer);
+                    this.sectionHighlightTimer = window.setTimeout(() => {
+                        if (this.sectionHighlightId === sectionId) {
+                            this.sectionHighlightId = '';
+                        }
+                    }, 1800);
+                },
+
+                scrollToSection(sectionId, requiresSelectedEvent = false) {
+                    this.jumpMessage = '';
+                    this.errorMessage = '';
+
+                    if (requiresSelectedEvent && !this.selectedSessionId) {
+                        this.jumpMessage = this.t('selectEventFirst');
+                        return;
+                    }
+
+                    const target = document.getElementById(sectionId);
+                    if (!target) {
+                        this.jumpMessage = this.t('selectEventFirst');
+                        return;
+                    }
+
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                    this.flashSection(sectionId);
+                    this.jumpMessage = this.t('jumpedToSection');
                 },
 
                 imageUrl(url) {
@@ -1238,7 +1274,6 @@
 
                     const settings = result.settings || {};
                     this.appSettings.homeBannerUrl = settings.homeBannerUrl || '/assets/gdsq-home-banner.png';
-                    this.appSettings.homeBannerSlidesText = (settings.homeBannerSlides || [this.appSettings.homeBannerUrl]).join('\n');
                     this.appSettings.defaultEventSettings = {
                         ...this.appSettings.defaultEventSettings,
                         ...(settings.defaultEventSettings || {})
@@ -1259,10 +1294,6 @@
                             },
                             body: JSON.stringify({
                                 homeBannerUrl: this.appSettings.homeBannerUrl,
-                                homeBannerSlides: this.appSettings.homeBannerSlidesText
-                                    .split('\n')
-                                    .map((slide) => slide.trim())
-                                    .filter(Boolean),
                                 defaultEventSettings: this.appSettings.defaultEventSettings
                             })
                         });
@@ -1273,7 +1304,6 @@
                         }
 
                         this.appSettings.homeBannerUrl = result.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
-                        this.appSettings.homeBannerSlidesText = (result.settings?.homeBannerSlides || [this.appSettings.homeBannerUrl]).join('\n');
                         this.appSettings.defaultEventSettings = {
                             ...this.appSettings.defaultEventSettings,
                             ...(result.settings?.defaultEventSettings || {})

@@ -95,8 +95,62 @@
 
         <main x-show="!selectedSessionId" x-cloak>
             <section id="home-section" class="public-jump-target px-5" :class="sectionHighlightId === 'home-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'home'" x-cloak>
-                <div class="relative overflow-hidden rounded-2xl bg-gray-100 shadow-sm">
-                    <img class="aspect-square w-full object-cover" :src="imageUrl(homeBannerUrl)" alt="GDSQ Pickleball Club" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                <div class="mb-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('homeUpdates')">Home Updates</p>
+                        <h2 class="text-lg font-black" x-text="t('clubUpdates')">Club Updates</h2>
+                    </div>
+                    <div class="flex gap-1.5" x-show="homeFeedPageCount > 1">
+                        <template x-for="page in homeFeedPageCount" :key="`feed-dot-${page}`">
+                            <button
+                                class="h-2 rounded-full transition-all"
+                                :class="homeFeedPageIndex === (page - 1) ? 'w-6 bg-gdsq' : 'w-2 bg-gray-300'"
+                                @click="goToHomeFeedPage(page - 1)"
+                            ></button>
+                        </template>
+                    </div>
+                </div>
+
+                <div
+                    class="overflow-hidden rounded-2xl"
+                    x-show="homeFeedBanners.length > 0"
+                    x-cloak
+                    @mouseenter="pauseHomeFeedCarousel()"
+                    @mouseleave="resumeHomeFeedCarousel()"
+                >
+                    <div
+                        class="flex transition-transform duration-700 ease-out"
+                        :style="homeFeedTrackStyle"
+                    >
+                        <template x-for="banner in homeFeedBanners" :key="banner.id">
+                            <div class="shrink-0 px-1.5" :style="homeFeedCardStyle">
+                                <template x-if="banner.linkUrl">
+                                    <a class="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md" :href="banner.linkUrl" target="_blank" rel="noreferrer">
+                                        <div class="aspect-[16/9] bg-gray-100">
+                                            <img class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home update'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                        </div>
+                                        <div class="p-3" x-show="banner.title">
+                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
+                                        </div>
+                                    </a>
+                                </template>
+                                <template x-if="!banner.linkUrl">
+                                    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
+                                        <div class="aspect-[16/9] bg-gray-100">
+                                            <img class="h-full w-full object-cover" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home update'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
+                                        </div>
+                                        <div class="p-3" x-show="banner.title">
+                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm font-semibold text-gray-500" x-show="homeFeedBanners.length === 0" x-cloak>
+                    <p x-text="t('noHomeUpdates')">No club updates yet.</p>
                 </div>
 
                 <div class="mt-5 grid grid-cols-4 gap-2 rounded-2xl bg-white p-4 shadow-lg shadow-gray-200/70">
@@ -116,60 +170,6 @@
                         <i class="fa-solid fa-store text-2xl"></i>
                         <span class="text-xs font-black" x-text="t('shop')">Shop</span>
                     </button>
-                </div>
-            </section>
-
-            <section class="mt-6 px-5 lg:relative lg:left-1/2 lg:w-[min(calc(100vw-3rem),72rem)] lg:-translate-x-1/2 lg:px-0" x-show="activeTab === 'home' && homeFeedBanners.length > 0" x-cloak>
-                <div class="mb-3 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('homeUpdates')">Home Updates</p>
-                        <h2 class="text-lg font-black" x-text="t('latestNews')">Latest News</h2>
-                    </div>
-                    <div class="flex gap-1.5" x-show="homeFeedPageCount > 1">
-                        <template x-for="page in homeFeedPageCount" :key="`feed-dot-${page}`">
-                            <button
-                                class="h-2 rounded-full transition-all"
-                                :class="homeFeedPageIndex === (page - 1) ? 'w-6 bg-gdsq' : 'w-2 bg-gray-300'"
-                                @click="goToHomeFeedPage(page - 1)"
-                            ></button>
-                        </template>
-                    </div>
-                </div>
-
-                <div
-                    class="overflow-hidden rounded-2xl"
-                    @mouseenter="pauseHomeFeedCarousel()"
-                    @mouseleave="resumeHomeFeedCarousel()"
-                >
-                    <div
-                        class="flex transition-transform duration-700 ease-out"
-                        :style="homeFeedTrackStyle"
-                    >
-                        <template x-for="banner in homeFeedBanners" :key="banner.id">
-                            <div class="shrink-0 px-1.5" :style="homeFeedCardStyle">
-                                <template x-if="banner.linkUrl">
-                                    <a class="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md" :href="banner.linkUrl" target="_blank" rel="noreferrer">
-                                        <div class="aspect-[4/5] bg-gray-100">
-                                            <img class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
-                                        </div>
-                                        <div class="p-3" x-show="banner.title">
-                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
-                                        </div>
-                                    </a>
-                                </template>
-                                <template x-if="!banner.linkUrl">
-                                    <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-                                        <div class="aspect-[4/5] bg-gray-100">
-                                            <img class="h-full w-full object-cover" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home banner'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
-                                        </div>
-                                        <div class="p-3" x-show="banner.title">
-                                            <p class="text-sm font-black text-gray-900" x-text="banner.title"></p>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                    </div>
                 </div>
             </section>
 
@@ -1335,8 +1335,9 @@
                         eventPublished: 'สร้างกิจกรรมแล้ว',
                         eventPublishFailed: 'สร้างกิจกรรมไม่สำเร็จ',
                         upcomingEvents: 'กิจกรรมที่กำลังจะมาถึง',
-                        homeUpdates: 'อัปเดตหน้าแรก',
-                        latestNews: 'ข่าวสารและแบนเนอร์',
+                        homeUpdates: 'อัปเดตคลับ',
+                        clubUpdates: 'Home Updates Slider',
+                        noHomeUpdates: 'ยังไม่มีรูปอัปเดตในตอนนี้',
                         refresh: 'รีเฟรช',
                         noEvents: 'ยังไม่มีกิจกรรม',
                         viewDetails: 'ดูรายละเอียด',
@@ -1538,8 +1539,9 @@
                         eventPublished: 'Event published',
                         eventPublishFailed: 'Unable to publish event',
                         upcomingEvents: 'Upcoming Events',
-                        homeUpdates: 'Home Updates',
-                        latestNews: 'Latest News',
+                        homeUpdates: 'Club Updates',
+                        clubUpdates: 'Home Updates Slider',
+                        noHomeUpdates: 'No club updates yet.',
                         refresh: 'Refresh',
                         noEvents: 'No events yet',
                         viewDetails: 'View details',
