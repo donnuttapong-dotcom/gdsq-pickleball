@@ -41,6 +41,22 @@ const sessionSelect = 'id, title, max_players, court_count, event_date, start_ti
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
 const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
+const VOTING_CATEGORIES = [
+  { key: 'mvp_match', label: 'MVP of the Match', badgeKey: 'mvp' },
+  { key: 'best_vibe', label: 'Best Vibe Player', badgeKey: 'goodVibes' },
+  { key: 'most_improved', label: 'Most Improved', badgeKey: 'mostImproved' },
+  { key: 'best_partner', label: 'Best Partner', badgeKey: 'bestPartner' },
+  { key: 'dink_master', label: 'Dink Master', badgeKey: 'dinkMaster' },
+  { key: 'power_shot', label: 'Power Shot', badgeKey: 'powerShot' },
+  { key: 'aggressive_player', label: 'Aggressive Player', badgeKey: 'aggressive' },
+  { key: 'fair_play', label: 'Fair Play', badgeKey: 'fairPlay' },
+  { key: 'style_on_court', label: 'Style on Court', badgeKey: 'style' },
+  { key: 'social_star', label: 'Social Star', badgeKey: 'socialStar' },
+  { key: 'rookie_of_the_day', label: 'Rookie of the Day', badgeKey: 'rookie' }
+];
+const VOTING_CATEGORY_KEYS = new Set(VOTING_CATEGORIES.map((category) => category.key));
+const VOTING_CATEGORY_MAP = Object.fromEntries(VOTING_CATEGORIES.map((category) => [category.key, category]));
+const DEFAULT_RANKING_CATEGORY = 'overall';
 
 function serializeHomeBanner(row) {
   return {
@@ -284,14 +300,113 @@ function getBangkokPeriodRange(period = 'all') {
 function buildPlayerBadges({ joinedCount = 0, hostedCount = 0, rating = {} }) {
   const badges = [];
 
-  if ((rating.mvpAverage || 0) >= 4.5) badges.push({ key: 'mvp', label: 'MVP' });
-  if ((rating.sportsmanshipAverage || 0) >= 4.5) badges.push({ key: 'fairPlay', label: 'Fair Play' });
-  if ((rating.teamworkAverage || 0) >= 4.5) badges.push({ key: 'teamPlayer', label: 'Team Player' });
-  if ((rating.vibesAverage || 0) >= 4.5) badges.push({ key: 'goodVibes', label: 'Good Vibes' });
+  const categoryCounts = rating.categoryCounts || {};
+  if ((categoryCounts.mvp_match || 0) > 0) badges.push({ key: 'mvp', label: 'MVP' });
+  if ((categoryCounts.best_vibe || 0) > 0) badges.push({ key: 'goodVibes', label: 'Good Vibes' });
+  if ((categoryCounts.social_star || 0) > 0) badges.push({ key: 'socialStar', label: 'Social Star' });
+  if ((categoryCounts.fair_play || 0) > 0) badges.push({ key: 'fairPlay', label: 'Fair Play' });
+  if ((categoryCounts.most_improved || 0) > 0) badges.push({ key: 'mostImproved', label: 'Most Improved' });
+  if ((categoryCounts.best_partner || 0) > 0) badges.push({ key: 'bestPartner', label: 'Best Partner' });
+  if ((categoryCounts.dink_master || 0) > 0) badges.push({ key: 'dinkMaster', label: 'Dink Master' });
+  if ((categoryCounts.power_shot || 0) > 0) badges.push({ key: 'powerShot', label: 'Power Shot' });
+  if ((categoryCounts.aggressive_player || 0) > 0) badges.push({ key: 'aggressive', label: 'Aggressive Player' });
+  if ((categoryCounts.style_on_court || 0) > 0) badges.push({ key: 'style', label: 'Style on Court' });
+  if ((categoryCounts.rookie_of_the_day || 0) > 0) badges.push({ key: 'rookie', label: 'Rookie of the Day' });
   if (joinedCount >= 5) badges.push({ key: 'regular', label: 'Regular Player' });
   if (hostedCount > 0) badges.push({ key: 'host', label: 'Host' });
 
   return badges;
+}
+
+function rankingCategoryLabel(categoryKey) {
+  if (categoryKey === DEFAULT_RANKING_CATEGORY) return 'Overall';
+  return VOTING_CATEGORY_MAP[categoryKey]?.label || categoryKey;
+}
+
+function categoryVoteCount(categoryCounts = {}, categoryKey = DEFAULT_RANKING_CATEGORY) {
+  if (categoryKey === DEFAULT_RANKING_CATEGORY) {
+    return Object.values(categoryCounts || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+  }
+
+  return Number(categoryCounts?.[categoryKey] || 0);
+}
+
+function bangkokDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+function bangkokDateValue(date = new Date()) {
+  const values = bangkokDateParts(date);
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function getWeekStartDateString(date = new Date()) {
+  const bangkokToday = bangkokDateValue(date);
+  const [year, month, day] = bangkokToday.split('-').map(Number);
+  const weekDate = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = weekDate.getUTCDay();
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  weekDate.setUTCDate(weekDate.getUTCDate() - daysFromMonday);
+  return weekDate.toISOString().slice(0, 10);
+}
+
+function getMonthId(date = new Date()) {
+  const values = bangkokDateParts(date);
+  return `${values.year}-${values.month}`;
+}
+
+function normalizeRankingPeriod(period = '') {
+  const value = String(period || '').toLowerCase();
+  if (value === 'weekly' || value === 'week') return 'weekly';
+  if (value === 'monthly' || value === 'month') return 'monthly';
+  return 'all-time';
+}
+
+function periodLabel(period, id = '') {
+  if (period === 'weekly') return `Week of ${id}`;
+  if (period === 'monthly') return id;
+  return 'All Time';
+}
+
+function defaultPeriodIdentifier(period = 'all-time') {
+  if (period === 'weekly') return getWeekStartDateString();
+  if (period === 'monthly') return getMonthId();
+  return '';
+}
+
+function periodRangeByIdentifier(period, identifier = '') {
+  if (period === 'weekly') {
+    const start = identifier || getWeekStartDateString();
+    return {
+      start,
+      end: addDaysToDateString(start, 6),
+      id: start
+    };
+  }
+
+  if (period === 'monthly') {
+    const monthId = identifier || getMonthId();
+    const [year, month] = monthId.split('-').map(Number);
+    const start = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = new Date(Date.UTC(year, month, 0));
+    return {
+      start,
+      end: endDate.toISOString().slice(0, 10),
+      id: monthId
+    };
+  }
+
+  return {
+    start: null,
+    end: null,
+    id: 'all-time'
+  };
 }
 
 function validateVoteScore(value) {
@@ -330,6 +445,208 @@ function isLikelyServiceRoleKey(key = '') {
   if (value.startsWith('sb_publishable_')) return false;
   const payload = decodeJwtPayload(value);
   return payload?.role === 'service_role';
+}
+
+async function buildVoteContext(eventId, lineUid) {
+  const { data, error } = await listSessionRsvps(eventId);
+
+  if (error || !data) {
+    return { data: null, error: error || new Error('Session not found.') };
+  }
+
+  const voter = lineUid ? await getUserByLineUid(lineUid) : null;
+  const joinedRows = data.rows.filter((row) => row.kind === 'member' && row.status === 'Joined');
+  const voterJoined = Boolean(voter && joinedRows.some((row) => row.user.id === voter.id));
+  const eventEnded = isSessionEnded(data.session);
+  const eligiblePlayers = joinedRows.map((row) => ({
+    id: row.user.id,
+    lineUid: row.user.line_uid,
+    displayName: row.user.display_name,
+    profileImageUrl: row.user.profile_image_url,
+    isSelf: voter ? row.user.id === voter.id : false
+  }));
+
+  const voteRows = await listRankingVotes({ eventId: data.session.id });
+  const myVotes = (voteRows || [])
+    .filter((vote) => lineUid && vote.voter_line_uid === lineUid)
+    .map((vote) => ({
+      category: vote.category,
+      nomineeLineUid: vote.nominee_line_uid
+    }));
+
+  const summaryByLineUid = {};
+  for (const vote of voteRows || []) {
+    if (!summaryByLineUid[vote.nominee_line_uid]) {
+      summaryByLineUid[vote.nominee_line_uid] = {
+        nomineeLineUid: vote.nominee_line_uid,
+        totalVotes: 0,
+        categoryCounts: {}
+      };
+    }
+    summaryByLineUid[vote.nominee_line_uid].totalVotes += 1;
+    summaryByLineUid[vote.nominee_line_uid].categoryCounts[vote.category] = (summaryByLineUid[vote.nominee_line_uid].categoryCounts[vote.category] || 0) + 1;
+  }
+
+  const categoryWinners = VOTING_CATEGORIES.map((category) => {
+    const nomineeRows = Object.values(summaryByLineUid)
+      .map((entry) => ({
+        nomineeLineUid: entry.nomineeLineUid,
+        totalVotes: Number(entry.categoryCounts[category.key] || 0)
+      }))
+      .filter((entry) => entry.totalVotes > 0)
+      .sort((a, b) => b.totalVotes - a.totalVotes);
+    return {
+      category: category.key,
+      categoryLabel: category.label,
+      winnerLineUid: nomineeRows[0]?.nomineeLineUid || '',
+      totalVotes: nomineeRows[0]?.totalVotes || 0
+    };
+  });
+
+  return {
+    data: {
+      session: serializeSession(data.session),
+      rawSession: data.session,
+      eventEnded,
+      voter,
+      voterJoined,
+      eligiblePlayers,
+      myVotes,
+      voteProgress: myVotes.length,
+      canVote: Boolean(voter && voterJoined),
+      categoryWinners,
+      voteSummary: Object.values(summaryByLineUid)
+    },
+    error: null
+  };
+}
+
+function serializeVoteContextPayload(context) {
+  return {
+    success: true,
+    session: context.session,
+    eventEnded: context.eventEnded,
+    canVote: Boolean(context.canVote && context.eventEnded),
+    voteProgress: context.voteProgress || 0,
+    totalCategories: VOTING_CATEGORIES.length,
+    categories: VOTING_CATEGORIES.map((category) => ({
+      key: category.key,
+      label: category.label
+    })),
+    players: (context.eligiblePlayers || []).map((player) => ({
+      id: player.id,
+      lineUid: player.lineUid,
+      displayName: player.displayName,
+      profileImageUrl: player.profileImageUrl,
+      isSelf: player.isSelf
+    })),
+    myVotes: context.myVotes || [],
+    voteSummary: (context.voteSummary || [])
+      .map((entry) => ({
+        nomineeLineUid: entry.nomineeLineUid,
+        totalVotes: entry.totalVotes,
+        categoryCounts: entry.categoryCounts || {}
+      }))
+      .sort((a, b) => b.totalVotes - a.totalVotes),
+    categoryWinners: context.categoryWinners || []
+  };
+}
+
+function findEligiblePlayer(context, lineUid) {
+  return (context.eligiblePlayers || []).find((player) => player.lineUid === lineUid) || null;
+}
+
+async function renderRankingSharePage(req, {
+  title,
+  subtitle = '',
+  winner = null,
+  top = [],
+  awards = [],
+  sharePath = ''
+}) {
+  const shareUrl = `${req.protocol}://${req.get('host')}${sharePath || req.originalUrl}`;
+  const winnerName = winner?.displayName || 'TBA';
+  const winnerImage = publicImageUrl(winner?.profileImageUrl) || '/assets/gdsq-logo.png';
+  const heroImage = absoluteUrl(req, winnerImage);
+  const topCards = (top || []).slice(0, 5).map((row, index) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:#f8fafc;">
+      <div style="width:34px;height:34px;border-radius:12px;background:#0b4fd9;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">${index + 1}</div>
+      <img src="${escapeHtml(publicImageUrl(row.profileImageUrl) || '/assets/gdsq-logo.png')}" alt="" style="width:48px;height:48px;border-radius:999px;object-fit:cover;border:2px solid #dbeafe;">
+      <div style="min-width:0;flex:1;">
+        <div style="font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(row.displayName || 'Player')}</div>
+        <div style="font-size:12px;color:#64748b;">${Number(row.totalVotes || row.voteCount || 0)} votes</div>
+      </div>
+    </div>
+  `).join('');
+  const awardCards = (awards || []).filter((award) => award.winner).map((award) => `
+    <div style="padding:14px 16px;border-radius:18px;background:#ffffff;border:1px solid #e5e7eb;">
+      <div style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;">${escapeHtml(award.categoryLabel)}</div>
+      <div style="margin-top:6px;font-size:16px;font-weight:900;color:#0f172a;">${escapeHtml(award.winner.displayName || 'Player')}</div>
+      <div style="font-size:13px;color:#0b4fd9;font-weight:800;">${Number(award.winner.totalVotes || 0)} votes</div>
+    </div>
+  `).join('');
+
+  return `<!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHtml(title)} | GDSQ Pickleball</title>
+    ${buildMetaTags({
+      title,
+      description: subtitle || `${winnerName} wins on GDSQ Pickleball.`,
+      imageUrl: heroImage,
+      url: shareUrl
+    })}
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body style="margin:0;background:#f8fafc;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f172a;">
+    <main style="max-width:720px;margin:0 auto;padding:24px 16px 48px;">
+      <section style="background:white;border-radius:28px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-size:12px;font-weight:900;color:#0b4fd9;text-transform:uppercase;letter-spacing:.08em;">GDSQ Pickleball</div>
+            <h1 style="margin:8px 0 0;font-size:30px;line-height:1.1;font-weight:900;">${escapeHtml(title)}</h1>
+            <p style="margin:8px 0 0;color:#64748b;font-size:14px;font-weight:600;">${escapeHtml(subtitle)}</p>
+          </div>
+          <button onclick="shareCard()" style="border:none;background:#0b4fd9;color:#fff;border-radius:16px;padding:12px 16px;font-weight:900;">Share</button>
+        </div>
+        <div style="margin-top:20px;border-radius:24px;background:linear-gradient(135deg,#0b4fd9,#2563eb);padding:20px;color:white;">
+          <div style="font-size:12px;font-weight:900;text-transform:uppercase;opacity:.9;">Winner</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-top:12px;">
+            <img src="${heroImage}" alt="" style="width:96px;height:96px;border-radius:999px;object-fit:cover;border:4px solid rgba(255,255,255,.4);background:#fff;">
+            <div>
+              <div style="font-size:28px;font-weight:900;">${escapeHtml(winnerName)}</div>
+              <div style="font-size:15px;font-weight:700;opacity:.92;">${Number(winner?.totalVotes || winner?.voteCount || 0)} votes</div>
+            </div>
+          </div>
+        </div>
+        ${topCards ? `<div style="margin-top:20px;"><div style="font-size:18px;font-weight:900;margin-bottom:12px;">Top Rankings</div><div style="display:grid;gap:12px;">${topCards}</div></div>` : ''}
+        ${awardCards ? `<div style="margin-top:20px;"><div style="font-size:18px;font-weight:900;margin-bottom:12px;">Category Awards</div><div style="display:grid;gap:12px;">${awardCards}</div></div>` : ''}
+        <button onclick="copyLink()" style="margin-top:20px;width:100%;border:none;background:#e0e7ff;color:#0b4fd9;border-radius:16px;padding:14px 16px;font-weight:900;">Copy Link</button>
+      </section>
+    </main>
+    <script>
+      async function copyLink() {
+        try {
+          await navigator.clipboard.writeText(${JSON.stringify(shareUrl)});
+          alert('Link copied');
+        } catch (error) {
+          alert(${JSON.stringify(shareUrl)});
+        }
+      }
+      async function shareCard() {
+        if (navigator.share) {
+          try {
+            await navigator.share({ title: ${JSON.stringify(title)}, text: ${JSON.stringify(subtitle)}, url: ${JSON.stringify(shareUrl)} });
+            return;
+          } catch (error) {}
+        }
+        copyLink();
+      }
+    </script>
+  </body>
+  </html>`;
 }
 
 function publicPaymentError(error) {
@@ -622,6 +939,163 @@ async function requireSessionHost({ lineUid, sessionId }) {
   }
 
   return { user, session };
+}
+
+async function listRankingVotes({
+  eventId = null,
+  voterLineUid = null,
+  nomineeLineUid = null,
+  period = 'all-time',
+  identifier = ''
+} = {}) {
+  let query = supabase
+    .from('ranking_votes')
+    .select('id, event_id, voter_line_uid, nominee_line_uid, category, created_at');
+
+  if (eventId) query = query.eq('event_id', eventId);
+  if (voterLineUid) query = query.eq('voter_line_uid', voterLineUid);
+  if (nomineeLineUid) query = query.eq('nominee_line_uid', nomineeLineUid);
+
+  const normalizedPeriod = normalizeRankingPeriod(period);
+  if (normalizedPeriod !== 'all-time') {
+    const range = periodRangeByIdentifier(normalizedPeriod, identifier);
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('sessions')
+      .select('id')
+      .gte('event_date', range.start)
+      .lte('event_date', range.end);
+
+    if (sessionsError) throw sessionsError;
+
+    const sessionIds = (sessions || []).map((session) => session.id);
+    if (sessionIds.length === 0) {
+      return [];
+    }
+
+    query = query.in('event_id', sessionIds);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) {
+    if (error.code === '42P01') return [];
+    throw error;
+  }
+
+  return data || [];
+}
+
+function topCategoryEntries(categoryCounts = {}, limit = 5) {
+  return Object.entries(categoryCounts || {})
+    .map(([categoryKey, votes]) => ({
+      categoryKey,
+      label: rankingCategoryLabel(categoryKey),
+      votes: Number(votes || 0)
+    }))
+    .filter((item) => item.votes > 0)
+    .sort((a, b) => b.votes - a.votes || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
+
+function buildRankingRows({ users = [], joinedByUserId = {}, votes = [], category = DEFAULT_RANKING_CATEGORY }) {
+  const tallyByLineUid = {};
+
+  for (const vote of votes || []) {
+    if (!tallyByLineUid[vote.nominee_line_uid]) {
+      tallyByLineUid[vote.nominee_line_uid] = {
+        totalVotes: 0,
+        categoryCounts: {}
+      };
+    }
+
+    tallyByLineUid[vote.nominee_line_uid].totalVotes += 1;
+    tallyByLineUid[vote.nominee_line_uid].categoryCounts[vote.category] = (tallyByLineUid[vote.nominee_line_uid].categoryCounts[vote.category] || 0) + 1;
+  }
+
+  return users
+    .map((user) => {
+      const tally = tallyByLineUid[user.line_uid] || { totalVotes: 0, categoryCounts: {} };
+      return {
+        ...serializeUser(user),
+        joinedCount: joinedByUserId[user.id] || 0,
+        voteCount: tally.totalVotes,
+        categoryVoteCount: categoryVoteCount(tally.categoryCounts, category),
+        categoryCounts: tally.categoryCounts,
+        topCategories: topCategoryEntries(tally.categoryCounts),
+        ratingAverage: tally.totalVotes || null
+      };
+    })
+    .filter((user) => user.voteCount > 0 || user.joinedCount > 0)
+    .sort((a, b) => (b.categoryVoteCount || 0) - (a.categoryVoteCount || 0) || (b.voteCount || 0) - (a.voteCount || 0) || (b.joinedCount || 0) - (a.joinedCount || 0) || String(a.displayName || '').localeCompare(String(b.displayName || '')));
+}
+
+function buildAwardWinners(rankings = [], limit = 5) {
+  return VOTING_CATEGORIES.map((category) => {
+    const ranked = rankings
+      .filter((row) => Number(row.categoryCounts?.[category.key] || 0) > 0)
+      .map((row) => ({
+        id: row.id,
+        lineUid: row.lineUid,
+        displayName: row.displayName,
+        profileImageUrl: row.profileImageUrl,
+        totalVotes: Number(row.categoryCounts?.[category.key] || 0)
+      }))
+      .sort((a, b) => b.totalVotes - a.totalVotes || String(a.displayName || '').localeCompare(String(b.displayName || '')));
+
+    return {
+      categoryKey: category.key,
+      categoryLabel: category.label,
+      winner: ranked[0] || null,
+      top: ranked.slice(0, limit)
+    };
+  });
+}
+
+async function loadRankingUsersAndJoinedCounts() {
+  const { data: joinedRsvps, error: rsvpError } = await supabase
+    .from('rsvps')
+    .select('user_id, status')
+    .eq('status', 'Joined');
+
+  if (rsvpError) throw rsvpError;
+
+  const joinedByUserId = {};
+  for (const rsvp of joinedRsvps || []) {
+    joinedByUserId[rsvp.user_id] = (joinedByUserId[rsvp.user_id] || 0) + 1;
+  }
+
+  const userIds = Object.keys(joinedByUserId);
+  if (userIds.length === 0) {
+    return { users: [], joinedByUserId };
+  }
+
+  const { data: users, error: userError } = await supabase
+    .from('users')
+    .select(userSelect)
+    .in('id', userIds);
+
+  if (userError) throw userError;
+  return { users: users || [], joinedByUserId };
+}
+
+async function buildRankingPayload({ period = 'all-time', identifier = '', category = DEFAULT_RANKING_CATEGORY }) {
+  const normalizedPeriod = normalizeRankingPeriod(period);
+  const normalizedCategory = VOTING_CATEGORY_KEYS.has(category) ? category : DEFAULT_RANKING_CATEGORY;
+  const resolvedIdentifier = identifier || defaultPeriodIdentifier(normalizedPeriod);
+  const { users, joinedByUserId } = await loadRankingUsersAndJoinedCounts();
+  const votes = await listRankingVotes({ period: normalizedPeriod, identifier: resolvedIdentifier });
+  const rankings = buildRankingRows({ users, joinedByUserId, votes, category: normalizedCategory });
+  const awards = buildAwardWinners(rankings);
+  const range = periodRangeByIdentifier(normalizedPeriod, resolvedIdentifier);
+
+  return {
+    period: normalizedPeriod,
+    periodId: range.id,
+    periodLabel: periodLabel(normalizedPeriod, range.id),
+    category: normalizedCategory,
+    rankings,
+    awards,
+    mvpWinner: awards.find((award) => award.categoryKey === 'mvp_match')?.winner || null
+  };
 }
 
 function serializeSession(session) {
@@ -1923,30 +2397,27 @@ app.get('/api/profile/history', async (req, res) => {
 
     if (hostedError) throw hostedError;
 
-    let votedSessionIds = new Set();
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('session_id')
-      .eq('voter_user_id', user.id);
-
-    if (votesError && votesError.code !== '42P01') throw votesError;
-    if (!votesError) {
-      votedSessionIds = new Set((votes || []).map((vote) => vote.session_id));
+    let voteCategoryCountBySessionId = {};
+    const votes = await listRankingVotes({ voterLineUid: user.line_uid });
+    for (const vote of votes || []) {
+      voteCategoryCountBySessionId[vote.event_id] = (voteCategoryCountBySessionId[vote.event_id] || 0) + 1;
     }
 
     const attended = await Promise.all(attendedSessions.map(async (session) => {
       const summary = await getSessionSummary(session.id, lineUid);
       const isEnded = isSessionEnded(session);
+      const completedVotes = Number(voteCategoryCountBySessionId[session.id] || 0);
       const votePending = isEnded
         && rsvpBySessionId[session.id]?.status === 'Joined'
-        && !votedSessionIds.has(session.id);
+        && completedVotes < VOTING_CATEGORIES.length;
 
       return {
         ...summary.data,
         rsvpStatus: rsvpBySessionId[session.id]?.status || null,
         isEnded,
         votePending,
-        voted: votedSessionIds.has(session.id)
+        voted: completedVotes >= VOTING_CATEGORIES.length,
+        voteProgress: completedVotes
       };
     }));
 
@@ -2093,100 +2564,17 @@ app.get('/api/players', async (req, res) => {
 
 app.get('/api/rankings', async (req, res) => {
   try {
-    const allowedPeriods = ['week', 'month', 'all'];
-    const allowedCategories = ['overall', 'mvp', 'sportsmanship', 'teamwork', 'skill', 'vibes'];
-    const period = allowedPeriods.includes(req.query.period) ? req.query.period : 'all';
-    const category = allowedCategories.includes(req.query.category) ? req.query.category : 'overall';
-    const { data: rsvps, error } = await supabase
-      .from('rsvps')
-      .select('user_id, status')
-      .eq('status', 'Joined');
-
-    if (error) {
-      throw error;
-    }
-
-    const joinedByUserId = {};
-    for (const rsvp of rsvps || []) {
-      joinedByUserId[rsvp.user_id] = (joinedByUserId[rsvp.user_id] || 0) + 1;
-    }
-
-    const userIds = Object.keys(joinedByUserId);
-    let users = [];
-
-    if (userIds.length > 0) {
-      const { data, error: usersError } = await supabase
-        .from('users')
-        .select(userSelect)
-        .in('id', userIds);
-
-      if (usersError) {
-        throw usersError;
-      }
-
-      users = data || [];
-    }
-
-    const ratingByUserId = {};
-    const periodRange = getBangkokPeriodRange(period);
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('session_id, voted_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score');
-
-    if (votesError && votesError.code !== '42P01') {
-      throw votesError;
-    }
-
-    if (!votesError) {
-      let allowedSessionIds = null;
-
-      if (periodRange) {
-        const { data: periodSessions, error: periodSessionError } = await supabase
-          .from('sessions')
-          .select('id')
-          .gte('event_date', periodRange.start)
-          .lte('event_date', periodRange.end);
-
-        if (periodSessionError) throw periodSessionError;
-        allowedSessionIds = new Set((periodSessions || []).map((session) => session.id));
-      }
-
-      for (const vote of votes || []) {
-        if (allowedSessionIds && !allowedSessionIds.has(vote.session_id)) {
-          continue;
-        }
-
-        if (!ratingByUserId[vote.voted_user_id]) {
-          ratingByUserId[vote.voted_user_id] = {
-            voteCount: 0,
-            totalRating: 0,
-            categoryTotal: 0
-          };
-        }
-
-        ratingByUserId[vote.voted_user_id].voteCount += 1;
-        ratingByUserId[vote.voted_user_id].totalRating += voteAverage(vote);
-        ratingByUserId[vote.voted_user_id].categoryTotal += voteScoreByCategory(vote, category);
-      }
-    }
+    const period = normalizeRankingPeriod(req.query.period);
+    const category = VOTING_CATEGORY_KEYS.has(req.query.category) ? req.query.category : DEFAULT_RANKING_CATEGORY;
+    const payload = await buildRankingPayload({
+      period,
+      identifier: req.query.periodId || '',
+      category
+    });
 
     return res.json({
       success: true,
-      period,
-      category,
-      rankings: users
-        .map((user) => ({
-          ...serializeUser(user),
-          joinedCount: joinedByUserId[user.id] || 0,
-          voteCount: ratingByUserId[user.id]?.voteCount || 0,
-          ratingAverage: ratingByUserId[user.id]?.voteCount
-            ? Number((ratingByUserId[user.id].totalRating / ratingByUserId[user.id].voteCount).toFixed(2))
-            : null,
-          categoryAverage: ratingByUserId[user.id]?.voteCount
-            ? Number((ratingByUserId[user.id].categoryTotal / ratingByUserId[user.id].voteCount).toFixed(2))
-            : null
-        }))
-        .sort((a, b) => (b.categoryAverage || 0) - (a.categoryAverage || 0) || b.voteCount - a.voteCount || b.joinedCount - a.joinedCount)
+      ...payload
     });
   } catch (error) {
     console.error('Rankings list error:', error);
@@ -2195,6 +2583,140 @@ app.get('/api/rankings', async (req, res) => {
       success: false,
       message: 'Unable to load rankings.'
     });
+  }
+});
+
+app.get('/api/awards/weekly/:weekId', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'weekly',
+      identifier: req.params.weekId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.json({
+      success: true,
+      ...payload,
+      top: payload.rankings.slice(0, 5)
+    });
+  } catch (error) {
+    console.error('Weekly awards load error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load weekly awards.'
+    });
+  }
+});
+
+app.get('/api/awards/monthly/:monthId', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'monthly',
+      identifier: req.params.monthId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.json({
+      success: true,
+      ...payload,
+      top: payload.rankings.slice(0, 5)
+    });
+  } catch (error) {
+    console.error('Monthly awards load error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load monthly awards.'
+    });
+  }
+});
+
+app.get('/rankings/weekly/:weekId', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'weekly',
+      identifier: req.params.weekId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.send(await renderRankingSharePage(req, {
+      title: 'Weekly Rankings',
+      subtitle: payload.periodLabel,
+      winner: payload.mvpWinner,
+      top: payload.rankings.slice(0, 5),
+      awards: payload.awards,
+      sharePath: req.originalUrl
+    }));
+  } catch (error) {
+    console.error('Weekly rankings page error:', error);
+    return res.status(500).send('Unable to load weekly rankings.');
+  }
+});
+
+app.get('/rankings/monthly/:monthId', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'monthly',
+      identifier: req.params.monthId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.send(await renderRankingSharePage(req, {
+      title: 'Monthly Rankings',
+      subtitle: payload.periodLabel,
+      winner: payload.mvpWinner,
+      top: payload.rankings.slice(0, 5),
+      awards: payload.awards,
+      sharePath: req.originalUrl
+    }));
+  } catch (error) {
+    console.error('Monthly rankings page error:', error);
+    return res.status(500).send('Unable to load monthly rankings.');
+  }
+});
+
+app.get('/awards/weekly/:weekId', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'weekly',
+      identifier: req.params.weekId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.send(await renderRankingSharePage(req, {
+      title: 'Weekly Awards',
+      subtitle: payload.periodLabel,
+      winner: payload.mvpWinner,
+      top: payload.rankings.slice(0, 3),
+      awards: payload.awards,
+      sharePath: req.originalUrl
+    }));
+  } catch (error) {
+    console.error('Weekly awards page error:', error);
+    return res.status(500).send('Unable to load weekly awards.');
+  }
+});
+
+app.get('/awards/monthly/:monthId', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'monthly',
+      identifier: req.params.monthId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.send(await renderRankingSharePage(req, {
+      title: 'Monthly Awards',
+      subtitle: payload.periodLabel,
+      winner: payload.mvpWinner,
+      top: payload.rankings.slice(0, 3),
+      awards: payload.awards,
+      sharePath: req.originalUrl
+    }));
+  } catch (error) {
+    console.error('Monthly awards page error:', error);
+    return res.status(500).send('Unable to load monthly awards.');
   }
 });
 
@@ -2257,44 +2779,18 @@ app.get('/api/players/:playerId', async (req, res) => {
     const rating = {
       voteCount: 0,
       ratingAverage: null,
-      mvpAverage: null,
-      sportsmanshipAverage: null,
-      teamworkAverage: null,
-      skillAverage: null,
-      vibesAverage: null
+      categoryCounts: {},
+      topCategories: []
     };
 
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score')
-      .eq('voted_user_id', user.id);
-
-    if (votesError && votesError.code !== '42P01') throw votesError;
-
-    if (!votesError && votes && votes.length > 0) {
-      const totals = votes.reduce((sum, vote) => ({
-        total: sum.total + voteAverage(vote),
-        mvp: sum.mvp + vote.mvp_score,
-        sportsmanship: sum.sportsmanship + vote.sportsmanship_score,
-        teamwork: sum.teamwork + vote.teamwork_score,
-        skill: sum.skill + vote.skill_score,
-        vibes: sum.vibes + vote.vibes_score
-      }), {
-        total: 0,
-        mvp: 0,
-        sportsmanship: 0,
-        teamwork: 0,
-        skill: 0,
-        vibes: 0
-      });
-
+    const votes = await listRankingVotes({ nomineeLineUid: user.line_uid });
+    if (votes.length > 0) {
+      for (const vote of votes) {
+        rating.categoryCounts[vote.category] = (rating.categoryCounts[vote.category] || 0) + 1;
+      }
       rating.voteCount = votes.length;
-      rating.ratingAverage = Number((totals.total / votes.length).toFixed(2));
-      rating.mvpAverage = Number((totals.mvp / votes.length).toFixed(2));
-      rating.sportsmanshipAverage = Number((totals.sportsmanship / votes.length).toFixed(2));
-      rating.teamworkAverage = Number((totals.teamwork / votes.length).toFixed(2));
-      rating.skillAverage = Number((totals.skill / votes.length).toFixed(2));
-      rating.vibesAverage = Number((totals.vibes / votes.length).toFixed(2));
+      rating.ratingAverage = votes.length;
+      rating.topCategories = topCategoryEntries(rating.categoryCounts);
     }
 
     const history = await Promise.all(
@@ -2698,6 +3194,15 @@ app.delete('/api/sessions/:sessionId', requireAdmin, async (req, res) => {
       throw voteDeleteError;
     }
 
+    const { error: rankingVoteDeleteError } = await supabase
+      .from('ranking_votes')
+      .delete()
+      .eq('event_id', currentSession.id);
+
+    if (rankingVoteDeleteError && rankingVoteDeleteError.code !== '42P01') {
+      throw rankingVoteDeleteError;
+    }
+
     const { error: sessionDeleteError } = await supabase
       .from('sessions')
       .delete()
@@ -2775,6 +3280,184 @@ app.get('/api/session/:sessionId/rsvps', requireAdmin, async (req, res) => {
   }
 });
 
+async function handleVoteOptionsRequest(req, res, eventId) {
+  try {
+    const { lineUid } = req.query;
+
+    if (!lineUid) {
+      return res.status(401).json({
+        success: false,
+        message: 'LINE login required.'
+      });
+    }
+
+    const context = await buildVoteContext(eventId, lineUid);
+    if (context.error || !context.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    return res.json(serializeVoteContextPayload(context.data));
+  } catch (error) {
+    console.error('Vote load error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load votes.'
+    });
+  }
+}
+
+async function handleVoteSubmitRequest(req, res, eventId) {
+  try {
+    const { lineUid, votes, category, nomineeLineUid } = req.body;
+
+    if (!lineUid) {
+      return res.status(401).json({
+        success: false,
+        message: 'LINE login required.'
+      });
+    }
+
+    const context = await buildVoteContext(eventId, lineUid);
+    if (context.error || !context.data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Session not found.'
+      });
+    }
+
+    if (!context.data.voter) {
+      return res.status(401).json({
+        success: false,
+        message: 'Player profile not found.'
+      });
+    }
+
+    if (!context.data.eventEnded) {
+      return res.status(400).json({
+        success: false,
+        message: 'Voting opens after the event ends.'
+      });
+    }
+
+    if (!context.data.voterJoined) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only joined players can vote in this event.'
+      });
+    }
+
+    const submittedVotes = Array.isArray(votes) && votes.length > 0
+      ? votes
+      : [{ category, nomineeLineUid }];
+
+    if (submittedVotes.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please choose at least one category to vote.'
+      });
+    }
+
+    const existingCategories = new Set((context.data.myVotes || []).map((vote) => vote.category));
+    const seenCategories = new Set();
+    const rowsToInsert = [];
+
+    for (const vote of submittedVotes) {
+      const categoryKey = String(vote?.category || '').trim();
+      const nomineeUid = String(vote?.nomineeLineUid || '').trim();
+
+      if (!VOTING_CATEGORY_KEYS.has(categoryKey)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid voting category: ${categoryKey || 'unknown'}`
+        });
+      }
+
+      if (seenCategories.has(categoryKey)) {
+        return res.status(400).json({
+          success: false,
+          message: `You can only submit one vote for ${rankingCategoryLabel(categoryKey)} at a time.`
+        });
+      }
+
+      if (existingCategories.has(categoryKey)) {
+        return res.status(409).json({
+          success: false,
+          message: `You already voted in ${rankingCategoryLabel(categoryKey)} for this event.`
+        });
+      }
+
+      if (!nomineeUid) {
+        return res.status(400).json({
+          success: false,
+          message: `Please choose a nominee for ${rankingCategoryLabel(categoryKey)}.`
+        });
+      }
+
+      if (nomineeUid === lineUid) {
+        return res.status(400).json({
+          success: false,
+          message: 'You cannot vote for yourself.'
+        });
+      }
+
+      const nominee = findEligiblePlayer(context.data, nomineeUid);
+      if (!nominee || nominee.isSelf) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only vote for players who joined the same event.'
+        });
+      }
+
+      seenCategories.add(categoryKey);
+      rowsToInsert.push({
+        event_id: eventId,
+        voter_line_uid: lineUid,
+        nominee_line_uid: nomineeUid,
+        category: categoryKey
+      });
+    }
+
+    const { error: insertError } = await supabase
+      .from('ranking_votes')
+      .insert(rowsToInsert);
+
+    if (insertError) {
+      if (insertError.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          message: 'You already voted in one of these categories for this event.'
+        });
+      }
+
+      if (insertError.code === '42P01') {
+        return res.status(500).json({
+          success: false,
+          message: 'Voting database is not ready yet. Please run the ranking votes migration in Supabase.'
+        });
+      }
+
+      throw insertError;
+    }
+
+    const refreshed = await buildVoteContext(eventId, lineUid);
+    return res.json({
+      ...serializeVoteContextPayload(refreshed.data),
+      message: rowsToInsert.length === 1 ? 'Vote submitted.' : 'Votes submitted.'
+    });
+  } catch (error) {
+    console.error('Vote save error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to save vote.'
+    });
+  }
+}
+
 app.get('/api/public/session/:sessionId/players', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -2822,245 +3505,54 @@ app.get('/api/public/session/:sessionId/players', async (req, res) => {
 });
 
 app.get('/api/session/:sessionId/votes', async (req, res) => {
+  return handleVoteOptionsRequest(req, res, req.params.sessionId);
+});
+
+app.post('/api/session/:sessionId/votes', async (req, res) => {
+  return handleVoteSubmitRequest(req, res, req.params.sessionId);
+});
+
+app.get('/api/events/:eventId/vote-options', async (req, res) => {
+  return handleVoteOptionsRequest(req, res, req.params.eventId);
+});
+
+app.get('/api/events/:eventId/my-votes', async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    const { eventId } = req.params;
     const { lineUid } = req.query;
 
     if (!lineUid) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: 'lineUid is required.'
+        message: 'LINE login required.'
       });
     }
 
-    const { data, error } = await listSessionRsvps(sessionId);
-
-    if (error || !data) {
+    const context = await buildVoteContext(eventId, lineUid);
+    if (context.error || !context.data) {
       return res.status(404).json({
         success: false,
         message: 'Session not found.'
       });
     }
 
-    const { data: voter, error: voterError } = await supabase
-      .from('users')
-      .select(userSelect)
-      .eq('line_uid', lineUid)
-      .maybeSingle();
-
-    if (voterError) throw voterError;
-
-    const eligiblePlayers = data.rows
-      .filter((row) => row.kind === 'member' && row.status === 'Joined')
-      .map((row) => ({
-        id: row.user.id,
-        displayName: row.user.display_name,
-        profileImageUrl: row.user.profile_image_url,
-        isSelf: voter ? row.user.id === voter.id : false
-      }));
-
-    const voterJoined = voter
-      ? data.rows.some((row) => row.kind === 'member' && row.status === 'Joined' && row.user.id === voter.id)
-      : false;
-    const eventEnded = isSessionEnded(data.session);
-    let myVotes = [];
-    let voteSummary = [];
-
-    const { data: votes, error: votesError } = await supabase
-      .from('event_player_votes')
-      .select('voted_user_id, voter_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score, note, created_at, updated_at')
-      .eq('session_id', data.session.id);
-
-    if (votesError && votesError.code !== '42P01') throw votesError;
-
-    if (!votesError) {
-      myVotes = (votes || [])
-        .filter((vote) => voter && vote.voter_user_id === voter.id)
-        .map((vote) => ({
-          votedUserId: vote.voted_user_id,
-          mvpScore: vote.mvp_score,
-          sportsmanshipScore: vote.sportsmanship_score,
-          teamworkScore: vote.teamwork_score,
-          skillScore: vote.skill_score,
-          vibesScore: vote.vibes_score,
-          note: vote.note || ''
-        }));
-
-      const summaryByUserId = {};
-      for (const vote of votes || []) {
-        if (!summaryByUserId[vote.voted_user_id]) {
-          summaryByUserId[vote.voted_user_id] = {
-            votedUserId: vote.voted_user_id,
-            voteCount: 0,
-            totalAverage: 0,
-            mvpAverage: 0,
-            sportsmanshipAverage: 0,
-            teamworkAverage: 0,
-            skillAverage: 0,
-            vibesAverage: 0
-          };
-        }
-
-        const summary = summaryByUserId[vote.voted_user_id];
-        summary.voteCount += 1;
-        summary.totalAverage += voteAverage(vote);
-        summary.mvpAverage += vote.mvp_score;
-        summary.sportsmanshipAverage += vote.sportsmanship_score;
-        summary.teamworkAverage += vote.teamwork_score;
-        summary.skillAverage += vote.skill_score;
-        summary.vibesAverage += vote.vibes_score;
-      }
-
-      voteSummary = Object.values(summaryByUserId).map((summary) => ({
-        ...summary,
-        totalAverage: Number((summary.totalAverage / summary.voteCount).toFixed(2)),
-        mvpAverage: Number((summary.mvpAverage / summary.voteCount).toFixed(2)),
-        sportsmanshipAverage: Number((summary.sportsmanshipAverage / summary.voteCount).toFixed(2)),
-        teamworkAverage: Number((summary.teamworkAverage / summary.voteCount).toFixed(2)),
-        skillAverage: Number((summary.skillAverage / summary.voteCount).toFixed(2)),
-        vibesAverage: Number((summary.vibesAverage / summary.voteCount).toFixed(2))
-      }));
-    }
-
     return res.json({
       success: true,
-      session: serializeSession(data.session),
-      canVote: Boolean(voter && voterJoined && eventEnded),
-      eventEnded,
-      voter: voter ? serializeUser(voter) : null,
-      players: eligiblePlayers,
-      myVotes,
-      voteSummary
+      myVotes: context.data.myVotes || [],
+      voteProgress: context.data.voteProgress || 0,
+      totalCategories: VOTING_CATEGORIES.length
     });
   } catch (error) {
-    console.error('Vote load error:', error);
-
+    console.error('My votes load error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Unable to load votes.'
+      message: 'Unable to load your votes.'
     });
   }
 });
 
-app.post('/api/session/:sessionId/votes', async (req, res) => {
-  try {
-    const { sessionId } = req.params;
-    const {
-      lineUid,
-      votedUserId,
-      mvpScore,
-      sportsmanshipScore,
-      teamworkScore,
-      skillScore,
-      vibesScore,
-      note
-    } = req.body;
-
-    if (!lineUid || !votedUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'lineUid and votedUserId are required.'
-      });
-    }
-
-    const scoreValues = [mvpScore, sportsmanshipScore, teamworkScore, skillScore, vibesScore];
-    if (!scoreValues.every(validateVoteScore)) {
-      return res.status(400).json({
-        success: false,
-        message: 'All vote scores must be between 1 and 5.'
-      });
-    }
-
-    const { data, error } = await listSessionRsvps(sessionId);
-
-    if (error || !data) {
-      return res.status(404).json({
-        success: false,
-        message: 'Session not found.'
-      });
-    }
-
-    if (!isSessionEnded(data.session)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Voting opens after the event ends.'
-      });
-    }
-
-    const { data: voter, error: voterError } = await supabase
-      .from('users')
-      .select(userSelect)
-      .eq('line_uid', lineUid)
-      .maybeSingle();
-
-    if (voterError) throw voterError;
-    if (!voter) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found.'
-      });
-    }
-
-    if (voter.id === votedUserId) {
-      return res.status(400).json({
-        success: false,
-        message: 'You cannot vote for yourself.'
-      });
-    }
-
-    const voterJoined = data.rows.some((row) => row.kind === 'member' && row.status === 'Joined' && row.user.id === voter.id);
-    const targetJoined = data.rows.some((row) => row.kind === 'member' && row.status === 'Joined' && row.user.id === votedUserId);
-
-    if (!voterJoined || !targetJoined) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only joined players can vote for joined players.'
-      });
-    }
-
-    const { data: vote, error: voteError } = await supabase
-      .from('event_player_votes')
-      .upsert({
-        session_id: data.session.id,
-        voter_user_id: voter.id,
-        voted_user_id: votedUserId,
-        mvp_score: Number(mvpScore),
-        sportsmanship_score: Number(sportsmanshipScore),
-        teamwork_score: Number(teamworkScore),
-        skill_score: Number(skillScore),
-        vibes_score: Number(vibesScore),
-        note: note || null,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'session_id,voter_user_id,voted_user_id'
-      })
-      .select('id, voted_user_id, mvp_score, sportsmanship_score, teamwork_score, skill_score, vibes_score, note')
-      .single();
-
-    if (voteError) throw voteError;
-
-    return res.json({
-      success: true,
-      vote: {
-        id: vote.id,
-        votedUserId: vote.voted_user_id,
-        mvpScore: vote.mvp_score,
-        sportsmanshipScore: vote.sportsmanship_score,
-        teamworkScore: vote.teamwork_score,
-        skillScore: vote.skill_score,
-        vibesScore: vote.vibes_score,
-        note: vote.note || ''
-      },
-      message: 'Vote saved.'
-    });
-  } catch (error) {
-    console.error('Vote save error:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Unable to save vote.'
-    });
-  }
+app.post('/api/events/:eventId/vote', async (req, res) => {
+  return handleVoteSubmitRequest(req, res, req.params.eventId);
 });
 
 app.get('/api/session/:sessionId/export.csv', requireAdmin, async (req, res) => {
@@ -4023,6 +4515,16 @@ app.delete('/api/rsvp', async (req, res) => {
 
     if (voteDeleteError && voteDeleteError.code !== '42P01') {
       throw voteDeleteError;
+    }
+
+    const { error: rankingVoteDeleteError } = await supabase
+      .from('ranking_votes')
+      .delete()
+      .eq('event_id', session.id)
+      .or(`voter_line_uid.eq.${user.line_uid},nominee_line_uid.eq.${user.line_uid}`);
+
+    if (rankingVoteDeleteError && rankingVoteDeleteError.code !== '42P01') {
+      throw rankingVoteDeleteError;
     }
 
     const { error: deleteError } = await supabase
