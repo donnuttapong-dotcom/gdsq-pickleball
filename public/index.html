@@ -281,18 +281,82 @@
                     <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
                 </div>
                 <div class="mb-4 space-y-3">
-                    <div class="grid grid-cols-3 gap-2 rounded-xl bg-gray-100 p-1">
+                    <div class="grid grid-cols-4 gap-2 rounded-xl bg-gray-100 p-1">
                         <template x-for="period in rankingPeriods" :key="period">
                             <button class="rounded-lg px-3 py-2 text-xs font-black" :class="rankingPeriod === period ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
                         </template>
                     </div>
-                    <div class="flex gap-2 overflow-x-auto pb-1">
+                    <p class="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500" x-show="rankingPeriod !== 'awards' && rankingMeta.periodLabel" x-text="rankingMeta.periodLabel"></p>
+                    <div class="flex gap-2 overflow-x-auto pb-1" x-show="rankingPeriod !== 'awards'">
                         <template x-for="category in rankingCategories" :key="category">
                             <button class="shrink-0 rounded-full px-3 py-2 text-xs font-black" :class="rankingCategory === category ? 'bg-gdsq text-white' : 'bg-gray-100 text-gray-600'" @click="rankingCategory = category; loadRankings()" x-text="rankingCategoryLabel(category)"></button>
                         </template>
                     </div>
                 </div>
-                <div class="space-y-3">
+
+                <div class="space-y-4" x-show="rankingPeriod === 'awards'">
+                    <div class="rounded-2xl bg-white p-4 shadow-sm" x-show="rankingAwards.weekly?.mvpWinner">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('thisWeek')">This Week</p>
+                                <h2 class="mt-1 text-lg font-black" x-text="t('shareWeeklyMvp')">Share Weekly MVP</h2>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="rounded-xl bg-gdsq px-3 py-2 text-xs font-black text-white" @click="shareAwardPage('weekly')" x-text="t('shareWeeklyMvp')"></button>
+                                <button class="rounded-xl border border-gray-300 px-3 py-2 text-xs font-black text-gdsq" @click="copyAwardLink('weekly')" x-text="t('copyLink')"></button>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center gap-3">
+                            <img class="h-14 w-14 rounded-full object-cover" :src="playerAvatar(rankingAwards.weekly.mvpWinner)" alt="">
+                            <div>
+                                <p class="text-lg font-black" x-text="rankingAwards.weekly.mvpWinner?.displayName || '-'"></p>
+                                <p class="text-sm font-semibold text-gray-500"><span x-text="rankingAwards.weekly.mvpWinner?.voteCount || 0"></span> <span x-text="t('votesReceived')"></span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm" x-show="rankingAwards.monthly?.mvpWinner">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-wide text-gdsq" x-text="t('thisMonth')">This Month</p>
+                                <h2 class="mt-1 text-lg font-black" x-text="t('shareMonthlyMvp')">Share Monthly MVP</h2>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="rounded-xl bg-gdsq px-3 py-2 text-xs font-black text-white" @click="shareAwardPage('monthly')" x-text="t('shareMonthlyMvp')"></button>
+                                <button class="rounded-xl border border-gray-300 px-3 py-2 text-xs font-black text-gdsq" @click="copyAwardLink('monthly')" x-text="t('copyLink')"></button>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex items-center gap-3">
+                            <img class="h-14 w-14 rounded-full object-cover" :src="playerAvatar(rankingAwards.monthly.mvpWinner)" alt="">
+                            <div>
+                                <p class="text-lg font-black" x-text="rankingAwards.monthly.mvpWinner?.displayName || '-'"></p>
+                                <p class="text-sm font-semibold text-gray-500"><span x-text="rankingAwards.monthly.mvpWinner?.voteCount || 0"></span> <span x-text="t('votesReceived')"></span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl bg-white p-4 shadow-sm">
+                        <h2 class="text-base font-black" x-text="t('categoryAwards')">Category Awards</h2>
+                        <div class="mt-4 space-y-3" x-show="(rankingAwards.monthly?.awards || []).length > 0">
+                            <template x-for="award in rankingAwards.monthly?.awards || []" :key="award.category">
+                                <div class="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-3">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-black" x-text="award.categoryLabel"></p>
+                                        <p class="truncate text-xs font-semibold text-gray-500" x-text="award.winner?.displayName || '-'"></p>
+                                    </div>
+                                    <p class="text-sm font-black text-gdsq"><span x-text="award.totalVotes || 0"></span> <span x-text="t('votesReceived')"></span></p>
+                                </div>
+                            </template>
+                        </div>
+                        <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="!(rankingAwards.monthly?.awards || []).length" x-text="t('noRankings')"></p>
+                    </div>
+                </div>
+
+                <div class="space-y-3" x-show="rankingPeriod !== 'awards'">
+                    <div class="flex flex-wrap gap-2" x-show="rankingPeriod === 'weekly' || rankingPeriod === 'monthly'">
+                        <button class="rounded-xl bg-gdsq px-3 py-2 text-xs font-black text-white" @click="shareRankingPeriod(rankingPeriod)" x-text="rankingPeriod === 'weekly' ? t('shareWeeklyMvp') : t('shareMonthlyMvp')"></button>
+                        <button class="rounded-xl border border-gray-300 px-3 py-2 text-xs font-black text-gdsq" @click="copyRankingPeriodLink(rankingPeriod)" x-text="t('copyLink')"></button>
+                    </div>
                     <template x-for="(player, index) in rankings" :key="player.id">
                         <button class="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
                             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gdsq text-lg font-black text-white" x-text="index + 1"></div>
@@ -300,23 +364,26 @@
                             <div class="min-w-0 flex-1">
                                 <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
                                 <p class="text-xs font-semibold text-gray-500">
-                                    <span x-text="player.categoryAverage ? `${player.categoryAverage}/5 · ` : ''"></span>
-                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votes')"></span> ·
+                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votesReceived')"></span> ·
                                     <span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span>
                                 </p>
+                                <p class="truncate text-[11px] font-semibold text-gray-400" x-show="(player.topCategories || []).length" x-text="player.topCategories.map((item) => `${item.label} ${item.votes}`).join(' · ')"></p>
                             </div>
-                            <i class="fa-solid fa-chevron-right text-gray-300"></i>
+                            <div class="text-right">
+                                <p class="text-lg font-black text-gdsq" x-text="player.categoryVoteCount || player.voteCount || 0"></p>
+                                <p class="text-[10px] font-bold uppercase text-gray-500" x-text="t('votes')"></p>
+                            </div>
                         </button>
                     </template>
                 </div>
-                <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankings.length === 0" x-text="t('noRankings')"></p>
+                <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankingPeriod !== 'awards' && rankings.length === 0" x-text="t('noRankings')"></p>
             </section>
 
             <section id="player-detail" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'player-detail' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'playerDetail'" x-cloak>
                 <div class="rounded-2xl bg-white p-5 text-center shadow-sm">
                     <img class="mx-auto h-24 w-24 rounded-full border-4 border-blue-50 object-cover" :src="playerAvatar(selectedPlayer)" alt="">
                     <h1 class="mt-3 text-2xl font-black" x-text="selectedPlayer.displayName || 'Player'">Player</h1>
-                    <p class="mt-1 text-sm font-semibold text-gray-500" x-text="selectedPlayer.ratingAverage ? `${selectedPlayer.ratingAverage}/5 · ${selectedPlayer.voteCount} ${t('votes')}` : t('noVotesYet')"></p>
+                    <p class="mt-1 text-sm font-semibold text-gray-500" x-text="selectedPlayer.voteCount ? `${selectedPlayer.voteCount} ${t('votesReceived')}` : t('noVotesYet')"></p>
                     <button class="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" @click="shareProfile()">
                         <i class="fa-solid fa-share-nodes"></i>
                         <span x-text="t('shareProfile')">Share Profile</span>
@@ -352,10 +419,10 @@
                             <div>
                                 <div class="mb-1 flex items-center justify-between text-sm">
                                     <span class="font-black" x-text="item.label"></span>
-                                    <span class="font-black text-gdsq" x-text="item.value ? `${item.value}/5` : '-'"></span>
+                                    <span class="font-black text-gdsq" x-text="`${item.value} ${t('votes')}`"></span>
                                 </div>
                                 <div class="h-2 overflow-hidden rounded-full bg-gray-100">
-                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.value ? (item.value / 5) * 100 : 0}%`"></div>
+                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.percent}%`"></div>
                                 </div>
                             </div>
                         </template>
@@ -541,8 +608,8 @@
                             <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('votes')"></p>
                         </div>
                         <div class="rounded-xl bg-gray-50 p-3 text-center">
-                            <p class="text-2xl font-black text-gray-900" x-text="myPlayerStats.ratingAverage ? `${myPlayerStats.ratingAverage}` : '-'"></p>
-                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('overall')"></p>
+                            <p class="text-2xl font-black text-gray-900" x-text="myPlayerStats.voteCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase text-gray-500" x-text="t('votesReceived')"></p>
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2" x-show="(myPlayerStats.badges || []).length > 0">
@@ -555,10 +622,10 @@
                             <div>
                                 <div class="mb-1 flex items-center justify-between text-sm">
                                     <span class="font-black" x-text="item.label"></span>
-                                    <span class="font-black text-gdsq" x-text="item.value ? `${item.value}/5` : '-'"></span>
+                                    <span class="font-black text-gdsq" x-text="`${item.value} ${t('votes')}`"></span>
                                 </div>
                                 <div class="h-2 overflow-hidden rounded-full bg-gray-100">
-                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.value ? (item.value / 5) * 100 : 0}%`"></div>
+                                    <div class="h-full rounded-full bg-gdsq" :style="`width: ${item.percent}%`"></div>
                                 </div>
                             </div>
                         </template>
@@ -851,46 +918,47 @@
                             <h2 class="text-base font-black" x-text="t('eventEnded')">กิจกรรมจบแล้ว</h2>
                             <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('voteHelp')">ให้คะแนนเพื่อนร่วมกิจกรรมเพื่อทำ Ranking</p>
                         </div>
-                        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-600" x-text="votePlayers.length + ' ' + t('players')"></span>
+                        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-black text-gray-600"><span x-text="voteProgress"></span>/<span x-text="totalVoteCategories"></span> <span x-text="t('voteProgress')"></span></span>
                     </div>
 
                     <div class="mt-4 rounded-xl bg-blue-50 p-3 text-sm font-semibold text-gdsq" x-show="!canVote" x-text="t('voteOnlyJoined')"></div>
 
                     <div class="mt-4 space-y-3" x-show="canVote">
-                        <select class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-black" x-model="selectedVoteUserId" @change="applySelectedVote()">
-                            <option value="" x-text="t('choosePlayerToVote')">เลือกผู้เล่นที่จะโหวต</option>
-                            <template x-for="player in votePlayers.filter((item) => !item.isSelf)" :key="player.id">
-                                <option :value="player.id" x-text="player.displayName"></option>
-                            </template>
-                        </select>
-
-                        <div class="space-y-3" x-show="selectedVoteUserId">
-                            <template x-for="field in voteFields" :key="field.key">
-                                <div class="rounded-xl border border-gray-100 p-3">
-                                    <div class="mb-2 flex items-center justify-between gap-3">
-                                        <p class="text-sm font-black" x-text="t(field.labelKey)"></p>
-                                        <p class="text-sm font-black text-gdsq"><span x-text="voteForm[field.key]"></span>/5</p>
+                        <template x-for="category in voteCategories" :key="category.key">
+                            <div class="rounded-2xl border border-gray-100 p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-black" x-text="category.label"></p>
+                                        <p class="mt-1 text-xs font-semibold text-gray-500" x-show="myVoteFor(category.key)" x-text="`${t('alreadyVoted')}: ${nomineeName(myVoteFor(category.key)?.nomineeLineUid)}`"></p>
                                     </div>
-                                    <input class="w-full accent-gdsq" type="range" min="1" max="5" step="1" x-model.number="voteForm[field.key]">
+                                    <span class="rounded-full bg-green-50 px-3 py-1 text-[11px] font-black text-green-700" x-show="myVoteFor(category.key)" x-text="t('alreadyVoted')"></span>
                                 </div>
-                            </template>
-                            <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="2" x-model="voteForm.note" :placeholder="t('voteNote')"></textarea>
-                            <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="submitVote()" :disabled="isLoading">
-                                <span x-show="!isLoading" x-text="t('submitVote')">ส่งคะแนน</span>
-                                <span x-show="isLoading" x-text="t('saving')">กำลังบันทึก...</span>
-                            </button>
-                        </div>
+
+                                <div class="mt-3 space-y-3" x-show="!myVoteFor(category.key)">
+                                    <select class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm font-black" x-model="voteSelections[category.key]">
+                                        <option value="" x-text="t('chooseNominee')">Choose nominee</option>
+                                        <template x-for="player in votePlayers.filter((item) => !item.isSelf)" :key="`${category.key}-${player.lineUid}`">
+                                            <option :value="player.lineUid" x-text="player.displayName"></option>
+                                        </template>
+                                    </select>
+                                    <button class="w-full rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white disabled:opacity-50" @click="submitVote(category.key)" :disabled="isLoading || !voteSelections[category.key]">
+                                        <span x-show="!isLoading" x-text="t('submitCategoryVote')">Submit Vote</span>
+                                        <span x-show="isLoading" x-text="t('saving')">กำลังบันทึก...</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </div>
 
                     <div class="mt-4 space-y-2" x-show="voteSummary.length > 0">
                         <h3 class="text-sm font-black" x-text="t('voteResults')">ผลโหวต</h3>
-                        <template x-for="summary in sortedVoteSummary()" :key="summary.votedUserId">
+                        <template x-for="summary in sortedVoteSummary()" :key="summary.nomineeLineUid">
                             <div class="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2">
                                 <div class="min-w-0">
-                                    <p class="truncate text-sm font-black" x-text="votePlayerName(summary.votedUserId)"></p>
-                                    <p class="text-xs font-semibold text-gray-500"><span x-text="summary.voteCount"></span> <span x-text="t('votes')"></span></p>
+                                    <p class="truncate text-sm font-black" x-text="nomineeName(summary.nomineeLineUid)"></p>
+                                    <p class="text-xs font-semibold text-gray-500" x-text="topCategorySummary(summary)"></p>
                                 </div>
-                                <p class="text-lg font-black text-gdsq"><span x-text="summary.totalAverage"></span>/5</p>
+                                <p class="text-lg font-black text-gdsq"><span x-text="summary.totalVotes"></span></p>
                             </div>
                         </template>
                     </div>
@@ -1053,10 +1121,19 @@
                 eventViewMode: 'upcoming',
                 players: [],
                 rankings: [],
-                rankingPeriod: 'month',
+                rankingMeta: {
+                    period: 'monthly',
+                    periodId: '',
+                    periodLabel: ''
+                },
+                rankingAwards: {
+                    weekly: null,
+                    monthly: null
+                },
+                rankingPeriod: 'monthly',
                 rankingCategory: 'overall',
-                rankingPeriods: ['week', 'month', 'all'],
-                rankingCategories: ['overall', 'mvp', 'sportsmanship', 'teamwork', 'skill', 'vibes'],
+                rankingPeriods: ['weekly', 'monthly', 'all-time', 'awards'],
+                rankingCategories: ['overall', 'mvp_match', 'best_vibe', 'most_improved', 'best_partner', 'dink_master', 'power_shot', 'aggressive_player', 'fair_play', 'style_on_court', 'social_star', 'rookie_of_the_day'],
                 profileHistory: [],
                 pendingVotes: [],
                 currentUserId: '',
@@ -1065,6 +1142,7 @@
                     voteCount: 0,
                     hostedCount: 0,
                     ratingAverage: null,
+                    topCategories: [],
                     badges: [],
                     history: []
                 },
@@ -1075,6 +1153,7 @@
                     joinedCount: 0,
                     voteCount: 0,
                     hostedCount: 0,
+                    topCategories: [],
                     badges: [],
                     upcoming: [],
                     playedTogether: [],
@@ -1086,22 +1165,22 @@
                 voteSummary: [],
                 myVotes: [],
                 canVote: false,
-                selectedVoteUserId: '',
-                voteFields: [
-                    { key: 'mvpScore', labelKey: 'voteMvp' },
-                    { key: 'sportsmanshipScore', labelKey: 'voteSportsmanship' },
-                    { key: 'teamworkScore', labelKey: 'voteTeamwork' },
-                    { key: 'skillScore', labelKey: 'voteSkill' },
-                    { key: 'vibesScore', labelKey: 'voteVibes' }
+                voteProgress: 0,
+                totalVoteCategories: 11,
+                voteCategories: [
+                    { key: 'mvp_match', label: 'MVP of the Match' },
+                    { key: 'best_vibe', label: 'Best Vibe Player' },
+                    { key: 'most_improved', label: 'Most Improved' },
+                    { key: 'best_partner', label: 'Best Partner' },
+                    { key: 'dink_master', label: 'Dink Master' },
+                    { key: 'power_shot', label: 'Power Shot' },
+                    { key: 'aggressive_player', label: 'Aggressive Player' },
+                    { key: 'fair_play', label: 'Fair Play' },
+                    { key: 'style_on_court', label: 'Style on Court' },
+                    { key: 'social_star', label: 'Social Star' },
+                    { key: 'rookie_of_the_day', label: 'Rookie of the Day' }
                 ],
-                voteForm: {
-                    mvpScore: 5,
-                    sportsmanshipScore: 5,
-                    teamworkScore: 5,
-                    skillScore: 5,
-                    vibesScore: 5,
-                    note: ''
-                },
+                voteSelections: {},
                 guestNames: [],
                 selectedSessionId: initialSessionId(),
                 initialPlayerProfileId,
@@ -1480,6 +1559,16 @@
                         eventEnded: 'กิจกรรมจบแล้ว',
                         voteHelp: 'ให้คะแนนเพื่อนร่วมกิจกรรมเพื่อทำ Ranking',
                         voteOnlyJoined: 'โหวตได้เฉพาะผู้เล่นที่เข้าร่วมกิจกรรมนี้ และหลังจบกิจกรรมเท่านั้น',
+                        chooseNominee: 'เลือกผู้ที่อยากโหวต',
+                        voteProgress: 'หมวดที่โหวตแล้ว',
+                        alreadyVoted: 'โหวตแล้ว',
+                        categoryAwards: 'รางวัลแยกหมวด',
+                        shareWeeklyMvp: 'แชร์ MVP ประจำสัปดาห์',
+                        shareMonthlyMvp: 'แชร์ MVP ประจำเดือน',
+                        copyLink: 'คัดลอกลิงก์',
+                        topRankings: 'อันดับสูงสุด',
+                        submitCategoryVote: 'ส่งโหวตหมวดนี้',
+                        votesReceived: 'คะแนนโหวตรวม',
                         choosePlayerToVote: 'เลือกผู้เล่นที่จะโหวต',
                         voteMvp: 'MVP / ผู้เล่นยอดเยี่ยม',
                         voteSportsmanship: 'น้ำใจนักกีฬา',
@@ -1683,6 +1772,16 @@
                         eventEnded: 'Event ended',
                         voteHelp: 'Rate players from this event for rankings.',
                         voteOnlyJoined: 'Only joined players can vote after the event ends.',
+                        chooseNominee: 'Choose nominee',
+                        voteProgress: 'votes completed',
+                        alreadyVoted: 'Already voted',
+                        categoryAwards: 'Category Awards',
+                        shareWeeklyMvp: 'Share Weekly MVP',
+                        shareMonthlyMvp: 'Share Monthly MVP',
+                        copyLink: 'Copy Link',
+                        topRankings: 'Top Rankings',
+                        submitCategoryVote: 'Submit Vote',
+                        votesReceived: 'votes received',
                         choosePlayerToVote: 'Choose a player to vote',
                         voteMvp: 'MVP / Best Player',
                         voteSportsmanship: 'Sportsmanship',
@@ -2078,31 +2177,37 @@
                 },
 
                 async loadRankings() {
+                    if (this.rankingPeriod === 'awards') {
+                        await this.loadAwardBoards();
+                        return;
+                    }
                     const params = new URLSearchParams({
                         period: this.rankingPeriod,
                         category: this.rankingCategory
                     });
                     const response = await fetch(`/api/rankings?${params.toString()}`);
                     const result = await response.json();
-                    if (response.ok) this.rankings = result.rankings || [];
+                    if (response.ok) {
+                        this.rankings = result.rankings || [];
+                        this.rankingMeta = {
+                            period: result.period || this.rankingPeriod,
+                            periodId: result.periodId || '',
+                            periodLabel: result.periodLabel || '',
+                            awards: result.awards || [],
+                            mvpWinner: result.mvpWinner || null
+                        };
+                    }
                 },
 
                 rankingPeriodLabel(period) {
-                    if (period === 'week') return this.t('thisWeek');
-                    if (period === 'month') return this.t('thisMonth');
+                    if (period === 'weekly') return this.t('thisWeek');
+                    if (period === 'monthly') return this.t('thisMonth');
+                    if (period === 'awards') return this.t('categoryAwards');
                     return this.t('allTime');
                 },
 
                 rankingCategoryLabel(category) {
-                    const labels = {
-                        overall: this.t('overall'),
-                        mvp: 'MVP',
-                        sportsmanship: this.t('voteSportsmanship'),
-                        teamwork: this.t('voteTeamwork'),
-                        skill: this.t('voteSkill'),
-                        vibes: this.t('voteVibes')
-                    };
-                    return labels[category] || category;
+                    return this.voteCategories.find((item) => item.key === category)?.label || (category === 'overall' ? this.t('overall') : category);
                 },
 
                 async openPlayerProfile(playerId) {
@@ -2130,13 +2235,13 @@
                 },
 
                 playerScoreRows() {
-                    return [
-                        { label: this.t('voteMvp'), value: this.selectedPlayer.mvpAverage },
-                        { label: this.t('voteSportsmanship'), value: this.selectedPlayer.sportsmanshipAverage },
-                        { label: this.t('voteTeamwork'), value: this.selectedPlayer.teamworkAverage },
-                        { label: this.t('voteSkill'), value: this.selectedPlayer.skillAverage },
-                        { label: this.t('voteVibes'), value: this.selectedPlayer.vibesAverage }
-                    ];
+                    const items = (this.selectedPlayer.topCategories || []).slice(0, 5);
+                    const highest = Math.max(...items.map((item) => Number(item.votes || 0)), 1);
+                    return items.map((item) => ({
+                        label: item.label,
+                        value: Number(item.votes || 0),
+                        percent: Math.max(10, Math.round((Number(item.votes || 0) / highest) * 100))
+                    }));
                 },
 
                 badgeIcon(key) {
@@ -2145,6 +2250,14 @@
                         fairPlay: 'fa-handshake',
                         teamPlayer: 'fa-users',
                         goodVibes: 'fa-face-smile',
+                        socialStar: 'fa-star',
+                        mostImproved: 'fa-chart-line',
+                        bestPartner: 'fa-user-group',
+                        dinkMaster: 'fa-table-tennis-paddle-ball',
+                        powerShot: 'fa-bolt',
+                        aggressive: 'fa-fire',
+                        style: 'fa-shirt',
+                        rookie: 'fa-seedling',
                         regular: 'fa-calendar-check',
                         host: 'fa-bullhorn'
                     };
@@ -2157,6 +2270,14 @@
                         fairPlay: 'bg-green-50 text-green-700',
                         teamPlayer: 'bg-blue-50 text-gdsq',
                         goodVibes: 'bg-pink-50 text-pink-700',
+                        socialStar: 'bg-amber-50 text-amber-700',
+                        mostImproved: 'bg-emerald-50 text-emerald-700',
+                        bestPartner: 'bg-cyan-50 text-cyan-700',
+                        dinkMaster: 'bg-indigo-50 text-indigo-700',
+                        powerShot: 'bg-orange-50 text-orange-700',
+                        aggressive: 'bg-rose-50 text-rose-700',
+                        style: 'bg-fuchsia-50 text-fuchsia-700',
+                        rookie: 'bg-lime-50 text-lime-700',
                         regular: 'bg-purple-50 text-purple-700',
                         host: 'bg-red-50 text-gdsqRed'
                     };
@@ -2182,13 +2303,13 @@
                 },
 
                 myScoreRows() {
-                    return [
-                        { label: this.t('voteMvp'), value: this.myPlayerStats.mvpAverage },
-                        { label: this.t('voteSportsmanship'), value: this.myPlayerStats.sportsmanshipAverage },
-                        { label: this.t('voteTeamwork'), value: this.myPlayerStats.teamworkAverage },
-                        { label: this.t('voteSkill'), value: this.myPlayerStats.skillAverage },
-                        { label: this.t('voteVibes'), value: this.myPlayerStats.vibesAverage }
-                    ];
+                    const items = (this.myPlayerStats.topCategories || []).slice(0, 5);
+                    const highest = Math.max(...items.map((item) => Number(item.votes || 0)), 1);
+                    return items.map((item) => ({
+                        label: item.label,
+                        value: Number(item.votes || 0),
+                        percent: Math.max(10, Math.round((Number(item.votes || 0) / highest) * 100))
+                    }));
                 },
 
                 async loadProfileHistory() {
@@ -2528,7 +2649,6 @@
                     this.userStatus = session.userStatus;
                     if (this.userStatus) this.pendingJoinPayment = false;
                     this.eventEnded = this.isEventEnded(session);
-                    this.selectedVoteUserId = '';
                     this.resetVoteForm();
                     if (this.userStatus && this.lineUid) this.loadPayment();
                     if (this.eventEnded && this.lineUid) this.loadVotes();
@@ -2694,42 +2814,109 @@
                 },
 
                 resetVoteForm() {
-                    this.voteForm = {
-                        mvpScore: 5,
-                        sportsmanshipScore: 5,
-                        teamworkScore: 5,
-                        skillScore: 5,
-                        vibesScore: 5,
-                        note: ''
-                    };
+                    this.voteSelections = {};
                 },
 
-                applySelectedVote() {
-                    this.resetVoteForm();
-                    const existingVote = this.myVotes.find((vote) => vote.votedUserId === this.selectedVoteUserId);
-                    if (!existingVote) return;
-
-                    this.voteForm = {
-                        mvpScore: existingVote.mvpScore || 5,
-                        sportsmanshipScore: existingVote.sportsmanshipScore || 5,
-                        teamworkScore: existingVote.teamworkScore || 5,
-                        skillScore: existingVote.skillScore || 5,
-                        vibesScore: existingVote.vibesScore || 5,
-                        note: existingVote.note || ''
-                    };
-                },
-
-                votePlayerName(userId) {
-                    return this.votePlayers.find((player) => player.id === userId)?.displayName || 'Player';
+                nomineeName(lineUid) {
+                    return this.votePlayers.find((player) => player.lineUid === lineUid)?.displayName || 'Player';
                 },
 
                 sortedVoteSummary() {
-                    return [...this.voteSummary].sort((a, b) => b.totalAverage - a.totalAverage || b.voteCount - a.voteCount);
+                    return [...this.voteSummary].sort((a, b) => b.totalVotes - a.totalVotes);
+                },
+
+                myVoteFor(categoryKey) {
+                    return (this.myVotes || []).find((vote) => vote.category === categoryKey) || null;
+                },
+
+                topCategorySummary(summary) {
+                    const top = Object.entries(summary.categoryCounts || {})
+                        .map(([key, votes]) => ({ label: this.rankingCategoryLabel(key), votes: Number(votes || 0) }))
+                        .sort((a, b) => b.votes - a.votes)[0];
+                    if (!top) return `${summary.totalVotes || 0} ${this.t('votes')}`;
+                    return `${top.label} · ${top.votes}`;
+                },
+
+                currentWeekId() {
+                    const now = new Date();
+                    const parts = new Intl.DateTimeFormat('en-CA', {
+                        timeZone: 'Asia/Bangkok',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    }).formatToParts(now);
+                    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+                    const date = new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)));
+                    const day = date.getUTCDay();
+                    const shift = day === 0 ? 6 : day - 1;
+                    date.setUTCDate(date.getUTCDate() - shift);
+                    return date.toISOString().slice(0, 10);
+                },
+
+                currentMonthId() {
+                    const parts = new Intl.DateTimeFormat('en-CA', {
+                        timeZone: 'Asia/Bangkok',
+                        year: 'numeric',
+                        month: '2-digit'
+                    }).formatToParts(new Date());
+                    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+                    return `${values.year}-${values.month}`;
+                },
+
+                async loadAwardBoards() {
+                    const [weeklyResponse, monthlyResponse] = await Promise.all([
+                        fetch(`/api/awards/weekly/${encodeURIComponent(this.currentWeekId())}`),
+                        fetch(`/api/awards/monthly/${encodeURIComponent(this.currentMonthId())}`)
+                    ]);
+                    const weeklyResult = await weeklyResponse.json();
+                    const monthlyResult = await monthlyResponse.json();
+                    if (weeklyResponse.ok) this.rankingAwards.weekly = weeklyResult;
+                    if (monthlyResponse.ok) this.rankingAwards.monthly = monthlyResult;
+                },
+
+                async shareAwardPage(period) {
+                    const url = period === 'weekly'
+                        ? `${window.location.origin}/awards/weekly/${encodeURIComponent(this.currentWeekId())}`
+                        : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
+                    if (navigator.share) {
+                        await navigator.share({ title: 'GDSQ Awards', url });
+                        return;
+                    }
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                async copyAwardLink(period) {
+                    const url = period === 'weekly'
+                        ? `${window.location.origin}/awards/weekly/${encodeURIComponent(this.currentWeekId())}`
+                        : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                async shareRankingPeriod(period) {
+                    const url = period === 'weekly'
+                        ? `${window.location.origin}/rankings/weekly/${encodeURIComponent(this.currentWeekId())}`
+                        : `${window.location.origin}/rankings/monthly/${encodeURIComponent(this.currentMonthId())}`;
+                    if (navigator.share) {
+                        await navigator.share({ title: 'GDSQ Rankings', url });
+                        return;
+                    }
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                async copyRankingPeriodLink(period) {
+                    const url = period === 'weekly'
+                        ? `${window.location.origin}/rankings/weekly/${encodeURIComponent(this.currentWeekId())}`
+                        : `${window.location.origin}/rankings/monthly/${encodeURIComponent(this.currentMonthId())}`;
+                    await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
                 },
 
                 async loadVotes() {
                     if (!this.lineUid || !this.selectedSessionId) return;
-                    const response = await fetch(`/api/session/${this.selectedSessionId}/votes?lineUid=${encodeURIComponent(this.lineUid)}`);
+                    const response = await fetch(`/api/events/${this.selectedSessionId}/vote-options?lineUid=${encodeURIComponent(this.lineUid)}`);
                     const result = await response.json();
                     if (!response.ok) return;
 
@@ -2737,31 +2924,48 @@
                     this.votePlayers = result.players || [];
                     this.myVotes = result.myVotes || [];
                     this.voteSummary = result.voteSummary || [];
+                    this.voteProgress = Number(result.voteProgress || 0);
+                    this.totalVoteCategories = Number(result.totalCategories || this.voteCategories.length);
+                    this.voteCategories = result.categories || this.voteCategories;
+                    const nextSelections = {};
+                    for (const category of this.voteCategories) {
+                        nextSelections[category.key] = '';
+                    }
+                    this.voteSelections = nextSelections;
                 },
 
-                async submitVote() {
-                    if (!this.lineUid || !this.selectedSessionId || !this.selectedVoteUserId) return;
+                async submitVote(categoryKey) {
+                    if (!this.lineUid || !this.selectedSessionId || !categoryKey) return;
+                    const nomineeLineUid = this.voteSelections[categoryKey];
+                    if (!nomineeLineUid) return;
 
                     this.isLoading = true;
                     this.statusMessage = '';
 
                     try {
-                        const response = await fetch(`/api/session/${this.selectedSessionId}/votes`, {
+                        const response = await fetch(`/api/events/${this.selectedSessionId}/vote`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 lineUid: this.lineUid,
-                                votedUserId: this.selectedVoteUserId,
-                                ...this.voteForm
+                                category: categoryKey,
+                                nomineeLineUid
                             })
                         });
                         const result = await response.json();
 
                         if (!response.ok) throw new Error(result.message || this.t('voteFailed'));
 
-                        this.statusMessage = this.t('voteSaved');
-                        await this.loadVotes();
+                        this.statusMessage = result.message || this.t('voteSaved');
+                        this.canVote = Boolean(result.canVote);
+                        this.votePlayers = result.players || this.votePlayers;
+                        this.myVotes = result.myVotes || this.myVotes;
+                        this.voteSummary = result.voteSummary || this.voteSummary;
+                        this.voteProgress = Number(result.voteProgress || this.voteProgress);
+                        this.totalVoteCategories = Number(result.totalCategories || this.totalVoteCategories);
+                        this.voteSelections[categoryKey] = '';
                         await this.loadProfileHistory();
+                        await this.loadRankings();
                     } catch (error) {
                         this.statusMessage = error.message || this.t('voteFailed');
                     } finally {
