@@ -275,23 +275,119 @@
                 <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="players.length === 0" x-text="t('noPlayers')"></p>
             </section>
 
-            <section id="rankings-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'rankings-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'rankings'" x-cloak>
-                <div class="mb-4 flex items-center justify-between">
-                    <h1 class="text-xl font-black" x-text="t('rankings')">Rankings</h1>
+            <section id="rankings-section" class="public-jump-target mt-5 px-5 pb-32" :class="sectionHighlightId === 'rankings-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'rankings'" x-cloak>
+                <div class="mb-4 flex items-end justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-black uppercase tracking-[0.18em] text-gdsq" x-text="t('clubAwards')">Club Awards</p>
+                        <h1 class="mt-1 text-2xl font-black" x-text="t('rankings')">Rankings</h1>
+                    </div>
                     <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
                 </div>
                 <div class="mb-4 space-y-3">
-                    <div class="grid grid-cols-4 gap-2 rounded-xl bg-gray-100 p-1">
+                    <div class="grid grid-cols-4 gap-2 rounded-2xl bg-white p-1 shadow-sm">
                         <template x-for="period in rankingPeriods" :key="period">
-                            <button class="rounded-lg px-3 py-2 text-xs font-black" :class="rankingPeriod === period ? 'bg-white text-gdsq shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
+                            <button class="rounded-xl px-2 py-2.5 text-[11px] font-black" :class="rankingPeriod === period ? 'bg-gdsq text-white shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
                         </template>
                     </div>
-                    <p class="rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500" x-show="rankingPeriod !== 'awards' && rankingMeta.periodLabel" x-text="rankingMeta.periodLabel"></p>
-                    <div class="flex gap-2 overflow-x-auto pb-1" x-show="rankingPeriod !== 'awards'">
-                        <template x-for="category in rankingCategories" :key="category">
-                            <button class="shrink-0 rounded-full px-3 py-2 text-xs font-black" :class="rankingCategory === category ? 'bg-gdsq text-white' : 'bg-gray-100 text-gray-600'" @click="rankingCategory = category; loadRankings()" x-text="rankingCategoryLabel(category)"></button>
+                    <p class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-gdsq" x-show="rankingPeriod !== 'awards' && rankingMeta.periodLabel" x-text="rankingMeta.periodLabel"></p>
+                </div>
+
+                <div class="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-gdsqNavy via-gdsq to-blue-500 p-5 text-white shadow-xl" x-show="rankingPeriod !== 'awards'">
+                    <div class="pointer-events-none absolute -right-4 -top-4 text-7xl text-white/10"><i class="fa-solid fa-trophy"></i></div>
+                    <div class="pointer-events-none absolute -left-8 top-12 h-28 w-28 rounded-full bg-white/10 blur-3xl"></div>
+                    <div class="pointer-events-none absolute bottom-0 right-8 h-24 w-24 rounded-full bg-amber-300/20 blur-3xl"></div>
+                    <p class="text-[11px] font-black uppercase tracking-[0.2em] text-blue-100" x-text="t('championHighlight')">Champion Highlight</p>
+                    <div class="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-bold text-blue-50">
+                        <i class="fa-solid fa-bolt text-yellow-200"></i>
+                        <span x-text="rankingChampionMood()"></span>
+                    </div>
+                    <div class="mt-4 flex items-center gap-4">
+                        <div class="relative shrink-0">
+                            <div class="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-yellow-200 via-yellow-400 to-amber-500 p-1 shadow-lg">
+                                <img class="h-full w-full rounded-full border-4 border-white object-cover" :src="playerAvatar(currentChampion())" alt="">
+                            </div>
+                            <span class="absolute -right-1 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-yellow-300 text-amber-900 shadow-md">
+                                <i class="fa-solid fa-crown"></i>
+                            </span>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-black text-blue-100" x-text="championTitle()"></p>
+                            <h2 class="truncate text-2xl font-black" x-text="currentChampion()?.displayName || t('noAwardsYet')"></h2>
+                            <p class="mt-1 text-sm font-bold text-blue-50">
+                                <span x-text="currentChampion()?.voteCount || 0"></span> <span x-text="t('votesReceived')"></span>
+                                <span x-show="currentChampionTopCategory()"> · </span>
+                                <span x-show="currentChampionTopCategory()" x-text="currentChampionTopCategory()"></span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <template x-for="badge in championBadges()" :key="badge.label">
+                            <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-black backdrop-blur-sm" x-text="badge.label"></span>
+                        </template>
+                        <span class="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold" x-show="championBadges().length === 0" x-text="t('noAwardsYet')"></span>
+                    </div>
+                    <div class="mt-5 grid grid-cols-3 gap-3">
+                        <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="t('awardRace')"></p>
+                            <p class="mt-1 text-lg font-black" x-text="rankings.length || 0"></p>
+                        </div>
+                        <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="t('votes')"></p>
+                            <p class="mt-1 text-lg font-black" x-text="currentChampion()?.voteCount || 0"></p>
+                        </div>
+                        <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
+                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="t('eventsJoined')"></p>
+                            <p class="mt-1 text-lg font-black" x-text="currentChampion()?.joinedCount || 0"></p>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2" x-show="rankingPeriod === 'weekly' || rankingPeriod === 'monthly'">
+                        <button class="rounded-xl bg-white px-4 py-2.5 text-xs font-black text-gdsq" @click="shareRankingPeriod(rankingPeriod)" x-text="rankingPeriod === 'weekly' ? t('shareWeeklyMvpCard') : t('shareMonthlyMvpCard')"></button>
+                        <button class="rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-xs font-black text-white" @click="copyRankingPeriodLink(rankingPeriod)" x-text="t('copyLink')"></button>
+                    </div>
+                </div>
+
+                <div class="mt-4" x-show="rankingPeriod !== 'awards' && podiumPlayers().length">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-[0.18em] text-gdsq" x-text="t('podiumSpotlight')"></p>
+                            <h2 class="mt-1 text-lg font-black" x-text="t('topRankings')"></h2>
+                        </div>
+                        <button class="rounded-full border border-gdsq/15 bg-white px-4 py-2 text-[11px] font-black text-gdsq shadow-sm" @click="navigateToSection('events')" x-text="t('joinEventForAwards')"></button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 items-end">
+                        <template x-for="slot in podiumPlayers()" :key="slot.place">
+                            <div class="rounded-[26px] p-3 text-center shadow-sm" :class="slot.place === 1 ? 'bg-gradient-to-b from-yellow-100 to-amber-50 border border-yellow-200' : (slot.place === 2 ? 'bg-gradient-to-b from-slate-100 to-white border border-slate-200' : 'bg-gradient-to-b from-orange-100 to-amber-50 border border-orange-200')">
+                                <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-sm font-black" :class="slot.place === 1 ? 'bg-yellow-400 text-amber-950' : (slot.place === 2 ? 'bg-slate-300 text-slate-800' : 'bg-orange-300 text-orange-950')" x-text="slot.place"></div>
+                                <div class="mx-auto mt-3 h-16 w-16 rounded-full p-1" :class="slot.place === 1 ? 'bg-gradient-to-br from-yellow-300 to-amber-500' : (slot.place === 2 ? 'bg-gradient-to-br from-slate-200 to-slate-400' : 'bg-gradient-to-br from-orange-200 to-amber-700')">
+                                    <img class="h-full w-full rounded-full border-4 border-white object-cover" :src="playerAvatar(slot.player)" :alt="slot.player?.displayName || 'Player'">
+                                </div>
+                                <p class="mt-3 truncate text-sm font-black" x-text="slot.player?.displayName || '-'"></p>
+                                <p class="mt-1 text-[11px] font-bold text-gray-500"><span x-text="slot.player?.voteCount || 0"></span> <span x-text="t('votes')"></span></p>
+                                <div class="mt-3 rounded-2xl px-3 py-3 text-left text-white" :class="slot.place === 1 ? 'bg-gdsq h-24' : (slot.place === 2 ? 'bg-slate-500 h-20' : 'bg-orange-500 h-16')">
+                                    <p class="text-[10px] font-black uppercase tracking-wide opacity-90" x-text="slot.place === 1 ? t('championLane') : (slot.place === 2 ? t('runnerUp') : t('thirdPlace'))"></p>
+                                    <p class="mt-2 text-sm font-black leading-tight" x-text="slot.player?.topCategories?.[0]?.label || t('clubAwards')"></p>
+                                </div>
+                            </div>
                         </template>
                     </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="rankingPeriod !== 'awards'">
+                    <p class="text-xs font-black uppercase tracking-wide text-gray-500" x-text="t('awardBadges')">Award Badges</p>
+                    <div class="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                        <template x-for="badge in awardBadgeCategories()" :key="badge.key">
+                            <div class="flex min-w-[108px] shrink-0 items-center gap-2 rounded-2xl bg-blue-50 px-3 py-3 text-gdsq">
+                                <i class="fa-solid text-sm" :class="awardCategoryIcon(badge.key)"></i>
+                                <span class="text-[11px] font-black leading-tight" x-text="badge.label"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]" x-show="rankingPeriod !== 'awards'">
+                    <template x-for="category in rankingCategories" :key="category">
+                        <button class="shrink-0 rounded-full px-4 py-2.5 text-xs font-black shadow-sm" :class="rankingCategory === category ? 'bg-gdsq text-white' : 'bg-white text-gray-600'" @click="rankingCategory = category; loadRankings()" x-text="rankingCategoryLabel(category)"></button>
+                    </template>
                 </div>
 
                 <div class="space-y-4" x-show="rankingPeriod === 'awards'">
@@ -352,29 +448,53 @@
                     </div>
                 </div>
 
-                <div class="space-y-3" x-show="rankingPeriod !== 'awards'">
-                    <div class="flex flex-wrap gap-2" x-show="rankingPeriod === 'weekly' || rankingPeriod === 'monthly'">
-                        <button class="rounded-xl bg-gdsq px-3 py-2 text-xs font-black text-white" @click="shareRankingPeriod(rankingPeriod)" x-text="rankingPeriod === 'weekly' ? t('shareWeeklyMvp') : t('shareMonthlyMvp')"></button>
-                        <button class="rounded-xl border border-gray-300 px-3 py-2 text-xs font-black text-gdsq" @click="copyRankingPeriodLink(rankingPeriod)" x-text="t('copyLink')"></button>
-                    </div>
+                <div class="mt-4 space-y-3" x-show="rankingPeriod !== 'awards'">
                     <template x-for="(player, index) in rankings" :key="player.id">
-                        <button class="flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm" @click="openPlayerProfile(player.id)">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gdsq text-lg font-black text-white" x-text="index + 1"></div>
-                            <img class="h-12 w-12 rounded-full object-cover" :src="playerAvatar(player)" :alt="player.displayName">
+                        <button class="flex w-full items-center gap-3 rounded-[24px] border border-white/60 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" @click="openPlayerProfile(player.id)">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-black" :class="rankBadgeClass(index)" x-text="index + 1"></div>
+                            <div class="relative shrink-0">
+                                <img class="h-12 w-12 rounded-full object-cover ring-2 ring-white" :src="playerAvatar(player)" :alt="player.displayName">
+                                <span class="absolute -bottom-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gdsq px-1 text-[10px] font-black text-white" x-text="index < 3 ? 'TOP' : '#' + (index + 1)"></span>
+                            </div>
                             <div class="min-w-0 flex-1">
-                                <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
+                                <div class="flex items-center gap-2">
+                                    <p class="truncate font-black" x-text="player.displayName || 'Player'"></p>
+                                    <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-gdsq" x-show="(player.topCategories || []).length" x-text="player.topCategories?.[0]?.label || ''"></span>
+                                </div>
                                 <p class="text-xs font-semibold text-gray-500">
                                     <span x-text="player.voteCount || 0"></span> <span x-text="t('votesReceived')"></span> ·
                                     <span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span>
                                 </p>
-                                <p class="truncate text-[11px] font-semibold text-gray-400" x-show="(player.topCategories || []).length" x-text="player.topCategories.map((item) => `${item.label} ${item.votes}`).join(' · ')"></p>
+                                <div class="mt-2 flex flex-wrap gap-1.5" x-show="(player.topCategories || []).length">
+                                    <template x-for="item in (player.topCategories || []).slice(0, 3)" :key="`${player.id}-${item.label}`">
+                                        <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-gdsq" x-text="item.label"></span>
+                                    </template>
+                                </div>
                             </div>
-                            <div class="text-right">
-                                <p class="text-lg font-black text-gdsq" x-text="player.categoryVoteCount || player.voteCount || 0"></p>
-                                <p class="text-[10px] font-bold uppercase text-gray-500" x-text="t('votes')"></p>
+                            <div class="rounded-2xl bg-blue-50 px-3 py-2 text-center text-gdsq">
+                                <p class="text-lg font-black" x-text="player.categoryVoteCount || player.voteCount || 0"></p>
+                                <p class="text-[10px] font-black uppercase" x-text="t('votes')"></p>
                             </div>
                         </button>
                     </template>
+                </div>
+                <div class="mt-5 rounded-[28px] bg-gradient-to-r from-gdsqNavy via-gdsq to-blue-500 p-5 text-white shadow-lg" x-show="rankingPeriod !== 'awards'">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-xs font-black uppercase tracking-[0.18em] text-blue-100" x-text="t('joinToUnlockAwards')"></p>
+                            <h2 class="mt-1 text-xl font-black" x-text="t('collectBadgesByPlaying')"></h2>
+                            <p class="mt-2 text-sm font-semibold text-blue-50" x-text="t('rankingJoinHint')"></p>
+                        </div>
+                        <div class="text-4xl text-white/20">
+                            <i class="fa-solid fa-medal"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-black">MVP</span>
+                        <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-black">Good Vibes</span>
+                        <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-black">Fair Play</span>
+                    </div>
+                    <button class="mt-4 rounded-xl bg-white px-4 py-3 text-sm font-black text-gdsq" @click="navigateToSection('events')" x-text="t('joinNextEvent')"></button>
                 </div>
                 <p class="rounded-2xl bg-gray-50 p-6 text-center text-sm font-semibold text-gray-500" x-show="rankingPeriod !== 'awards' && rankings.length === 0" x-text="t('noRankings')"></p>
             </section>
@@ -1565,8 +1685,24 @@
                         categoryAwards: 'รางวัลแยกหมวด',
                         shareWeeklyMvp: 'แชร์ MVP ประจำสัปดาห์',
                         shareMonthlyMvp: 'แชร์ MVP ประจำเดือน',
+                        shareWeeklyMvpCard: 'แชร์การ์ด MVP ประจำสัปดาห์',
+                        shareMonthlyMvpCard: 'แชร์การ์ด MVP ประจำเดือน',
                         copyLink: 'คัดลอกลิงก์',
                         topRankings: 'อันดับสูงสุด',
+                        clubAwards: 'รางวัลของคลับ',
+                        championHighlight: 'แชมป์เด่น',
+                        awardBadges: 'แบดจ์รางวัล',
+                        awardRace: 'สายรางวัล',
+                        podiumSpotlight: 'แท่นรางวัล',
+                        championLane: 'แชมป์ประจำช่วง',
+                        runnerUp: 'รองแชมป์',
+                        thirdPlace: 'อันดับสาม',
+                        joinEventForAwards: 'ไปเข้าร่วมกิจกรรม',
+                        joinToUnlockAwards: 'ร่วมกิจกรรมเพื่อปลดล็อกรางวัล',
+                        collectBadgesByPlaying: 'เล่นให้สนุก เก็บแบดจ์ให้เต็มโปรไฟล์',
+                        rankingJoinHint: 'ยิ่งเข้าร่วมกิจกรรม ยิ่งมีสิทธิ์เก็บคะแนนโหวตและรางวัลเด่นของคลับ',
+                        joinNextEvent: 'ดูกิจกรรมถัดไป',
+                        noAwardsYet: 'ยังไม่มีรางวัล',
                         submitCategoryVote: 'ส่งโหวตหมวดนี้',
                         votesReceived: 'คะแนนโหวตรวม',
                         choosePlayerToVote: 'เลือกผู้เล่นที่จะโหวต',
@@ -1778,8 +1914,24 @@
                         categoryAwards: 'Category Awards',
                         shareWeeklyMvp: 'Share Weekly MVP',
                         shareMonthlyMvp: 'Share Monthly MVP',
+                        shareWeeklyMvpCard: 'Share Weekly MVP Card',
+                        shareMonthlyMvpCard: 'Share Monthly MVP Card',
                         copyLink: 'Copy Link',
                         topRankings: 'Top Rankings',
+                        clubAwards: 'Club Awards',
+                        championHighlight: 'Champion Highlight',
+                        awardBadges: 'Award Badges',
+                        awardRace: 'Award Race',
+                        podiumSpotlight: 'Podium Spotlight',
+                        championLane: 'Champion Lane',
+                        runnerUp: 'Runner Up',
+                        thirdPlace: 'Third Place',
+                        joinEventForAwards: 'Join an Event',
+                        joinToUnlockAwards: 'Join events to unlock awards',
+                        collectBadgesByPlaying: 'Play more, collect more badges',
+                        rankingJoinHint: 'Every event gives players more chances to earn votes, badges, and spotlight moments.',
+                        joinNextEvent: 'See Next Event',
+                        noAwardsYet: 'No awards yet',
                         submitCategoryVote: 'Submit Vote',
                         votesReceived: 'votes received',
                         choosePlayerToVote: 'Choose a player to vote',
@@ -2208,6 +2360,70 @@
 
                 rankingCategoryLabel(category) {
                     return this.voteCategories.find((item) => item.key === category)?.label || (category === 'overall' ? this.t('overall') : category);
+                },
+
+                currentChampion() {
+                    return this.rankingMeta.mvpWinner || this.rankings[0] || null;
+                },
+
+                championTitle() {
+                    if (this.rankingPeriod === 'weekly') return this.t('shareWeeklyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
+                    if (this.rankingPeriod === 'monthly') return this.t('shareMonthlyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
+                    return this.t('topRankings');
+                },
+
+                rankingChampionMood() {
+                    if (this.rankingPeriod === 'weekly') return this.t('thisWeek');
+                    if (this.rankingPeriod === 'monthly') return this.t('thisMonth');
+                    return this.t('allTime');
+                },
+
+                currentChampionTopCategory() {
+                    return this.currentChampion()?.topCategories?.[0]?.label || '';
+                },
+
+                championBadges() {
+                    return (this.currentChampion()?.topCategories || []).slice(0, 3);
+                },
+
+                podiumPlayers() {
+                    return [
+                        { place: 2, player: this.rankings[1] || null },
+                        { place: 1, player: this.rankings[0] || null },
+                        { place: 3, player: this.rankings[2] || null }
+                    ].filter((item) => item.player);
+                },
+
+                awardBadgeCategories() {
+                    return this.voteCategories
+                        .filter((category) => category.key !== 'best_partner')
+                        .map((category) => ({
+                            key: category.key,
+                            label: category.label
+                        }));
+                },
+
+                awardCategoryIcon(category) {
+                    const icons = {
+                        mvp_match: 'fa-trophy',
+                        best_vibe: 'fa-face-smile',
+                        most_improved: 'fa-chart-line',
+                        dink_master: 'fa-table-tennis-paddle-ball',
+                        power_shot: 'fa-bolt',
+                        aggressive_player: 'fa-fire',
+                        fair_play: 'fa-handshake',
+                        style_on_court: 'fa-shirt',
+                        social_star: 'fa-star',
+                        rookie_of_the_day: 'fa-seedling'
+                    };
+                    return icons[category] || 'fa-medal';
+                },
+
+                rankBadgeClass(index) {
+                    if (index === 0) return 'bg-gradient-to-br from-yellow-200 to-amber-500 text-amber-950 shadow-sm';
+                    if (index === 1) return 'bg-gradient-to-br from-slate-100 to-slate-300 text-slate-700 shadow-sm';
+                    if (index === 2) return 'bg-gradient-to-br from-orange-200 to-amber-700 text-amber-950 shadow-sm';
+                    return 'bg-blue-50 text-gdsq';
                 },
 
                 async openPlayerProfile(playerId) {
