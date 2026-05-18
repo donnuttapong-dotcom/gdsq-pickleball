@@ -565,8 +565,9 @@ async function renderRankingSharePage(req, {
   sharePath = ''
 }) {
   const shareUrl = `${req.protocol}://${req.get('host')}${sharePath || req.originalUrl}`;
-  const winnerName = winner?.displayName || 'TBA';
-  const winnerImage = publicImageUrl(winner?.profileImageUrl) || '/assets/gdsq-logo.png';
+  const resolvedWinner = winner || (top || [])[0] || null;
+  const winnerName = resolvedWinner?.displayName || 'TBA';
+  const winnerImage = publicImageUrl(resolvedWinner?.profileImageUrl) || '/assets/gdsq-logo.png';
   const heroImage = absoluteUrl(req, winnerImage);
   const topCards = (top || []).slice(0, 5).map((row, index) => `
     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:#f8fafc;">
@@ -617,7 +618,7 @@ async function renderRankingSharePage(req, {
             <img src="${heroImage}" alt="" style="width:96px;height:96px;border-radius:999px;object-fit:cover;border:4px solid rgba(255,255,255,.4);background:#fff;">
             <div>
               <div style="font-size:28px;font-weight:900;">${escapeHtml(winnerName)}</div>
-              <div style="font-size:15px;font-weight:700;opacity:.92;">${Number(winner?.totalVotes || winner?.voteCount || 0)} votes</div>
+              <div style="font-size:15px;font-weight:700;opacity:.92;">${Number(resolvedWinner?.totalVotes || resolvedWinner?.voteCount || 0)} votes</div>
             </div>
           </div>
         </div>
