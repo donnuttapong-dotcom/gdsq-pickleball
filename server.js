@@ -995,6 +995,45 @@ async function listRankingVotes({
   return data || [];
 }
 
+async function findLatestRankingPeriodIdentifier(period = 'all-time') {
+  const normalizedPeriod = normalizeRankingPeriod(period);
+  if (normalizedPeriod === 'all-time') return '';
+
+  const { data: votes, error: votesError } = await supabase
+    .from('ranking_votes')
+    .select('event_id, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
+  if (votesError) {
+    if (votesError.code === '42P01') return '';
+    throw votesError;
+  }
+
+  const eventIds = [...new Set((votes || []).map((vote) => vote.event_id).filter(Boolean))];
+  if (eventIds.length === 0) return '';
+
+  const { data: sessions, error: sessionsError } = await supabase
+    .from('sessions')
+    .select('id, event_date')
+    .in('id', eventIds)
+    .not('event_date', 'is', null);
+
+  if (sessionsError) throw sessionsError;
+
+  const identifiers = (sessions || [])
+    .map((session) => {
+      if (!session.event_date) return '';
+      if (normalizedPeriod === 'weekly') return normalizeWeekIdentifier(session.event_date);
+      if (normalizedPeriod === 'monthly') return String(session.event_date).slice(0, 7);
+      return '';
+    })
+    .filter(Boolean)
+    .sort();
+
+  return identifiers.length ? identifiers[identifiers.length - 1] : '';
+}
+
 function topCategoryEntries(categoryCounts = {}, limit = 5) {
   return Object.entries(categoryCounts || {})
     .map(([categoryKey, votes]) => ({
@@ -1035,7 +1074,10 @@ function buildRankingRows({ users = [], joinedByUserId = {}, votes = [], categor
         ratingAverage: tally.totalVotes || null
       };
     })
-    .filter((user) => user.voteCount > 0 || user.joinedCount > 0)
+    .filter((user) => {
+      if (category === DEFAULT_RANKING_CATEGORY) return user.voteCount > 0;
+      return user.categoryVoteCount > 0;
+    })
     .sort((a, b) => (b.categoryVoteCount || 0) - (a.categoryVoteCount || 0) || (b.voteCount || 0) - (a.voteCount || 0) || (b.joinedCount || 0) - (a.joinedCount || 0) || String(a.displayName || '').localeCompare(String(b.displayName || '')));
 }
 
@@ -1048,7 +1090,10 @@ function buildAwardWinners(rankings = [], limit = 5) {
         lineUid: row.lineUid,
         displayName: row.displayName,
         profileImageUrl: row.profileImageUrl,
-        totalVotes: Number(row.categoryCounts?.[category.key] || 0)
+        totalVotes: Number(row.categoryCounts?.[category.key] || 0),
+        voteCount: Number(row.categoryCounts?.[category.key] || 0),
+        joinedCount: Number(row.joinedCount || 0),
+        topCategories: [{ label: category.label, votes: Number(row.categoryCounts?.[category.key] || 0) }]
       }))
       .sort((a, b) => b.totalVotes - a.totalVotes || String(a.displayName || '').localeCompare(String(b.displayName || '')));
 
@@ -1093,19 +1138,39 @@ async function buildRankingPayload({ period = 'all-time', identifier = '', categ
   const normalizedCategory = VOTING_CATEGORY_KEYS.has(category) ? category : DEFAULT_RANKING_CATEGORY;
   const resolvedIdentifier = identifier || defaultPeriodIdentifier(normalizedPeriod);
   const { users, joinedByUserId } = await loadRankingUsersAndJoinedCounts();
-  const votes = await listRankingVotes({ period: normalizedPeriod, identifier: resolvedIdentifier });
+  let effectiveIdentifier = resolvedIdentifier;
+  let votes = await listRankingVotes({ period: normalizedPeriod, identifier: resolvedIdentifier });
+  let isFallback = false;
+
+  if (normalizedPeriod !== 'all-time' && votes.length === 0) {
+    const latestIdentifier = await findLatestRankingPeriodIdentifier(normalizedPeriod);
+    if (latestIdentifier && latestIdentifier !== resolvedIdentifier) {
+      const fallbackVotes = await listRankingVotes({ period: normalizedPeriod, identifier: latestIdentifier });
+      if (fallbackVotes.length > 0) {
+        votes = fallbackVotes;
+        effectiveIdentifier = latestIdentifier;
+        isFallback = true;
+      }
+    }
+  }
+
   const rankings = buildRankingRows({ users, joinedByUserId, votes, category: normalizedCategory });
   const awards = buildAwardWinners(rankings);
-  const range = periodRangeByIdentifier(normalizedPeriod, resolvedIdentifier);
+  const range = periodRangeByIdentifier(normalizedPeriod, effectiveIdentifier);
+  const requestedRange = periodRangeByIdentifier(normalizedPeriod, resolvedIdentifier);
 
   return {
     period: normalizedPeriod,
     periodId: range.id,
     periodLabel: periodLabel(normalizedPeriod, range.id),
+    requestedPeriodId: requestedRange.id,
+    requestedPeriodLabel: periodLabel(normalizedPeriod, requestedRange.id),
     category: normalizedCategory,
     rankings,
     awards,
-    mvpWinner: awards.find((award) => award.categoryKey === 'mvp_match')?.winner || null
+    mvpWinner: awards.find((award) => award.categoryKey === 'mvp_match')?.winner || null,
+    isFallback,
+    hasVotes: votes.length > 0
   };
 }
 
