@@ -3110,15 +3110,9 @@
                 },
 
                 async shareAwardPage(period) {
-                    const url = period === 'weekly'
-                        ? `${window.location.origin}/awards/weekly/${encodeURIComponent(this.currentWeekId())}`
-                        : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
-                    if (navigator.share) {
-                        await navigator.share({ title: 'GDSQ Awards', url });
-                        return;
-                    }
-                    await navigator.clipboard.writeText(url);
-                    this.statusMessage = this.t('copiedLink');
+                    await this.shareAwardLink(period, {
+                        title: period === 'weekly' ? this.t('shareWeeklyMvpCard') : this.t('shareMonthlyMvpCard')
+                    });
                 },
 
                 async copyAwardLink(period) {
@@ -3130,16 +3124,10 @@
                 },
 
                 async shareRankingPeriod(period) {
-                    const url = period === 'weekly'
-                        ? `${window.location.origin}/awards/weekly/${encodeURIComponent(this.currentWeekId())}`
-                        : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
                     const shareTitle = period === 'weekly' ? this.t('shareWeeklyMvpCard') : this.t('shareMonthlyMvpCard');
-                    if (navigator.share) {
-                        await navigator.share({ title: shareTitle, text: this.currentChampion()?.displayName || 'GDSQ Pickleball', url });
-                        return;
-                    }
-                    await navigator.clipboard.writeText(url);
-                    this.statusMessage = this.t('copiedLink');
+                    await this.shareAwardLink(period, {
+                        title: shareTitle
+                    });
                 },
 
                 async copyRankingPeriodLink(period) {
@@ -3147,6 +3135,146 @@
                         ? `${window.location.origin}/awards/weekly/${encodeURIComponent(this.currentWeekId())}`
                         : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
                     await navigator.clipboard.writeText(url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                awardShareUrl(period) {
+                    return period === 'weekly'
+                        ? `${window.location.origin}/awards/weekly/${encodeURIComponent(this.currentWeekId())}`
+                        : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
+                },
+
+                awardSharePayload(period) {
+                    const isWeekly = period === 'weekly';
+                    const awardBoard = isWeekly ? this.rankingAwards.weekly : this.rankingAwards.monthly;
+                    const champion = awardBoard?.mvpWinner || this.currentChampion() || null;
+                    const title = isWeekly ? this.t('shareWeeklyMvpCard') : this.t('shareMonthlyMvpCard');
+                    const heroImage = this.playerAvatar(champion);
+                    const periodLabel = awardBoard?.periodLabel || this.rankingMeta?.periodLabel || '';
+                    const votes = Number(champion?.voteCount || champion?.totalVotes || 0);
+                    const topCategory = champion?.topCategories?.[0]?.label || this.currentChampionTopCategory() || this.t('clubAwards');
+                    const championName = champion?.displayName || 'GDSQ Pickleball';
+                    const url = this.awardShareUrl(period);
+
+                    return {
+                        url,
+                        title,
+                        champion,
+                        championName,
+                        votes,
+                        topCategory,
+                        heroImage,
+                        periodLabel
+                    };
+                },
+
+                async shareAwardLink(period, options = {}) {
+                    const payload = this.awardSharePayload(period);
+                    const shareTitle = options.title || payload.title;
+                    const shareText = [
+                        shareTitle,
+                        payload.championName,
+                        payload.periodLabel,
+                        `${payload.votes} ${this.t('votes')}`,
+                        payload.topCategory
+                    ].filter(Boolean).join(' · ');
+
+                    if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                        try {
+                            await liff.shareTargetPicker([
+                                {
+                                    type: 'flex',
+                                    altText: `${shareTitle} - ${payload.championName}`,
+                                    contents: {
+                                        type: 'bubble',
+                                        size: 'mega',
+                                        hero: {
+                                            type: 'image',
+                                            url: payload.heroImage,
+                                            size: 'full',
+                                            aspectRatio: '20:13',
+                                            aspectMode: 'cover',
+                                            action: {
+                                                type: 'uri',
+                                                uri: payload.url
+                                            }
+                                        },
+                                        body: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            spacing: 'md',
+                                            contents: [
+                                                {
+                                                    type: 'text',
+                                                    text: 'GDSQ PICKLEBALL',
+                                                    size: 'xs',
+                                                    weight: 'bold',
+                                                    color: '#0B4FD9'
+                                                },
+                                                {
+                                                    type: 'text',
+                                                    text: shareTitle,
+                                                    size: 'xl',
+                                                    weight: 'bold',
+                                                    wrap: true,
+                                                    color: '#111827'
+                                                },
+                                                {
+                                                    type: 'text',
+                                                    text: payload.championName,
+                                                    size: 'lg',
+                                                    weight: 'bold',
+                                                    wrap: true,
+                                                    color: '#0B4FD9'
+                                                },
+                                                {
+                                                    type: 'text',
+                                                    text: [payload.periodLabel, `${payload.votes} ${this.t('votes')}`, payload.topCategory].filter(Boolean).join(' • '),
+                                                    size: 'sm',
+                                                    wrap: true,
+                                                    color: '#6B7280'
+                                                }
+                                            ]
+                                        },
+                                        footer: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            spacing: 'sm',
+                                            contents: [
+                                                {
+                                                    type: 'button',
+                                                    style: 'primary',
+                                                    color: '#0B4FD9',
+                                                    action: {
+                                                        type: 'uri',
+                                                        label: this.t('viewAll'),
+                                                        uri: payload.url
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'text',
+                                    text: payload.url
+                                }
+                            ]);
+                            return;
+                        } catch (error) {
+                            console.warn('LINE award share fallback:', error);
+                        }
+                    }
+
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: shareTitle,
+                            url: payload.url
+                        });
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(payload.url);
                     this.statusMessage = this.t('copiedLink');
                 },
 
