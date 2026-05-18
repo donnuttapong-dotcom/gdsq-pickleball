@@ -289,7 +289,10 @@
                             <button class="rounded-xl px-2 py-2.5 text-[11px] font-black" :class="rankingPeriod === period ? 'bg-gdsq text-white shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
                         </template>
                     </div>
-                    <p class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-gdsq" x-show="rankingPeriod !== 'awards' && rankingMeta.periodLabel" x-text="rankingMeta.periodLabel"></p>
+                    <div class="flex flex-wrap gap-2" x-show="rankingPeriod !== 'awards' && (rankingMeta.periodLabel || rankingMeta.isFallback)">
+                        <p class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-gdsq" x-show="rankingMeta.periodLabel" x-text="rankingMeta.periodLabel"></p>
+                        <p class="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700" x-show="rankingMeta.isFallback" x-text="t('latestResult')"></p>
+                    </div>
                 </div>
 
                 <div class="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-gdsqNavy via-gdsq to-blue-500 p-5 text-white shadow-xl" x-show="rankingPeriod !== 'awards'">
@@ -300,6 +303,10 @@
                     <div class="mt-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-bold text-blue-50">
                         <i class="fa-solid fa-bolt text-yellow-200"></i>
                         <span x-text="rankingChampionMood()"></span>
+                    </div>
+                    <div class="mt-2 inline-flex items-center gap-2 rounded-full border border-amber-200/50 bg-amber-300/20 px-3 py-1 text-[11px] font-black text-amber-100" x-show="rankingMeta.isFallback">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span x-text="t('latestResult')"></span>
                     </div>
                     <div class="mt-4 flex items-start gap-3 sm:gap-4">
                         <div class="relative shrink-0">
@@ -1244,7 +1251,11 @@
                 rankingMeta: {
                     period: 'monthly',
                     periodId: '',
-                    periodLabel: ''
+                    periodLabel: '',
+                    requestedPeriodId: '',
+                    requestedPeriodLabel: '',
+                    isFallback: false,
+                    hasVotes: false
                 },
                 rankingAwards: {
                     weekly: null,
@@ -1703,6 +1714,10 @@
                         rankingJoinHint: 'ยิ่งเข้าร่วมกิจกรรม ยิ่งมีสิทธิ์เก็บคะแนนโหวตและรางวัลเด่นของคลับ',
                         joinNextEvent: 'ดูกิจกรรมถัดไป',
                         noAwardsYet: 'ยังไม่มีรางวัล',
+                        latestResult: 'ผลล่าสุด',
+                        latestWeeklyChampion: 'แชมป์ล่าสุดประจำสัปดาห์',
+                        latestMonthlyChampion: 'แชมป์ล่าสุดประจำเดือน',
+                        noVotesInPeriod: 'ยังไม่มีผลโหวตในช่วงนี้',
                         submitCategoryVote: 'ส่งโหวตหมวดนี้',
                         votesReceived: 'คะแนนโหวตรวม',
                         choosePlayerToVote: 'เลือกผู้เล่นที่จะโหวต',
@@ -1932,6 +1947,10 @@
                         rankingJoinHint: 'Every event gives players more chances to earn votes, badges, and spotlight moments.',
                         joinNextEvent: 'See Next Event',
                         noAwardsYet: 'No awards yet',
+                        latestResult: 'Latest Result',
+                        latestWeeklyChampion: 'Latest Weekly Champion',
+                        latestMonthlyChampion: 'Latest Monthly Champion',
+                        noVotesInPeriod: 'No votes for this period yet',
                         submitCategoryVote: 'Submit Vote',
                         votesReceived: 'votes received',
                         choosePlayerToVote: 'Choose a player to vote',
@@ -2345,6 +2364,10 @@
                             period: result.period || this.rankingPeriod,
                             periodId: result.periodId || '',
                             periodLabel: result.periodLabel || '',
+                            requestedPeriodId: result.requestedPeriodId || '',
+                            requestedPeriodLabel: result.requestedPeriodLabel || '',
+                            isFallback: Boolean(result.isFallback),
+                            hasVotes: Boolean(result.hasVotes),
                             awards: result.awards || [],
                             mvpWinner: result.mvpWinner || null
                         };
@@ -2367,12 +2390,15 @@
                 },
 
                 championTitle() {
+                    if (this.rankingMeta.isFallback && this.rankingPeriod === 'weekly') return this.t('latestWeeklyChampion');
+                    if (this.rankingMeta.isFallback && this.rankingPeriod === 'monthly') return this.t('latestMonthlyChampion');
                     if (this.rankingPeriod === 'weekly') return this.t('shareWeeklyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
                     if (this.rankingPeriod === 'monthly') return this.t('shareMonthlyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
                     return this.t('topRankings');
                 },
 
                 rankingChampionMood() {
+                    if (this.rankingMeta.isFallback) return this.t('latestResult');
                     if (this.rankingPeriod === 'weekly') return this.t('thisWeek');
                     if (this.rankingPeriod === 'monthly') return this.t('thisMonth');
                     return this.t('allTime');
