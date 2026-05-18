@@ -4,6 +4,7 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -41,6 +42,7 @@ const sessionSelect = 'id, title, max_players, court_count, event_date, start_ti
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
 const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
+const hasDefaultHomeBannerAsset = fs.existsSync(path.join(__dirname, 'public', 'assets', 'gdsq-home-banner.png'));
 const VOTING_CATEGORIES = [
   { key: 'mvp_match', label: 'MVP of the Match', badgeKey: 'mvp' },
   { key: 'best_vibe', label: 'Best Vibe Player', badgeKey: 'goodVibes' },
@@ -182,10 +184,14 @@ function buildMetaTags({ title, description, imageUrl, url }) {
     ? `
     <meta property="og:image" content="${safeImage}">
     <meta property="og:image:secure_url" content="${safeImage}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="${safeTitle}">
     <meta name="twitter:image" content="${safeImage}">`
     : '';
 
   return `
+    <link rel="canonical" href="${safeUrl}">
     <meta name="description" content="${safeDescription}">
     <meta property="og:type" content="website">
     <meta property="og:title" content="${safeTitle}">
@@ -196,7 +202,8 @@ function buildMetaTags({ title, description, imageUrl, url }) {
     ${imageTags}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${safeTitle}">
-    <meta name="twitter:description" content="${safeDescription}">`;
+    <meta name="twitter:description" content="${safeDescription}">
+    <meta name="twitter:url" content="${safeUrl}">`;
 }
 
 function getBangkokDateString(date = new Date()) {
@@ -569,6 +576,9 @@ async function renderRankingSharePage(req, {
   const winnerName = resolvedWinner?.displayName || 'TBA';
   const winnerImage = publicImageUrl(resolvedWinner?.profileImageUrl) || '/assets/gdsq-logo.png';
   const heroImage = absoluteUrl(req, winnerImage);
+  const shareImage = hasDefaultHomeBannerAsset
+    ? absoluteUrl(req, publicImageUrl(defaultHomeBannerUrl) || winnerImage)
+    : heroImage;
   const topCards = (top || []).slice(0, 5).map((row, index) => `
     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:#f8fafc;">
       <div style="width:34px;height:34px;border-radius:12px;background:#0b4fd9;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">${index + 1}</div>
@@ -596,7 +606,7 @@ async function renderRankingSharePage(req, {
     ${buildMetaTags({
       title,
       description: subtitle || `${winnerName} wins on GDSQ Pickleball.`,
-      imageUrl: heroImage,
+      imageUrl: shareImage,
       url: shareUrl
     })}
     <script src="https://cdn.tailwindcss.com"></script>
