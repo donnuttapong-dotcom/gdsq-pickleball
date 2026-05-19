@@ -43,6 +43,7 @@ const userSelect = 'id, line_uid, display_name, phone, profile_image_url, create
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
 const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
 const hasDefaultHomeBannerAsset = fs.existsSync(path.join(__dirname, 'public', 'assets', 'gdsq-home-banner.png'));
+const adminActivityUserSelect = 'id, line_uid, display_name, profile_image_url, last_seen_at, app_open_count, created_at';
 const VOTING_CATEGORIES = [
   { key: 'mvp_match', label: 'MVP of the Match', badgeKey: 'mvp' },
   { key: 'best_vibe', label: 'Best Vibe Player', badgeKey: 'goodVibes' },
@@ -1216,6 +1217,18 @@ function serializeUser(user) {
   };
 }
 
+function serializeAdminActivityUser(user) {
+  return {
+    id: user.id,
+    lineUid: user.line_uid,
+    displayName: user.display_name,
+    profileImageUrl: user.profile_image_url,
+    lastSeenAt: user.last_seen_at || null,
+    appOpenCount: Number(user.app_open_count || 0),
+    createdAt: user.created_at || null
+  };
+}
+
 async function upsertLineUser({ lineUid, displayName, profileImageUrl, phone }) {
   const { data: existingUser, error: findUserError } = await supabase
     .from('users')
@@ -1276,6 +1289,36 @@ async function upsertLineUser({ lineUid, displayName, profileImageUrl, phone }) 
   }
 
   return newUser;
+}
+
+async function recordUserAppOpen({ lineUid, displayName, profileImageUrl, phone }) {
+  const user = await upsertLineUser({
+    lineUid,
+    displayName,
+    profileImageUrl,
+    phone
+  });
+
+  const { data: currentUser, error: currentUserError } = await supabase
+    .from('users')
+    .select('id, last_seen_at, app_open_count')
+    .eq('id', user.id)
+    .single();
+
+  if (currentUserError) throw currentUserError;
+
+  const { data: updatedUser, error: updateUserError } = await supabase
+    .from('users')
+    .update({
+      last_seen_at: new Date().toISOString(),
+      app_open_count: Number(currentUser?.app_open_count || 0) + 1
+    })
+    .eq('id', user.id)
+    .select(adminActivityUserSelect)
+    .single();
+
+  if (updateUserError) throw updateUserError;
+  return updatedUser;
 }
 
 function parseSessionPayload(body) {
@@ -2638,6 +2681,38 @@ app.get('/api/players', async (req, res) => {
   }
 });
 
+app.post('/api/app-open', async (req, res) => {
+  try {
+    const { lineUid, displayName, profileImageUrl, phone } = req.body || {};
+
+    if (!lineUid) {
+      return res.status(400).json({
+        success: false,
+        message: 'lineUid is required.'
+      });
+    }
+
+    const user = await recordUserAppOpen({
+      lineUid,
+      displayName,
+      profileImageUrl,
+      phone
+    });
+
+    return res.json({
+      success: true,
+      user: serializeAdminActivityUser(user)
+    });
+  } catch (error) {
+    console.error('App open tracking error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to track app open.'
+    });
+  }
+});
+
 app.get('/api/rankings', async (req, res) => {
   try {
     const period = normalizeRankingPeriod(req.query.period);
@@ -2658,6 +2733,44 @@ app.get('/api/rankings', async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to load rankings.'
+    });
+  }
+});
+
+app.get('/api/admin/app-activity', requireAdmin, async (req, res) => {
+  try {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select(adminActivityUserSelect)
+      .not('last_seen_at', 'is', null)
+      .order('last_seen_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const usersList = (users || []).map(serializeAdminActivityUser);
+    const activeLast24Hours = usersList.filter((user) => {
+      if (!user.lastSeenAt) return false;
+      return now - new Date(user.lastSeenAt).getTime() <= dayMs;
+    }).length;
+
+    return res.json({
+      success: true,
+      users: usersList,
+      summary: {
+        activeLast24Hours,
+        totalTrackedUsers: usersList.length,
+        latestUser: usersList[0] || null
+      }
+    });
+  } catch (error) {
+    console.error('Admin app activity error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load app activity.'
     });
   }
 });
