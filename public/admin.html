@@ -134,6 +134,50 @@
             </div>
         </div>
 
+        <div class="mb-5 rounded-xl bg-white p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq" x-text="t('appActivity')">App Activity</p>
+                    <h2 class="text-xl font-black" x-text="t('recentVisitors')">Recent visitors</h2>
+                    <p class="mt-1 text-sm text-gray-500" x-text="t('recentVisitorsHelp')">ดูว่าใครเปิดแอพล่าสุดและเปิดเข้ามากี่ครั้ง</p>
+                </div>
+                <button class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-bold hover:bg-gray-50" @click="loadAppActivity()">
+                    <i class="fa-solid fa-clock-rotate-left mr-2 text-gdsq"></i><span x-text="t('refresh')">Refresh</span>
+                </button>
+            </div>
+            <div class="grid gap-3 md:grid-cols-3">
+                <div class="rounded-xl bg-blue-50 p-4">
+                    <p class="text-xs font-bold uppercase text-gdsq" x-text="t('activeLast24Hours')">Last 24 Hours</p>
+                    <p class="mt-1 text-3xl font-black text-gdsq" x-text="appActivitySummary.activeLast24Hours || 0">0</p>
+                </div>
+                <div class="rounded-xl bg-gray-50 p-4">
+                    <p class="text-xs font-bold uppercase text-gray-500" x-text="t('trackedUsers')">Tracked users</p>
+                    <p class="mt-1 text-3xl font-black" x-text="appActivitySummary.totalTrackedUsers || 0">0</p>
+                </div>
+                <div class="rounded-xl bg-gray-50 p-4">
+                    <p class="text-xs font-bold uppercase text-gray-500" x-text="t('latestVisitor')">Latest visitor</p>
+                    <p class="mt-1 truncate text-lg font-black" x-text="appActivitySummary.latestUser?.displayName || '-'">-</p>
+                    <p class="mt-1 text-xs font-semibold text-gray-500" x-text="appActivitySummary.latestUser?.lastSeenAt ? formatDate(appActivitySummary.latestUser.lastSeenAt) : '-'">-</p>
+                </div>
+            </div>
+            <div class="mt-4 space-y-3" x-show="recentAppUsers.length > 0">
+                <template x-for="user in recentAppUsers" :key="user.id">
+                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-3">
+                        <img class="h-12 w-12 rounded-full object-cover" :src="imageUrl(user.profileImageUrl) || `https://ui-avatars.com/api/?background=0044CC&color=fff&name=${encodeURIComponent(user.displayName || 'GDSQ')}`" :alt="user.displayName || 'Player'">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-black" x-text="user.displayName || '-'"></p>
+                            <p class="text-xs font-semibold text-gray-500" x-text="user.lineUid || '-'"></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-black text-gdsq"><span x-text="user.appOpenCount || 0"></span> <span x-text="t('opens')">opens</span></p>
+                            <p class="text-xs font-semibold text-gray-500" x-text="user.lastSeenAt ? formatDate(user.lastSeenAt) : '-'">-</p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <p class="mt-4 rounded-xl bg-gray-50 p-5 text-center text-sm font-semibold text-gray-500" x-show="recentAppUsers.length === 0" x-text="t('noRecentVisitors')">No app opens tracked yet.</p>
+        </div>
+
         <div class="mb-5 rounded-xl bg-blue-50 p-4 text-sm text-blue-900">
             <p class="font-black" x-text="t('adminWorkflowTitle')">วิธีใช้หลังบ้านแบบเร็ว</p>
             <div class="mt-2 grid gap-2 md:grid-cols-4">
@@ -650,6 +694,12 @@
                     displayOrder: 0,
                     isActive: true
                 },
+                recentAppUsers: [],
+                appActivitySummary: {
+                    activeLast24Hours: 0,
+                    totalTrackedUsers: 0,
+                    latestUser: null
+                },
                 appSettings: {
                     homeBannerUrl: '/assets/gdsq-home-banner.png',
                     defaultEventSettings: {
@@ -685,6 +735,14 @@
                         endedEvents: 'กิจกรรมที่จบแล้ว',
                         pendingSlipReview: 'รอตรวจสลิป',
                         unpaidPlayers: 'ยังไม่จ่าย',
+                        appActivity: 'การเข้าใช้งานแอพ',
+                        recentVisitors: 'คนที่เปิดแอพล่าสุด',
+                        recentVisitorsHelp: 'ดูว่าใครเปิดแอพล่าสุดและเข้าใช้งานสะสมกี่ครั้ง',
+                        activeLast24Hours: '24 ชั่วโมงล่าสุด',
+                        trackedUsers: 'ผู้ใช้ที่เคยเปิด',
+                        latestVisitor: 'คนล่าสุด',
+                        opens: 'ครั้ง',
+                        noRecentVisitors: 'ยังไม่มีข้อมูลการเปิดแอพ',
                         adminWorkflowTitle: 'วิธีใช้หลังบ้านแบบเร็ว',
                         quickJump: 'ปุ่มลัด',
                         quickJumpHelp: 'กดเพื่อไปยังส่วนที่ต้องการทันที',
@@ -821,6 +879,14 @@
                         endedEvents: 'Ended events',
                         pendingSlipReview: 'Slip review',
                         unpaidPlayers: 'Unpaid',
+                        appActivity: 'App Activity',
+                        recentVisitors: 'Recent visitors',
+                        recentVisitorsHelp: 'See who opened the app last and how many times they have opened it.',
+                        activeLast24Hours: 'Last 24 Hours',
+                        trackedUsers: 'Tracked users',
+                        latestVisitor: 'Latest visitor',
+                        opens: 'opens',
+                        noRecentVisitors: 'No app opens tracked yet.',
                         adminWorkflowTitle: 'Quick admin workflow',
                         quickJump: 'Quick Jump',
                         quickJumpHelp: 'Jump straight to the section you need',
@@ -1121,10 +1187,32 @@
                     if (this.isAuthenticated) {
                         await this.loadSettings();
                         await this.loadHomeBanners();
+                        await this.loadAppActivity();
                     }
                     if (this.selectedSessionId) {
                         await this.loadRsvps();
                     }
+                },
+
+                async loadAppActivity() {
+                    const response = await fetch('/api/admin/app-activity');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.errorMessage = result.message || 'Unable to load app activity';
+                        return;
+                    }
+
+                    this.recentAppUsers = result.users || [];
+                    this.appActivitySummary = result.summary || {
+                        activeLast24Hours: 0,
+                        totalTrackedUsers: 0,
+                        latestUser: null
+                    };
                 },
 
                 resetHomeBannerForm() {

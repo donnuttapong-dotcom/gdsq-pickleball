@@ -2241,6 +2241,7 @@
                         this.profile.displayName = profile.displayName || '';
                         this.profile.profileImageUrl = profile.pictureUrl || '';
                         this.statusMessage = `${this.t('loggedIn')}: ${this.displayName}`;
+                        await this.trackAppOpen();
                         await this.saveProfile(true);
                         await this.loadProfile();
                         await this.loadProfileHistory();
@@ -2260,6 +2261,29 @@
 
                 hideAppLoader() {
                     document.body.classList.add('app-ready');
+                },
+
+                async trackAppOpen() {
+                    if (!this.lineUid) return;
+                    const sessionKey = `gdsqAppOpenTracked:${this.lineUid}:${new Date().toISOString().slice(0, 10)}`;
+                    if (sessionStorage.getItem(sessionKey)) return;
+
+                    try {
+                        const response = await fetch('/api/app-open', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                lineUid: this.lineUid,
+                                displayName: this.displayName || this.profile.displayName || '',
+                                profileImageUrl: this.profile.profileImageUrl || ''
+                            })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || 'Failed to track app open');
+                        sessionStorage.setItem(sessionKey, '1');
+                    } catch (error) {
+                        console.warn('App open tracking failed:', error);
+                    }
                 },
 
                 async loadSessions() {
