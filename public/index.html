@@ -316,7 +316,7 @@
                     </div>
                 </div>
 
-                <div class="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-gdsqNavy via-gdsq to-blue-500 p-5 text-white shadow-xl" x-show="rankingPeriod !== 'awards'">
+                <div class="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-gdsqNavy via-gdsq to-blue-500 p-4 text-white shadow-xl sm:p-5" x-show="rankingPeriod !== 'awards'">
                     <div class="pointer-events-none absolute -right-4 -top-4 text-7xl text-white/10"><i class="fa-solid fa-trophy"></i></div>
                     <div class="pointer-events-none absolute -left-8 top-12 h-28 w-28 rounded-full bg-white/10 blur-3xl"></div>
                     <div class="pointer-events-none absolute bottom-0 right-8 h-24 w-24 rounded-full bg-amber-300/20 blur-3xl"></div>
@@ -331,7 +331,7 @@
                     </div>
                     <div class="mt-4 flex items-start gap-3 sm:gap-4">
                         <div class="relative shrink-0">
-                            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-yellow-200 via-yellow-400 to-amber-500 p-1 shadow-lg sm:h-20 sm:w-20">
+                            <div class="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-yellow-200 via-yellow-400 to-amber-500 p-1 shadow-lg sm:h-20 sm:w-20">
                                 <img class="h-full w-full rounded-full border-4 border-white object-cover" :src="playerAvatar(currentChampion())" alt="">
                             </div>
                             <span class="absolute -right-1 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-yellow-300 text-amber-900 shadow-md">
@@ -339,39 +339,47 @@
                             </span>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-xs font-black text-blue-100" x-text="championTitle()"></p>
-                            <h2 class="text-xl font-black leading-tight sm:text-2xl" x-text="currentChampion()?.displayName || t('noAwardsYet')"></h2>
-                            <p class="mt-1 text-sm font-bold leading-snug text-blue-50">
-                                <span x-text="currentChampion()?.voteCount || 0"></span> <span x-text="t('votesReceived')"></span>
-                                <span x-show="currentChampionTopCategory()"> · </span>
-                                <span x-show="currentChampionTopCategory()" x-text="currentChampionTopCategory()"></span>
-                            </p>
+                            <p class="text-[11px] font-black text-blue-100" x-text="championTitle()"></p>
+                            <h2 class="text-lg font-black leading-tight sm:text-2xl" x-text="currentChampion()?.displayName || t('noAwardsYet')"></h2>
+                            <p class="mt-1 text-xs font-bold leading-snug text-blue-50 sm:text-sm" x-text="championSummaryText()"></p>
+                            <p class="mt-2 rounded-full bg-white/12 px-3 py-1 text-[11px] font-bold text-blue-50" x-show="championSupportText()" x-text="championSupportText()"></p>
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
                         <template x-for="badge in championBadges()" :key="badge.label">
-                            <span class="rounded-full bg-white/15 px-3 py-1 text-[11px] font-black backdrop-blur-sm" x-text="badge.label"></span>
+                            <span class="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black backdrop-blur-sm sm:text-[11px]" x-text="compactAwardLabel(badge.label)"></span>
                         </template>
-                        <span class="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold" x-show="championBadges().length === 0" x-text="t('noAwardsYet')"></span>
+                        <span class="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold sm:text-[11px]" x-show="championBadges().length === 0" x-text="t('noAwardsYet')"></span>
                     </div>
-                    <div class="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+                    <div class="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
                         <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
                             <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="rankingFirstStatLabel()"></p>
-                            <p class="mt-1 text-lg font-black" x-text="rankingFirstStatValue()"></p>
+                            <p class="mt-1 text-base font-black sm:text-lg" x-text="rankingFirstStatValue()"></p>
                         </div>
                         <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
                             <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="rankingSecondStatLabel()"></p>
-                            <p class="mt-1 text-lg font-black" x-text="rankingSecondStatValue()"></p>
+                            <p class="mt-1 text-base font-black sm:text-lg" x-text="rankingSecondStatValue()"></p>
                         </div>
                         <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
                             <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="rankingThirdStatLabel()"></p>
-                            <p class="mt-1 text-lg font-black" x-text="rankingThirdStatValue()"></p>
+                            <p class="mt-1 text-base font-black sm:text-lg" x-text="rankingThirdStatValue()"></p>
                         </div>
                     </div>
                     <div class="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap" x-show="rankingPeriod === 'weekly' || rankingPeriod === 'monthly' || rankingPeriod === 'by-event'">
                         <button class="rounded-xl bg-white px-4 py-3 text-sm font-black text-gdsq" @click="rankingPeriod === 'by-event' ? shareEventAwardLink() : shareRankingPeriod(rankingPeriod)" x-text="rankingPeriod === 'weekly' ? t('shareWeeklyMvpCard') : (rankingPeriod === 'monthly' ? t('shareMonthlyMvpCard') : t('shareEventMvpCard'))"></button>
                         <button class="rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-black text-white" @click="rankingPeriod === 'by-event' ? copyEventAwardLink() : copyRankingPeriodLink(rankingPeriod)" x-text="t('copyLink')"></button>
                         <button class="rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-black text-white" x-show="rankingPeriod === 'by-event' && rankingMeta.session?.id" @click="selectSession(rankingMeta.session.id)" x-text="t('openEvent')"></button>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="rankingPeriod !== 'awards' && currentMvpSpotlight() && rankingCategory === 'overall'">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-black uppercase tracking-[0.18em] text-gdsq" x-text="t('mvpSpotlight')"></p>
+                            <h3 class="mt-1 text-base font-black text-gray-900" x-text="mvpSpotlightTitle()"></h3>
+                            <p class="mt-1 text-xs font-semibold text-gray-500" x-text="mvpSpotlightSummary()"></p>
+                        </div>
+                        <img class="h-12 w-12 shrink-0 rounded-full border-2 border-blue-100 object-cover" :src="playerAvatar(currentMvpSpotlight())" alt="">
                     </div>
                 </div>
 
@@ -494,35 +502,35 @@
 
                 <div class="mt-4 space-y-3" x-show="rankingPeriod !== 'awards'">
                     <template x-for="(player, index) in rankings" :key="player.id">
-                        <button class="flex w-full items-center gap-3 rounded-[24px] border border-white/60 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" @click="openPlayerProfile(player.id)">
+                        <button class="flex w-full items-center gap-2 rounded-[22px] border border-white/60 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:gap-3 sm:p-4" @click="openPlayerProfile(player.id)">
                             <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-black" :class="rankBadgeClass(index)" x-text="index + 1"></div>
                             <div class="relative shrink-0">
                                 <img class="h-12 w-12 rounded-full object-cover ring-2 ring-white" :src="playerAvatar(player)" :alt="player.displayName">
                                 <span class="absolute -bottom-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gdsq px-1 text-[10px] font-black text-white" x-text="index < 3 ? 'TOP' : '#' + (index + 1)"></span>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <p class="max-w-full break-words text-lg font-black leading-tight" x-text="player.displayName || 'Player'"></p>
+                                <div class="flex flex-wrap items-start gap-2">
+                                    <p class="max-w-full truncate text-base font-black leading-tight sm:text-lg" x-text="player.displayName || 'Player'"></p>
                                     <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-gdsq" x-show="(player.topCategories || []).length" x-text="compactAwardLabel(player.topCategories?.[0]?.label || '')"></span>
                                 </div>
-                                <p class="mt-1 text-sm font-semibold leading-snug text-gray-500">
-                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votesReceived')"></span> ·
+                                <p class="mt-1 text-xs font-semibold leading-snug text-gray-500 sm:text-sm">
+                                    <span x-text="player.voteCount || 0"></span> <span x-text="t('votesReceivedCompact')"></span> ·
                                     <template x-if="rankingPeriod === 'by-event'">
-                                        <span x-text="t('joined')"></span>
+                                        <span x-text="t('eventPlayer')"></span>
                                     </template>
                                     <template x-if="rankingPeriod !== 'by-event'">
-                                        <span><span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span></span>
+                                        <span><span x-text="player.joinedCount"></span> <span x-text="t('eventsJoinedCompact')"></span></span>
                                     </template>
                                 </p>
                                 <div class="mt-2 flex flex-wrap gap-1.5" x-show="(player.topCategories || []).length">
-                                    <template x-for="item in (player.topCategories || []).slice(0, 3)" :key="`${player.id}-${item.label}`">
+                                    <template x-for="item in (player.topCategories || []).slice(0, 2)" :key="`${player.id}-${item.label}`">
                                         <span class="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-gdsq" x-text="compactAwardLabel(item.label)"></span>
                                     </template>
                                 </div>
                             </div>
-                            <div class="rounded-2xl bg-blue-50 px-3 py-2 text-center text-gdsq shrink-0">
-                                <p class="text-lg font-black" x-text="player.categoryVoteCount || player.voteCount || 0"></p>
-                                <p class="text-[10px] font-black uppercase" x-text="t('votes')"></p>
+                            <div class="rounded-2xl bg-blue-50 px-2.5 py-2 text-center text-gdsq shrink-0 sm:px-3">
+                                <p class="text-base font-black sm:text-lg" x-text="player.categoryVoteCount || player.voteCount || 0"></p>
+                                <p class="text-[10px] font-black uppercase leading-tight" x-text="t('votes')"></p>
                             </div>
                         </button>
                     </template>
@@ -1760,8 +1768,10 @@
                         participantsJoined: 'ผู้เข้าร่วม',
                         scoredEvents: 'กิจกรรมที่นับคะแนน',
                         totalVotesCast: 'โหวตทั้งหมด',
+                        leaderVotes: 'คะแนนผู้นำ',
                         categoryWinners: 'ผู้ชนะรายหมวด',
                         championHighlight: 'แชมป์เด่น',
+                        mvpSpotlight: 'MVP เด่น',
                         awardBadges: 'แบดจ์รางวัล',
                         awardRace: 'สายรางวัล',
                         podiumSpotlight: 'แท่นรางวัล',
@@ -1778,6 +1788,20 @@
                         latestWeeklyChampion: 'แชมป์ล่าสุดประจำสัปดาห์',
                         latestMonthlyChampion: 'แชมป์ล่าสุดประจำเดือน',
                         latestEventChampion: 'ผู้เล่นเด่นของกิจกรรมนี้',
+                        weeklyLeaderboard: 'ผู้นำคะแนนประจำสัปดาห์',
+                        monthlyLeaderboard: 'ผู้นำคะแนนประจำเดือน',
+                        allTimeLeaderboard: 'ผู้นำคะแนนสะสม',
+                        weeklyMvpSpotlight: 'MVP ล่าสุดประจำสัปดาห์',
+                        monthlyMvpSpotlight: 'MVP ล่าสุดประจำเดือน',
+                        eventMvpSpotlight: 'MVP ของกิจกรรมนี้',
+                        leaderboardLeader: 'ผู้นำคะแนนรวม',
+                        basedOnAllVotes: 'รวมจากทุกหมวดโหวตในช่วงนี้',
+                        latestMvpLabel: 'MVP ล่าสุด',
+                        eventMvpLabel: 'MVP ของงานนี้',
+                        topPlayerLabel: 'ผู้นำคะแนน',
+                        votesReceivedCompact: 'คะแนน',
+                        eventsJoinedCompact: 'กิจกรรม',
+                        eventPlayer: 'ผู้เล่นกิจกรรมนี้',
                         noVotesInPeriod: 'ยังไม่มีผลโหวตในช่วงนี้',
                         submitCategoryVote: 'ส่งโหวตหมวดนี้',
                         votesReceived: 'คะแนนโหวตรวม',
@@ -2008,8 +2032,10 @@
                         participantsJoined: 'Participants',
                         scoredEvents: 'Scored Events',
                         totalVotesCast: 'Total Votes',
+                        leaderVotes: 'Leader Votes',
                         categoryWinners: 'Category Winners',
                         championHighlight: 'Champion Highlight',
+                        mvpSpotlight: 'MVP Spotlight',
                         awardBadges: 'Award Badges',
                         awardRace: 'Award Race',
                         podiumSpotlight: 'Podium Spotlight',
@@ -2026,6 +2052,20 @@
                         latestWeeklyChampion: 'Latest Weekly Champion',
                         latestMonthlyChampion: 'Latest Monthly Champion',
                         latestEventChampion: 'Event Spotlight',
+                        weeklyLeaderboard: 'Weekly Leaderboard Leader',
+                        monthlyLeaderboard: 'Monthly Leaderboard Leader',
+                        allTimeLeaderboard: 'All-Time Leaderboard Leader',
+                        weeklyMvpSpotlight: 'Latest Weekly MVP',
+                        monthlyMvpSpotlight: 'Latest Monthly MVP',
+                        eventMvpSpotlight: 'Event MVP',
+                        leaderboardLeader: 'Leaderboard Leader',
+                        basedOnAllVotes: 'Combined from every vote in this period',
+                        latestMvpLabel: 'Latest MVP',
+                        eventMvpLabel: 'Event MVP',
+                        topPlayerLabel: 'Top Player',
+                        votesReceivedCompact: 'votes',
+                        eventsJoinedCompact: 'events',
+                        eventPlayer: 'event player',
                         noVotesInPeriod: 'No votes for this period yet',
                         submitCategoryVote: 'Submit Vote',
                         votesReceived: 'votes received',
@@ -2540,19 +2580,20 @@
                 },
 
                 currentChampion() {
-                    if (this.rankingCategory !== 'overall') return this.rankings[0] || null;
-                    return this.rankingMeta.mvpWinner || this.rankings[0] || null;
+                    if (this.rankings.length > 0) return this.rankings[0];
+                    if (this.rankingCategory === 'overall') return this.rankingMeta.mvpWinner || null;
+                    return null;
                 },
 
                 championTitle() {
-                    if (this.rankingPeriod === 'by-event' && this.rankingCategory === 'overall') return this.t('eventMvp');
+                    if (this.rankingPeriod === 'by-event' && this.rankingCategory === 'overall') return this.t('topPlayerLabel');
                     if (this.rankingCategory !== 'overall') return this.rankingCategoryLabel(this.rankingCategory);
-                    if (this.rankingPeriod === 'by-event') return this.t('latestEventChampion');
+                    if (this.rankingPeriod === 'by-event') return this.t('topPlayerLabel');
                     if (this.rankingMeta.isFallback && this.rankingPeriod === 'weekly') return this.t('latestWeeklyChampion');
                     if (this.rankingMeta.isFallback && this.rankingPeriod === 'monthly') return this.t('latestMonthlyChampion');
-                    if (this.rankingPeriod === 'weekly') return this.t('shareWeeklyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
-                    if (this.rankingPeriod === 'monthly') return this.t('shareMonthlyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
-                    return this.t('topRankings');
+                    if (this.rankingPeriod === 'weekly') return this.t('weeklyLeaderboard');
+                    if (this.rankingPeriod === 'monthly') return this.t('monthlyLeaderboard');
+                    return this.t('allTimeLeaderboard');
                 },
 
                 rankingChampionMood() {
@@ -2566,6 +2607,58 @@
                 currentChampionTopCategory() {
                     if (this.rankingCategory !== 'overall') return this.rankingCategoryLabel(this.rankingCategory);
                     return this.currentChampion()?.topCategories?.[0]?.label || '';
+                },
+
+                currentMvpSpotlight() {
+                    return this.rankingCategory === 'overall' ? (this.rankingMeta?.mvpWinner || null) : null;
+                },
+
+                championSummaryText() {
+                    const champion = this.currentChampion();
+                    if (!champion) return this.t('noAwardsYet');
+
+                    const voteValue = this.rankingCategory === 'overall'
+                        ? Number(champion.voteCount || 0)
+                        : Number(champion.categoryVoteCount || champion.voteCount || 0);
+                    const pieces = [`${voteValue} ${this.t('votesReceivedCompact')}`];
+
+                    if (this.rankingCategory === 'overall') {
+                        pieces.push(this.t('basedOnAllVotes'));
+                    } else if (this.currentChampionTopCategory()) {
+                        pieces.push(this.currentChampionTopCategory());
+                    }
+
+                    return pieces.filter(Boolean).join(' · ');
+                },
+
+                championSupportText() {
+                    const spotlight = this.currentMvpSpotlight();
+                    if (!spotlight) return '';
+
+                    if (this.rankingPeriod === 'by-event') {
+                        return `${this.t('eventMvpLabel')}: ${spotlight.displayName || '-'}`;
+                    }
+
+                    if (this.currentChampion()?.lineUid === spotlight.lineUid) {
+                        return '';
+                    }
+
+                    return `${this.t('latestMvpLabel')}: ${spotlight.displayName || '-'}`;
+                },
+
+                mvpSpotlightTitle() {
+                    if (this.rankingPeriod === 'weekly') return this.t('weeklyMvpSpotlight');
+                    if (this.rankingPeriod === 'monthly') return this.t('monthlyMvpSpotlight');
+                    if (this.rankingPeriod === 'by-event') return this.t('eventMvpSpotlight');
+                    return this.t('latestMvpLabel');
+                },
+
+                mvpSpotlightSummary() {
+                    const spotlight = this.currentMvpSpotlight();
+                    if (!spotlight) return '';
+                    const votes = Number(spotlight.voteCount || spotlight.totalVotes || 0);
+                    const category = spotlight.topCategories?.[0]?.label || this.t('clubAwards');
+                    return `${spotlight.displayName || '-'} · ${votes} ${this.t('votesReceivedCompact')} · ${category}`;
                 },
 
                 championBadges() {
@@ -2599,24 +2692,22 @@
                 },
 
                 rankingSecondStatLabel() {
-                    return this.rankingPeriod === 'by-event' ? this.t('totalVotesCast') : this.t('votes');
+                    return this.t('totalVotesCast');
                 },
 
                 rankingSecondStatValue() {
-                    return this.rankingPeriod === 'by-event'
-                        ? (this.rankingMeta.totalVotes || 0)
-                        : (this.currentChampion()?.voteCount || 0);
+                    return this.rankingMeta.totalVotes || 0;
                 },
 
                 rankingThirdStatLabel() {
-                    return this.rankingPeriod === 'by-event' ? this.t('participantsJoined') : this.t('eventsJoined');
+                    return this.rankingPeriod === 'by-event' ? this.t('participantsJoined') : this.t('leaderVotes');
                 },
 
                 rankingThirdStatValue() {
                     if (this.rankingPeriod === 'by-event') {
                         return this.rankingMeta.session?.joinedCount || 0;
                     }
-                    return this.currentChampion()?.joinedCount || 0;
+                    return this.currentChampion()?.voteCount || 0;
                 },
 
                 podiumPlayers() {
@@ -3377,6 +3468,11 @@
                         : `${window.location.origin}/awards/monthly/${encodeURIComponent(this.currentMonthId())}`;
                 },
 
+                sharePreviewUrl(url) {
+                    const separator = String(url || '').includes('?') ? '&' : '?';
+                    return `${url}${separator}preview=${Date.now()}`;
+                },
+
                 awardSharePayload(period) {
                     const isWeekly = period === 'weekly';
                     const awardBoard = isWeekly ? this.rankingAwards.weekly : this.rankingAwards.monthly;
@@ -3387,7 +3483,7 @@
                     const votes = Number(champion?.voteCount || champion?.totalVotes || 0);
                     const topCategory = champion?.topCategories?.[0]?.label || this.currentChampionTopCategory() || this.t('clubAwards');
                     const championName = champion?.displayName || 'GDSQ Pickleball';
-                    const url = this.awardShareUrl(period);
+                    const url = this.sharePreviewUrl(this.awardShareUrl(period));
 
                     return {
                         url,
@@ -3411,6 +3507,7 @@
                     const top = this.rankings.slice(0, 3);
                     return {
                         url: this.eventAwardShareUrl(),
+                        shareUrl: this.sharePreviewUrl(this.eventAwardShareUrl()),
                         title: this.t('shareEventMvpCard'),
                         sessionTitle: session.title || this.t('eventMvp'),
                         periodLabel: this.rankingEventSummaryText(session),
@@ -3436,79 +3533,6 @@
                         try {
                             await liff.shareTargetPicker([
                                 {
-                                    type: 'flex',
-                                    altText: `${shareTitle} - ${payload.championName}`,
-                                    contents: {
-                                        type: 'bubble',
-                                        size: 'mega',
-                                        hero: {
-                                            type: 'image',
-                                            url: payload.heroImage,
-                                            size: 'full',
-                                            aspectRatio: '20:13',
-                                            aspectMode: 'cover',
-                                            action: {
-                                                type: 'uri',
-                                                uri: payload.url
-                                            }
-                                        },
-                                        body: {
-                                            type: 'box',
-                                            layout: 'vertical',
-                                            spacing: 'md',
-                                            contents: [
-                                                {
-                                                    type: 'text',
-                                                    text: 'GDSQ PICKLEBALL',
-                                                    size: 'xs',
-                                                    weight: 'bold',
-                                                    color: '#0B4FD9'
-                                                },
-                                                {
-                                                    type: 'text',
-                                                    text: shareTitle,
-                                                    size: 'xl',
-                                                    weight: 'bold',
-                                                    wrap: true,
-                                                    color: '#111827'
-                                                },
-                                                {
-                                                    type: 'text',
-                                                    text: payload.championName,
-                                                    size: 'lg',
-                                                    weight: 'bold',
-                                                    wrap: true,
-                                                    color: '#0B4FD9'
-                                                },
-                                                {
-                                                    type: 'text',
-                                                    text: [payload.periodLabel, `${payload.votes} ${this.t('votes')}`, payload.topCategory].filter(Boolean).join(' • '),
-                                                    size: 'sm',
-                                                    wrap: true,
-                                                    color: '#6B7280'
-                                                }
-                                            ]
-                                        },
-                                        footer: {
-                                            type: 'box',
-                                            layout: 'vertical',
-                                            spacing: 'sm',
-                                            contents: [
-                                                {
-                                                    type: 'button',
-                                                    style: 'primary',
-                                                    color: '#0B4FD9',
-                                                    action: {
-                                                        type: 'uri',
-                                                        label: this.t('viewAll'),
-                                                        uri: payload.url
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
                                     type: 'text',
                                     text: payload.url
                                 }
@@ -3522,6 +3546,7 @@
                     if (navigator.share) {
                         await navigator.share({
                             title: shareTitle,
+                            text: shareText,
                             url: payload.url
                         });
                         return;
@@ -3546,69 +3571,8 @@
                         try {
                             await liff.shareTargetPicker([
                                 {
-                                    type: 'flex',
-                                    altText: `${payload.sessionTitle} - ${payload.championName}`,
-                                    contents: {
-                                        type: 'bubble',
-                                        size: 'mega',
-                                        hero: {
-                                            type: 'image',
-                                            url: payload.heroImage,
-                                            size: 'full',
-                                            aspectRatio: '20:13',
-                                            aspectMode: 'cover',
-                                            action: {
-                                                type: 'uri',
-                                                uri: payload.url
-                                            }
-                                        },
-                                        body: {
-                                            type: 'box',
-                                            layout: 'vertical',
-                                            spacing: 'md',
-                                            contents: [
-                                                { type: 'text', text: 'GDSQ EVENT MVP', size: 'xs', weight: 'bold', color: '#0B4FD9' },
-                                                { type: 'text', text: payload.sessionTitle, size: 'xl', weight: 'bold', wrap: true, color: '#111827' },
-                                                { type: 'text', text: payload.championName, size: 'lg', weight: 'bold', wrap: true, color: '#0B4FD9' },
-                                                { type: 'text', text: `${payload.championVotes} ${this.t('votes')} • ${payload.periodLabel}`, size: 'sm', wrap: true, color: '#6B7280' },
-                                                {
-                                                    type: 'box',
-                                                    layout: 'vertical',
-                                                    margin: 'md',
-                                                    spacing: 'sm',
-                                                    contents: payload.top.map((player, index) => ({
-                                                        type: 'text',
-                                                        text: `${index + 1}. ${player.displayName} (${player.voteCount || 0})`,
-                                                        size: 'sm',
-                                                        weight: index === 0 ? 'bold' : 'regular',
-                                                        color: index === 0 ? '#0B4FD9' : '#111827',
-                                                        wrap: true
-                                                    }))
-                                                }
-                                            ]
-                                        },
-                                        footer: {
-                                            type: 'box',
-                                            layout: 'vertical',
-                                            spacing: 'sm',
-                                            contents: [
-                                                {
-                                                    type: 'button',
-                                                    style: 'primary',
-                                                    color: '#0B4FD9',
-                                                    action: {
-                                                        type: 'uri',
-                                                        label: this.t('viewDetails'),
-                                                        uri: payload.url
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
                                     type: 'text',
-                                    text: `${shareText}\n${payload.url}`
+                                    text: payload.shareUrl
                                 }
                             ]);
                             return;
@@ -3621,7 +3585,7 @@
                         await navigator.share({
                             title: payload.title,
                             text: shareText,
-                            url: payload.url
+                            url: payload.shareUrl
                         });
                         return;
                     }
