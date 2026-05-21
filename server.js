@@ -3030,14 +3030,23 @@ app.get('/awards/weekly/:weekId', async (req, res) => {
       identifier: req.params.weekId,
       category: DEFAULT_RANKING_CATEGORY
     });
+    const winner = payload.mvpWinner || payload.rankings[0] || null;
 
     return res.send(await renderRankingSharePage(req, {
-      title: 'Weekly Awards',
-      subtitle: payload.periodLabel,
-      winner: payload.mvpWinner,
+      title: winner?.displayName ? `Weekly MVP · ${winner.displayName}` : 'Weekly Awards',
+      subtitle: [payload.periodLabel, winner ? `${Number(winner.voteCount || winner.totalVotes || 0)} votes` : '', 'Top 3 rankings inside'].filter(Boolean).join(' • '),
+      winner,
       top: payload.rankings.slice(0, 3),
       awards: payload.awards,
-      sharePath: req.originalUrl
+      sharePath: req.originalUrl,
+      winnerImageUrl: winner?.profileImageUrl || '',
+      shareImageUrl: winner?.profileImageUrl || '',
+      kicker: payload.isFallback ? 'GDSQ Latest Weekly Result' : 'GDSQ Weekly Awards',
+      summaryChips: [
+        payload.periodLabel,
+        `${payload.totalVotes || 0} votes`,
+        `${payload.rankings.slice(0, 3).length} ranked`
+      ]
     }));
   } catch (error) {
     console.error('Weekly awards page error:', error);
@@ -3052,14 +3061,23 @@ app.get('/awards/monthly/:monthId', async (req, res) => {
       identifier: req.params.monthId,
       category: DEFAULT_RANKING_CATEGORY
     });
+    const winner = payload.mvpWinner || payload.rankings[0] || null;
 
     return res.send(await renderRankingSharePage(req, {
-      title: 'Monthly Awards',
-      subtitle: payload.periodLabel,
-      winner: payload.mvpWinner,
+      title: winner?.displayName ? `Monthly MVP · ${winner.displayName}` : 'Monthly Awards',
+      subtitle: [payload.periodLabel, winner ? `${Number(winner.voteCount || winner.totalVotes || 0)} votes` : '', 'Top 3 rankings inside'].filter(Boolean).join(' • '),
+      winner,
       top: payload.rankings.slice(0, 3),
       awards: payload.awards,
-      sharePath: req.originalUrl
+      sharePath: req.originalUrl,
+      winnerImageUrl: winner?.profileImageUrl || '',
+      shareImageUrl: winner?.profileImageUrl || '',
+      kicker: payload.isFallback ? 'GDSQ Latest Monthly Result' : 'GDSQ Monthly Awards',
+      summaryChips: [
+        payload.periodLabel,
+        `${payload.totalVotes || 0} votes`,
+        `${payload.rankings.slice(0, 3).length} ranked`
+      ]
     }));
   } catch (error) {
     console.error('Monthly awards page error:', error);
@@ -3073,15 +3091,18 @@ app.get('/awards/event/:sessionId', async (req, res) => {
       sessionId: req.params.sessionId,
       category: DEFAULT_RANKING_CATEGORY
     });
+    const winner = payload.mvpWinner || payload.rankings[0] || null;
 
     return res.send(await renderRankingSharePage(req, {
-      title: `${payload.session?.title || 'Event'} MVP`,
+      title: winner?.displayName
+        ? `${payload.session?.title || 'Event'} MVP · ${winner.displayName}`
+        : `${payload.session?.title || 'Event'} MVP`,
       subtitle: eventShareSubtitle(payload.session),
-      winner: payload.mvpWinner,
+      winner,
       top: payload.rankings.slice(0, 3),
       awards: payload.awards,
       sharePath: req.originalUrl,
-      winnerImageUrl: payload.mvpWinner?.profileImageUrl || '',
+      winnerImageUrl: winner?.profileImageUrl || '',
       shareImageUrl: payload.session?.posterUrl || '',
       kicker: 'GDSQ Event Awards',
       summaryChips: [
