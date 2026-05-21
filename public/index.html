@@ -284,10 +284,31 @@
                     <button class="text-sm font-black text-gdsq" @click="loadRankings()" x-text="t('refresh')">Refresh</button>
                 </div>
                 <div class="mb-4 space-y-3">
-                    <div class="grid grid-cols-4 gap-2 rounded-2xl bg-white p-1 shadow-sm">
+                    <div class="flex gap-2 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm [scrollbar-width:none]">
                         <template x-for="period in rankingPeriods" :key="period">
-                            <button class="rounded-xl px-2 py-2.5 text-[11px] font-black" :class="rankingPeriod === period ? 'bg-gdsq text-white shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
+                            <button class="shrink-0 rounded-xl px-3 py-2.5 text-[11px] font-black" :class="rankingPeriod === period ? 'bg-gdsq text-white shadow-sm' : 'text-gray-500'" @click="rankingPeriod = period; loadRankings()" x-text="rankingPeriodLabel(period)"></button>
                         </template>
+                    </div>
+                    <div class="rounded-2xl bg-white p-4 shadow-sm" x-show="rankingPeriod === 'by-event'">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-[0.16em] text-gdsq" x-text="t('eventAwards')"></p>
+                                <h2 class="mt-1 text-lg font-black" x-text="t('choosePastEvent')"></h2>
+                                <p class="mt-1 text-sm font-semibold text-gray-500" x-text="t('eventAwardHint')"></p>
+                            </div>
+                            <button class="rounded-xl border border-gdsq/15 px-3 py-2 text-xs font-black text-gdsq" @click="loadPastSessions(); loadRankings()" x-text="t('refresh')"></button>
+                        </div>
+                        <select class="mt-4 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700" x-model="rankingEventId" @change="loadRankings()">
+                            <option value="" x-text="t('choosePastEvent')"></option>
+                            <template x-for="session in rankingEventOptions()" :key="session.id">
+                                <option :value="session.id" x-text="`${dateShort(session.eventDate)} · ${session.title}`"></option>
+                            </template>
+                        </select>
+                        <p class="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm font-semibold text-gray-500" x-show="rankingEventOptions().length === 0" x-text="t('noPastEvents')"></p>
+                        <div class="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-semibold text-gray-600" x-show="rankingMeta.session">
+                            <p class="font-black text-gdsq" x-text="rankingMeta.session?.title || ''"></p>
+                            <p class="mt-1" x-text="rankingEventSummaryText(rankingMeta.session)"></p>
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-2" x-show="rankingPeriod !== 'awards' && (rankingMeta.periodLabel || rankingMeta.isFallback)">
                         <p class="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-gdsq" x-show="rankingMeta.periodLabel" x-text="rankingMeta.periodLabel"></p>
@@ -335,21 +356,22 @@
                     </div>
                     <div class="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
                         <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="t('awardRace')"></p>
-                            <p class="mt-1 text-lg font-black" x-text="rankings.length || 0"></p>
+                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="rankingFirstStatLabel()"></p>
+                            <p class="mt-1 text-lg font-black" x-text="rankingFirstStatValue()"></p>
                         </div>
                         <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="t('votes')"></p>
-                            <p class="mt-1 text-lg font-black" x-text="currentChampion()?.voteCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="rankingSecondStatLabel()"></p>
+                            <p class="mt-1 text-lg font-black" x-text="rankingSecondStatValue()"></p>
                         </div>
                         <div class="rounded-2xl bg-white/12 px-3 py-3 backdrop-blur-sm">
-                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="t('eventsJoined')"></p>
-                            <p class="mt-1 text-lg font-black" x-text="currentChampion()?.joinedCount || 0"></p>
+                            <p class="text-[10px] font-black uppercase tracking-wide text-blue-100" x-text="rankingThirdStatLabel()"></p>
+                            <p class="mt-1 text-lg font-black" x-text="rankingThirdStatValue()"></p>
                         </div>
                     </div>
-                    <div class="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap" x-show="rankingPeriod === 'weekly' || rankingPeriod === 'monthly'">
-                        <button class="rounded-xl bg-white px-4 py-3 text-sm font-black text-gdsq" @click="shareRankingPeriod(rankingPeriod)" x-text="rankingPeriod === 'weekly' ? t('shareWeeklyMvpCard') : t('shareMonthlyMvpCard')"></button>
-                        <button class="rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-black text-white" @click="copyRankingPeriodLink(rankingPeriod)" x-text="t('copyLink')"></button>
+                    <div class="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap" x-show="rankingPeriod === 'weekly' || rankingPeriod === 'monthly' || rankingPeriod === 'by-event'">
+                        <button class="rounded-xl bg-white px-4 py-3 text-sm font-black text-gdsq" @click="rankingPeriod === 'by-event' ? shareEventAwardLink() : shareRankingPeriod(rankingPeriod)" x-text="rankingPeriod === 'weekly' ? t('shareWeeklyMvpCard') : (rankingPeriod === 'monthly' ? t('shareMonthlyMvpCard') : t('shareEventMvpCard'))"></button>
+                        <button class="rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-black text-white" @click="rankingPeriod === 'by-event' ? copyEventAwardLink() : copyRankingPeriodLink(rankingPeriod)" x-text="t('copyLink')"></button>
+                        <button class="rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-black text-white" x-show="rankingPeriod === 'by-event' && rankingMeta.session?.id" @click="selectSession(rankingMeta.session.id)" x-text="t('openEvent')"></button>
                     </div>
                 </div>
 
@@ -397,6 +419,21 @@
                     </template>
                 </div>
 
+                <div class="mt-4 rounded-2xl bg-white p-4 shadow-sm" x-show="rankingPeriod === 'by-event' && (rankingMeta.awards || []).length > 0">
+                    <h2 class="text-base font-black" x-text="t('categoryWinners')"></h2>
+                    <div class="mt-4 space-y-3">
+                        <template x-for="award in (rankingMeta.awards || []).filter((item) => item.winner)" :key="award.categoryKey">
+                            <div class="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3 py-3">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-black" x-text="award.categoryLabel"></p>
+                                    <p class="truncate text-xs font-semibold text-gray-500" x-text="award.winner?.displayName || '-'"></p>
+                                </div>
+                                <p class="shrink-0 text-sm font-black text-gdsq"><span x-text="award.winner?.voteCount || 0"></span> <span x-text="t('votes')"></span></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
                 <div class="space-y-4" x-show="rankingPeriod === 'awards'">
                     <div class="rounded-2xl bg-white p-4 shadow-sm" x-show="rankingAwards.weekly?.mvpWinner">
                         <div class="flex items-start justify-between gap-3">
@@ -441,13 +478,13 @@
                     <div class="rounded-2xl bg-white p-4 shadow-sm">
                         <h2 class="text-base font-black" x-text="t('categoryAwards')">Category Awards</h2>
                         <div class="mt-4 space-y-3" x-show="(rankingAwards.monthly?.awards || []).length > 0">
-                            <template x-for="award in rankingAwards.monthly?.awards || []" :key="award.category">
+                            <template x-for="award in rankingAwards.monthly?.awards || []" :key="award.categoryKey">
                                 <div class="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-3">
                                     <div class="min-w-0">
                                         <p class="truncate text-sm font-black" x-text="award.categoryLabel"></p>
                                         <p class="truncate text-xs font-semibold text-gray-500" x-text="award.winner?.displayName || '-'"></p>
                                     </div>
-                                    <p class="text-sm font-black text-gdsq"><span x-text="award.totalVotes || 0"></span> <span x-text="t('votesReceived')"></span></p>
+                                    <p class="text-sm font-black text-gdsq"><span x-text="award.winner?.voteCount || 0"></span> <span x-text="t('votesReceived')"></span></p>
                                 </div>
                             </template>
                         </div>
@@ -470,7 +507,12 @@
                                 </div>
                                 <p class="mt-1 text-sm font-semibold leading-snug text-gray-500">
                                     <span x-text="player.voteCount || 0"></span> <span x-text="t('votesReceived')"></span> ·
-                                    <span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span>
+                                    <template x-if="rankingPeriod === 'by-event'">
+                                        <span x-text="t('joined')"></span>
+                                    </template>
+                                    <template x-if="rankingPeriod !== 'by-event'">
+                                        <span><span x-text="player.joinedCount"></span> <span x-text="t('eventsJoined')"></span></span>
+                                    </template>
                                 </p>
                                 <div class="mt-2 flex flex-wrap gap-1.5" x-show="(player.topCategories || []).length">
                                     <template x-for="item in (player.topCategories || []).slice(0, 3)" :key="`${player.id}-${item.label}`">
@@ -1255,7 +1297,10 @@
                     requestedPeriodId: '',
                     requestedPeriodLabel: '',
                     isFallback: false,
-                    hasVotes: false
+                    hasVotes: false,
+                    totalVotes: 0,
+                    sessionCount: 0,
+                    session: null
                 },
                 rankingAwards: {
                     weekly: null,
@@ -1263,8 +1308,9 @@
                 },
                 rankingPeriod: 'monthly',
                 rankingCategory: 'overall',
-                rankingPeriods: ['weekly', 'monthly', 'all-time', 'awards'],
+                rankingPeriods: ['weekly', 'monthly', 'all-time', 'by-event', 'awards'],
                 rankingCategories: ['overall', 'mvp_match', 'best_vibe', 'most_improved', 'best_partner', 'dink_master', 'power_shot', 'aggressive_player', 'fair_play', 'style_on_court', 'social_star', 'rookie_of_the_day'],
+                rankingEventId: '',
                 profileHistory: [],
                 pendingVotes: [],
                 currentUserId: '',
@@ -1697,10 +1743,24 @@
                         shareWeeklyMvp: 'แชร์ MVP ประจำสัปดาห์',
                         shareMonthlyMvp: 'แชร์ MVP ประจำเดือน',
                         shareWeeklyMvpCard: 'แชร์การ์ด MVP ประจำสัปดาห์',
+                        shareEventMvpCard: 'แชร์การ์ด MVP ของกิจกรรมนี้',
                         shareMonthlyMvpCard: 'แชร์การ์ด MVP ประจำเดือน',
                         copyLink: 'คัดลอกลิงก์',
                         topRankings: 'อันดับสูงสุด',
                         clubAwards: 'รางวัลของคลับ',
+                        byEvent: 'รายกิจกรรม',
+                        choosePastEvent: 'เลือกกิจกรรมที่ผ่านมา',
+                        eventMvp: 'MVP ของกิจกรรม',
+                        latestEventResults: 'ผลโหวตของกิจกรรมนี้',
+                        eventRankings: 'อันดับของกิจกรรม',
+                        eventAwards: 'รางวัลของกิจกรรม',
+                        eventAwardHint: 'ดู MVP และอันดับเฉพาะของกิจกรรมที่ผ่านมาแต่ละงาน',
+                        noPastEvents: 'ยังไม่มีกิจกรรมที่ผ่านมาให้ดู',
+                        openEvent: 'เปิดหน้ากิจกรรม',
+                        participantsJoined: 'ผู้เข้าร่วม',
+                        scoredEvents: 'กิจกรรมที่นับคะแนน',
+                        totalVotesCast: 'โหวตทั้งหมด',
+                        categoryWinners: 'ผู้ชนะรายหมวด',
                         championHighlight: 'แชมป์เด่น',
                         awardBadges: 'แบดจ์รางวัล',
                         awardRace: 'สายรางวัล',
@@ -1717,6 +1777,7 @@
                         latestResult: 'ผลล่าสุด',
                         latestWeeklyChampion: 'แชมป์ล่าสุดประจำสัปดาห์',
                         latestMonthlyChampion: 'แชมป์ล่าสุดประจำเดือน',
+                        latestEventChampion: 'ผู้เล่นเด่นของกิจกรรมนี้',
                         noVotesInPeriod: 'ยังไม่มีผลโหวตในช่วงนี้',
                         submitCategoryVote: 'ส่งโหวตหมวดนี้',
                         votesReceived: 'คะแนนโหวตรวม',
@@ -1930,10 +1991,24 @@
                         shareWeeklyMvp: 'Share Weekly MVP',
                         shareMonthlyMvp: 'Share Monthly MVP',
                         shareWeeklyMvpCard: 'Share Weekly MVP Card',
+                        shareEventMvpCard: 'Share This Event MVP Card',
                         shareMonthlyMvpCard: 'Share Monthly MVP Card',
                         copyLink: 'Copy Link',
                         topRankings: 'Top Rankings',
                         clubAwards: 'Club Awards',
+                        byEvent: 'By Event',
+                        choosePastEvent: 'Choose a past event',
+                        eventMvp: 'Event MVP',
+                        latestEventResults: 'Event Results',
+                        eventRankings: 'Event Rankings',
+                        eventAwards: 'Event Awards',
+                        eventAwardHint: 'See MVP and rankings for each finished event.',
+                        noPastEvents: 'No past events yet',
+                        openEvent: 'Open Event',
+                        participantsJoined: 'Participants',
+                        scoredEvents: 'Scored Events',
+                        totalVotesCast: 'Total Votes',
+                        categoryWinners: 'Category Winners',
                         championHighlight: 'Champion Highlight',
                         awardBadges: 'Award Badges',
                         awardRace: 'Award Race',
@@ -1950,6 +2025,7 @@
                         latestResult: 'Latest Result',
                         latestWeeklyChampion: 'Latest Weekly Champion',
                         latestMonthlyChampion: 'Latest Monthly Champion',
+                        latestEventChampion: 'Event Spotlight',
                         noVotesInPeriod: 'No votes for this period yet',
                         submitCategoryVote: 'Submit Vote',
                         votesReceived: 'votes received',
@@ -2376,6 +2452,46 @@
                         await this.loadAwardBoards();
                         return;
                     }
+                    if (this.rankingPeriod === 'by-event') {
+                        await this.ensureRankingEventLoaded();
+                        if (!this.rankingEventId) {
+                            this.rankings = [];
+                            this.rankingMeta = {
+                                period: 'by-event',
+                                periodId: '',
+                                periodLabel: '',
+                                requestedPeriodId: '',
+                                requestedPeriodLabel: '',
+                                isFallback: false,
+                                hasVotes: false,
+                                totalVotes: 0,
+                                sessionCount: 0,
+                                session: null
+                            };
+                            return;
+                        }
+
+                        const response = await fetch(`/api/rankings/event/${encodeURIComponent(this.rankingEventId)}?category=${encodeURIComponent(this.rankingCategory)}`);
+                        const result = await response.json();
+                        if (response.ok) {
+                            this.rankings = result.rankings || [];
+                            this.rankingMeta = {
+                                period: result.period || this.rankingPeriod,
+                                periodId: result.periodId || '',
+                                periodLabel: result.periodLabel || '',
+                                requestedPeriodId: result.requestedPeriodId || '',
+                                requestedPeriodLabel: result.requestedPeriodLabel || '',
+                                isFallback: false,
+                                hasVotes: Boolean(result.hasVotes),
+                                awards: result.awards || [],
+                                mvpWinner: result.mvpWinner || null,
+                                totalVotes: Number(result.totalVotes || 0),
+                                sessionCount: Number(result.sessionCount || 0),
+                                session: result.session || null
+                            };
+                        }
+                        return;
+                    }
                     const params = new URLSearchParams({
                         period: this.rankingPeriod,
                         category: this.rankingCategory
@@ -2393,14 +2509,28 @@
                             isFallback: Boolean(result.isFallback),
                             hasVotes: Boolean(result.hasVotes),
                             awards: result.awards || [],
-                            mvpWinner: result.mvpWinner || null
+                            mvpWinner: result.mvpWinner || null,
+                            totalVotes: Number(result.totalVotes || 0),
+                            sessionCount: Number(result.sessionCount || 0),
+                            session: result.session || null
                         };
+                    }
+                },
+
+                async ensureRankingEventLoaded() {
+                    if (this.pastSessions.length === 0) {
+                        await this.loadPastSessions();
+                    }
+
+                    if (!this.rankingEventId && this.pastSessions.length > 0) {
+                        this.rankingEventId = this.pastSessions[0].id;
                     }
                 },
 
                 rankingPeriodLabel(period) {
                     if (period === 'weekly') return this.t('thisWeek');
                     if (period === 'monthly') return this.t('thisMonth');
+                    if (period === 'by-event') return this.t('byEvent');
                     if (period === 'awards') return this.t('categoryAwards');
                     return this.t('allTime');
                 },
@@ -2410,10 +2540,14 @@
                 },
 
                 currentChampion() {
+                    if (this.rankingCategory !== 'overall') return this.rankings[0] || null;
                     return this.rankingMeta.mvpWinner || this.rankings[0] || null;
                 },
 
                 championTitle() {
+                    if (this.rankingPeriod === 'by-event' && this.rankingCategory === 'overall') return this.t('eventMvp');
+                    if (this.rankingCategory !== 'overall') return this.rankingCategoryLabel(this.rankingCategory);
+                    if (this.rankingPeriod === 'by-event') return this.t('latestEventChampion');
                     if (this.rankingMeta.isFallback && this.rankingPeriod === 'weekly') return this.t('latestWeeklyChampion');
                     if (this.rankingMeta.isFallback && this.rankingPeriod === 'monthly') return this.t('latestMonthlyChampion');
                     if (this.rankingPeriod === 'weekly') return this.t('shareWeeklyMvp').replace(/^แชร์\s*/, '').replace(/^Share\s*/, '');
@@ -2422,6 +2556,7 @@
                 },
 
                 rankingChampionMood() {
+                    if (this.rankingPeriod === 'by-event') return this.t('latestEventResults');
                     if (this.rankingMeta.isFallback) return this.t('latestResult');
                     if (this.rankingPeriod === 'weekly') return this.t('thisWeek');
                     if (this.rankingPeriod === 'monthly') return this.t('thisMonth');
@@ -2429,11 +2564,59 @@
                 },
 
                 currentChampionTopCategory() {
+                    if (this.rankingCategory !== 'overall') return this.rankingCategoryLabel(this.rankingCategory);
                     return this.currentChampion()?.topCategories?.[0]?.label || '';
                 },
 
                 championBadges() {
+                    if (this.rankingCategory !== 'overall') {
+                        return this.currentChampionTopCategory() ? [{ label: this.currentChampionTopCategory() }] : [];
+                    }
                     return (this.currentChampion()?.topCategories || []).slice(0, 3);
+                },
+
+                rankingEventOptions() {
+                    return [...this.pastSessions];
+                },
+
+                rankingEventSummaryText(session) {
+                    if (!session) return '';
+                    return [
+                        this.dateShort(session.eventDate),
+                        this.timeRange(session),
+                        session.location || this.t('locationTba')
+                    ].filter(Boolean).join(' · ');
+                },
+
+                rankingFirstStatLabel() {
+                    return this.rankingPeriod === 'by-event' ? this.t('eventRankings') : this.t('scoredEvents');
+                },
+
+                rankingFirstStatValue() {
+                    return this.rankingPeriod === 'by-event'
+                        ? (this.rankings.length || 0)
+                        : (this.rankingMeta.sessionCount || 0);
+                },
+
+                rankingSecondStatLabel() {
+                    return this.rankingPeriod === 'by-event' ? this.t('totalVotesCast') : this.t('votes');
+                },
+
+                rankingSecondStatValue() {
+                    return this.rankingPeriod === 'by-event'
+                        ? (this.rankingMeta.totalVotes || 0)
+                        : (this.currentChampion()?.voteCount || 0);
+                },
+
+                rankingThirdStatLabel() {
+                    return this.rankingPeriod === 'by-event' ? this.t('participantsJoined') : this.t('eventsJoined');
+                },
+
+                rankingThirdStatValue() {
+                    if (this.rankingPeriod === 'by-event') {
+                        return this.rankingMeta.session?.joinedCount || 0;
+                    }
+                    return this.currentChampion()?.joinedCount || 0;
                 },
 
                 podiumPlayers() {
@@ -3218,6 +3401,26 @@
                     };
                 },
 
+                eventAwardShareUrl() {
+                    return `${window.location.origin}/awards/event/${encodeURIComponent(this.rankingEventId)}`;
+                },
+
+                eventAwardSharePayload() {
+                    const session = this.rankingMeta.session || {};
+                    const champion = this.currentChampion() || null;
+                    const top = this.rankings.slice(0, 3);
+                    return {
+                        url: this.eventAwardShareUrl(),
+                        title: this.t('shareEventMvpCard'),
+                        sessionTitle: session.title || this.t('eventMvp'),
+                        periodLabel: this.rankingEventSummaryText(session),
+                        championName: champion?.displayName || 'GDSQ Pickleball',
+                        championVotes: Number(champion?.voteCount || champion?.totalVotes || 0),
+                        heroImage: this.imageUrl(session.posterUrl) || this.playerAvatar(champion),
+                        top
+                    };
+                },
+
                 async shareAwardLink(period, options = {}) {
                     const payload = this.awardSharePayload(period);
                     const shareTitle = options.title || payload.title;
@@ -3325,6 +3528,110 @@
                     }
 
                     await navigator.clipboard.writeText(payload.url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                async shareEventAwardLink() {
+                    const payload = this.eventAwardSharePayload();
+                    const topLines = payload.top.map((player, index) => `${index + 1}. ${player.displayName} (${player.voteCount || 0} ${this.t('votes')})`);
+                    const shareText = [
+                        payload.title,
+                        payload.sessionTitle,
+                        payload.periodLabel,
+                        `${payload.championName} · ${payload.championVotes} ${this.t('votes')}`,
+                        ...topLines
+                    ].filter(Boolean).join('\n');
+
+                    if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                        try {
+                            await liff.shareTargetPicker([
+                                {
+                                    type: 'flex',
+                                    altText: `${payload.sessionTitle} - ${payload.championName}`,
+                                    contents: {
+                                        type: 'bubble',
+                                        size: 'mega',
+                                        hero: {
+                                            type: 'image',
+                                            url: payload.heroImage,
+                                            size: 'full',
+                                            aspectRatio: '20:13',
+                                            aspectMode: 'cover',
+                                            action: {
+                                                type: 'uri',
+                                                uri: payload.url
+                                            }
+                                        },
+                                        body: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            spacing: 'md',
+                                            contents: [
+                                                { type: 'text', text: 'GDSQ EVENT MVP', size: 'xs', weight: 'bold', color: '#0B4FD9' },
+                                                { type: 'text', text: payload.sessionTitle, size: 'xl', weight: 'bold', wrap: true, color: '#111827' },
+                                                { type: 'text', text: payload.championName, size: 'lg', weight: 'bold', wrap: true, color: '#0B4FD9' },
+                                                { type: 'text', text: `${payload.championVotes} ${this.t('votes')} • ${payload.periodLabel}`, size: 'sm', wrap: true, color: '#6B7280' },
+                                                {
+                                                    type: 'box',
+                                                    layout: 'vertical',
+                                                    margin: 'md',
+                                                    spacing: 'sm',
+                                                    contents: payload.top.map((player, index) => ({
+                                                        type: 'text',
+                                                        text: `${index + 1}. ${player.displayName} (${player.voteCount || 0})`,
+                                                        size: 'sm',
+                                                        weight: index === 0 ? 'bold' : 'regular',
+                                                        color: index === 0 ? '#0B4FD9' : '#111827',
+                                                        wrap: true
+                                                    }))
+                                                }
+                                            ]
+                                        },
+                                        footer: {
+                                            type: 'box',
+                                            layout: 'vertical',
+                                            spacing: 'sm',
+                                            contents: [
+                                                {
+                                                    type: 'button',
+                                                    style: 'primary',
+                                                    color: '#0B4FD9',
+                                                    action: {
+                                                        type: 'uri',
+                                                        label: this.t('viewDetails'),
+                                                        uri: payload.url
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'text',
+                                    text: `${shareText}\n${payload.url}`
+                                }
+                            ]);
+                            return;
+                        } catch (error) {
+                            console.warn('LINE event award share fallback:', error);
+                        }
+                    }
+
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: payload.title,
+                            text: shareText,
+                            url: payload.url
+                        });
+                        return;
+                    }
+
+                    await navigator.clipboard.writeText(payload.url);
+                    this.statusMessage = this.t('copiedLink');
+                },
+
+                async copyEventAwardLink() {
+                    await navigator.clipboard.writeText(this.eventAwardShareUrl());
                     this.statusMessage = this.t('copiedLink');
                 },
 
