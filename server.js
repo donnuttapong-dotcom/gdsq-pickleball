@@ -1107,7 +1107,11 @@ function buildRankingRows({ users = [], joinedByUserId = {}, votes = [], categor
       if (category === DEFAULT_RANKING_CATEGORY) return user.voteCount > 0;
       return user.categoryVoteCount > 0;
     })
-    .sort((a, b) => (b.categoryVoteCount || 0) - (a.categoryVoteCount || 0) || (b.voteCount || 0) - (a.voteCount || 0) || (b.joinedCount || 0) - (a.joinedCount || 0) || String(a.displayName || '').localeCompare(String(b.displayName || '')));
+    .sort((a, b) =>
+      (b.categoryVoteCount || 0) - (a.categoryVoteCount || 0)
+      || (b.voteCount || 0) - (a.voteCount || 0)
+      || String(a.displayName || '').localeCompare(String(b.displayName || ''))
+    );
 }
 
 function buildAwardWinners(rankings = [], limit = 5) {
