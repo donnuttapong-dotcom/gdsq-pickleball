@@ -207,6 +207,120 @@ function buildMetaTags({ title, description, imageUrl, url }) {
     <meta name="twitter:url" content="${safeUrl}">`;
 }
 
+function truncateText(value, limit = 80) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 1)).trim()}…`;
+}
+
+function shareCardPalette(kind = 'award') {
+  if (kind === 'player') {
+    return {
+      top: '#0b4fd9',
+      bottom: '#2563eb',
+      accent: '#facc15',
+      panel: '#eff6ff',
+      textMuted: '#cbd5e1'
+    };
+  }
+
+  return {
+    top: '#0f172a',
+    bottom: '#0b4fd9',
+    accent: '#facc15',
+    panel: '#eff6ff',
+    textMuted: '#cbd5e1'
+  };
+}
+
+function buildShareCardSvg({
+  kind = 'award',
+  kicker = 'GDSQ PICKLEBALL',
+  title = 'Club Awards',
+  subtitle = '',
+  highlightLabel = 'Champion',
+  highlightValue = '',
+  scoreLabel = 'Votes',
+  scoreValue = '',
+  chips = [],
+  top = []
+}) {
+  const palette = shareCardPalette(kind);
+  const safeKicker = escapeHtml(truncateText(kicker, 32));
+  const safeTitle = escapeHtml(truncateText(title, 42));
+  const safeSubtitle = escapeHtml(truncateText(subtitle, 78));
+  const safeHighlightLabel = escapeHtml(truncateText(highlightLabel, 24));
+  const safeHighlightValue = escapeHtml(truncateText(highlightValue, 34));
+  const safeScoreLabel = escapeHtml(truncateText(scoreLabel, 18));
+  const safeScoreValue = escapeHtml(truncateText(scoreValue, 20));
+  const safeChips = (chips || []).filter(Boolean).slice(0, 3).map((chip) => escapeHtml(truncateText(chip, 24)));
+  const safeTop = (top || []).slice(0, 3).map((entry, index) => ({
+    rank: index + 1,
+    name: escapeHtml(truncateText(entry.name || 'Player', 18)),
+    votes: escapeHtml(truncateText(entry.votes || '', 18))
+  }));
+
+  const chipMarkup = safeChips.map((chip, index) => `
+    <g transform="translate(${60 + (index * 205)},465)">
+      <rect width="185" height="42" rx="21" fill="${palette.panel}" fill-opacity="0.96"/>
+      <text x="92.5" y="27" text-anchor="middle" font-size="18" font-weight="800" fill="#0b4fd9">${chip}</text>
+    </g>
+  `).join('');
+
+  const topMarkup = safeTop.map((entry, index) => {
+    const x = 720 + (index * 150);
+    const medal = ['#facc15', '#c0cad8', '#f6ad55'][index] || '#cbd5e1';
+    return `
+      <g transform="translate(${x},340)">
+        <rect width="130" height="190" rx="28" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-opacity="0.22"/>
+        <circle cx="65" cy="42" r="24" fill="${medal}"/>
+        <text x="65" y="50" text-anchor="middle" font-size="22" font-weight="900" fill="#0f172a">${entry.rank}</text>
+        <text x="65" y="98" text-anchor="middle" font-size="20" font-weight="900" fill="#ffffff">${entry.name}</text>
+        <text x="65" y="132" text-anchor="middle" font-size="18" font-weight="700" fill="#dbeafe">${entry.votes}</text>
+      </g>
+    `;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="${safeTitle}">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${palette.top}"/>
+        <stop offset="100%" stop-color="${palette.bottom}"/>
+      </linearGradient>
+      <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.20"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.08"/>
+      </linearGradient>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.24"/>
+      </filter>
+    </defs>
+    <rect width="1200" height="630" fill="url(#bg)"/>
+    <circle cx="1090" cy="86" r="52" fill="${palette.accent}" fill-opacity="0.92"/>
+    <circle cx="1020" cy="128" r="18" fill="#ffffff" fill-opacity="0.22"/>
+    <circle cx="1118" cy="170" r="10" fill="#ffffff" fill-opacity="0.35"/>
+    <rect x="46" y="44" width="1108" height="542" rx="40" fill="url(#panel)" filter="url(#shadow)"/>
+    <text x="60" y="92" font-size="24" font-weight="900" fill="${palette.accent}" letter-spacing="2">${safeKicker}</text>
+    <text x="60" y="158" font-size="58" font-weight="900" fill="#ffffff">${safeTitle}</text>
+    <text x="60" y="204" font-size="24" font-weight="600" fill="${palette.textMuted}">${safeSubtitle}</text>
+
+    <g transform="translate(60,250)">
+      <rect width="580" height="185" rx="34" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-opacity="0.14"/>
+      <text x="34" y="46" font-size="20" font-weight="800" fill="${palette.accent}" letter-spacing="1.5">${safeHighlightLabel}</text>
+      <text x="34" y="104" font-size="44" font-weight="900" fill="#ffffff">${safeHighlightValue}</text>
+      <text x="34" y="150" font-size="22" font-weight="700" fill="${palette.textMuted}">${safeScoreLabel}</text>
+      <text x="250" y="150" font-size="28" font-weight="900" fill="#ffffff">${safeScoreValue}</text>
+    </g>
+
+    ${chipMarkup}
+    ${topMarkup}
+
+    <text x="60" y="580" font-size="22" font-weight="800" fill="#dbeafe">Good Game. Good People. Join the Fun!</text>
+  </svg>`;
+}
+
 function getBangkokDateString(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Bangkok',
@@ -573,6 +687,7 @@ async function renderRankingSharePage(req, {
   sharePath = '',
   winnerImageUrl = '',
   shareImageUrl = '',
+  shareImagePath = '',
   kicker = 'GDSQ Pickleball',
   summaryChips = []
 }) {
@@ -583,7 +698,8 @@ async function renderRankingSharePage(req, {
   const heroImage = absoluteUrl(req, publicImageUrl(winnerImageUrl) || winnerImage);
   const shareImage = absoluteUrl(
     req,
-    publicImageUrl(shareImageUrl)
+    shareImagePath
+      || publicImageUrl(shareImageUrl)
       || (hasDefaultHomeBannerAsset ? publicImageUrl(defaultHomeBannerUrl) : '')
       || publicImageUrl(winnerImageUrl)
       || winnerImage
@@ -3044,7 +3160,7 @@ app.get('/awards/weekly/:weekId', async (req, res) => {
       awards: payload.awards,
       sharePath: req.originalUrl,
       winnerImageUrl: winner?.profileImageUrl || '',
-      shareImageUrl: winner?.profileImageUrl || '',
+      shareImagePath: `/og/awards/weekly/${encodeURIComponent(req.params.weekId)}.svg`,
       kicker: payload.isFallback ? 'GDSQ Latest Weekly Result' : 'GDSQ Weekly Awards',
       summaryChips: [
         payload.periodLabel,
@@ -3075,7 +3191,7 @@ app.get('/awards/monthly/:monthId', async (req, res) => {
       awards: payload.awards,
       sharePath: req.originalUrl,
       winnerImageUrl: winner?.profileImageUrl || '',
-      shareImageUrl: winner?.profileImageUrl || '',
+      shareImagePath: `/og/awards/monthly/${encodeURIComponent(req.params.monthId)}.svg`,
       kicker: payload.isFallback ? 'GDSQ Latest Monthly Result' : 'GDSQ Monthly Awards',
       summaryChips: [
         payload.periodLabel,
@@ -3107,7 +3223,7 @@ app.get('/awards/event/:sessionId', async (req, res) => {
       awards: payload.awards,
       sharePath: req.originalUrl,
       winnerImageUrl: winner?.profileImageUrl || '',
-      shareImageUrl: payload.session?.posterUrl || '',
+      shareImagePath: `/og/awards/event/${encodeURIComponent(req.params.sessionId)}.svg`,
       kicker: 'GDSQ Event Awards',
       summaryChips: [
         `${payload.session?.joinedCount || 0} joined`,
@@ -3118,6 +3234,232 @@ app.get('/awards/event/:sessionId', async (req, res) => {
   } catch (error) {
     console.error('Event awards page error:', error);
     return res.status(error.statusCode || 500).send('Unable to load event awards.');
+  }
+});
+
+async function getPlayerShareSummary(playerId) {
+  if (!uuidPattern.test(playerId)) {
+    const error = new Error('Invalid player id.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select(userSelect)
+    .eq('id', playerId)
+    .maybeSingle();
+
+  if (userError) throw userError;
+  if (!user) {
+    const error = new Error('Player not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const { data: rsvps, error: rsvpError } = await supabase
+    .from('rsvps')
+    .select('status')
+    .eq('user_id', user.id);
+
+  if (rsvpError) throw rsvpError;
+
+  const votes = await listRankingVotes({ nomineeLineUid: user.line_uid });
+  const categoryCounts = {};
+  for (const vote of votes) {
+    categoryCounts[vote.category] = (categoryCounts[vote.category] || 0) + 1;
+  }
+
+  const joinedCount = (rsvps || []).filter((rsvp) => rsvp.status === 'Joined').length;
+  const hostedCount = await getHostedCount(user.id);
+  const topCategories = topCategoryEntries(categoryCounts);
+
+  return {
+    id: user.id,
+    displayName: user.display_name || 'GDSQ Player',
+    profileImageUrl: user.profile_image_url || '',
+    voteCount: votes.length,
+    joinedCount,
+    hostedCount,
+    topCategories,
+    badges: buildPlayerBadges({
+      rating: {
+        categoryCounts,
+        voteCount: votes.length,
+        topCategories
+      },
+      topCategories,
+      joinedCount,
+      hostedCount
+    })
+  };
+}
+
+app.get('/og/awards/weekly/:weekId.svg', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'weekly',
+      identifier: req.params.weekId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+    const winner = payload.mvpWinner || payload.rankings[0] || null;
+    const svg = buildShareCardSvg({
+      kind: 'award',
+      kicker: payload.isFallback ? 'LATEST WEEKLY RESULT' : 'WEEKLY CLUB AWARDS',
+      title: winner?.displayName || 'Weekly MVP',
+      subtitle: payload.periodLabel || 'Weekly rankings',
+      highlightLabel: 'MVP of the Week',
+      highlightValue: winner?.topCategories?.[0]?.label || 'Top Player',
+      scoreLabel: 'Votes Received',
+      scoreValue: `${Number(winner?.voteCount || winner?.totalVotes || 0)} votes`,
+      chips: [payload.periodLabel, `${payload.totalVotes || 0} total votes`, payload.isFallback ? 'Latest result' : 'This week'],
+      top: payload.rankings.slice(0, 3).map((row) => ({
+        name: row.displayName,
+        votes: `${Number(row.voteCount || row.totalVotes || 0)} votes`
+      }))
+    });
+    res.type('image/svg+xml').send(svg);
+  } catch (error) {
+    console.error('Weekly award share image error:', error);
+    res.status(error.statusCode || 500).send('Unable to render share image.');
+  }
+});
+
+app.get('/og/awards/monthly/:monthId.svg', async (req, res) => {
+  try {
+    const payload = await buildRankingPayload({
+      period: 'monthly',
+      identifier: req.params.monthId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+    const winner = payload.mvpWinner || payload.rankings[0] || null;
+    const svg = buildShareCardSvg({
+      kind: 'award',
+      kicker: payload.isFallback ? 'LATEST MONTHLY RESULT' : 'MONTHLY CLUB AWARDS',
+      title: winner?.displayName || 'Monthly MVP',
+      subtitle: payload.periodLabel || 'Monthly rankings',
+      highlightLabel: 'MVP of the Month',
+      highlightValue: winner?.topCategories?.[0]?.label || 'Top Player',
+      scoreLabel: 'Votes Received',
+      scoreValue: `${Number(winner?.voteCount || winner?.totalVotes || 0)} votes`,
+      chips: [payload.periodLabel, `${payload.totalVotes || 0} total votes`, payload.isFallback ? 'Latest result' : 'This month'],
+      top: payload.rankings.slice(0, 3).map((row) => ({
+        name: row.displayName,
+        votes: `${Number(row.voteCount || row.totalVotes || 0)} votes`
+      }))
+    });
+    res.type('image/svg+xml').send(svg);
+  } catch (error) {
+    console.error('Monthly award share image error:', error);
+    res.status(error.statusCode || 500).send('Unable to render share image.');
+  }
+});
+
+app.get('/og/awards/event/:sessionId.svg', async (req, res) => {
+  try {
+    const payload = await buildEventRankingPayload({
+      sessionId: req.params.sessionId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+    const winner = payload.mvpWinner || payload.rankings[0] || null;
+    const svg = buildShareCardSvg({
+      kind: 'award',
+      kicker: 'EVENT MVP CARD',
+      title: payload.session?.title || 'Event Awards',
+      subtitle: eventShareSubtitle(payload.session),
+      highlightLabel: winner?.displayName || 'Top Player',
+      highlightValue: winner?.topCategories?.[0]?.label || 'MVP of the Event',
+      scoreLabel: 'Votes Received',
+      scoreValue: `${Number(winner?.voteCount || winner?.totalVotes || 0)} votes`,
+      chips: [
+        payload.session?.eventDate || '',
+        `${payload.session?.joinedCount || 0} joined`,
+        `${payload.totalVotes || 0} total votes`
+      ],
+      top: payload.rankings.slice(0, 3).map((row) => ({
+        name: row.displayName,
+        votes: `${Number(row.voteCount || row.totalVotes || 0)} votes`
+      }))
+    });
+    res.type('image/svg+xml').send(svg);
+  } catch (error) {
+    console.error('Event award share image error:', error);
+    res.status(error.statusCode || 500).send('Unable to render share image.');
+  }
+});
+
+app.get('/og/players/:playerId.svg', async (req, res) => {
+  try {
+    const player = await getPlayerShareSummary(req.params.playerId);
+    const svg = buildShareCardSvg({
+      kind: 'player',
+      kicker: 'PLAYER PROFILE',
+      title: player.displayName,
+      subtitle: 'GDSQ Pickleball Community Profile',
+      highlightLabel: 'Top Award',
+      highlightValue: player.topCategories?.[0]?.label || 'No awards yet',
+      scoreLabel: 'Votes Received',
+      scoreValue: `${Number(player.voteCount || 0)} votes`,
+      chips: [
+        `${player.joinedCount || 0} joined events`,
+        `${player.hostedCount || 0} hosted`,
+        player.badges?.[0]?.label || 'GDSQ Player'
+      ],
+      top: (player.topCategories || []).slice(0, 3).map((entry) => ({
+        name: entry.label,
+        votes: `${Number(entry.votes || 0)} votes`
+      }))
+    });
+    res.type('image/svg+xml').send(svg);
+  } catch (error) {
+    console.error('Player share image error:', error);
+    res.status(error.statusCode || 500).send('Unable to render share image.');
+  }
+});
+
+app.get('/share/player/:playerId', async (req, res) => {
+  try {
+    const player = await getPlayerShareSummary(req.params.playerId);
+    const shareUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    const imageUrl = absoluteUrl(req, `/og/players/${encodeURIComponent(player.id)}.svg`);
+    const title = `${player.displayName} · GDSQ Player Profile`;
+    const description = [
+      `${player.voteCount || 0} votes received`,
+      `${player.joinedCount || 0} joined events`,
+      player.topCategories?.[0]?.label || 'GDSQ Pickleball community player'
+    ].join(' • ');
+
+    return res.send(`<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${escapeHtml(title)}</title>
+      ${buildMetaTags({
+        title,
+        description,
+        imageUrl,
+        url: shareUrl
+      })}
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-50 font-sans text-slate-900">
+      <main class="mx-auto flex min-h-screen max-w-2xl items-center justify-center p-6">
+        <section class="w-full rounded-[28px] bg-white p-8 shadow-xl shadow-slate-200/60">
+          <div class="text-xs font-black uppercase tracking-[0.22em] text-gdsq">GDSQ Pickleball</div>
+          <h1 class="mt-3 text-4xl font-black">${escapeHtml(player.displayName)}</h1>
+          <p class="mt-3 text-sm font-semibold text-slate-500">${escapeHtml(description)}</p>
+          <img class="mt-6 aspect-[1200/630] w-full rounded-3xl border border-slate-200 object-cover" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(player.displayName)} share card">
+          <div class="mt-6 flex flex-wrap gap-3">
+            ${(player.badges || []).slice(0, 4).map((badge) => `<span class="rounded-full bg-blue-50 px-4 py-2 text-sm font-black text-gdsq">${escapeHtml(badge.label || 'Badge')}</span>`).join('')}
+          </div>
+        </section>
+      </main>
+    </body>
+    </html>`);
+  } catch (error) {
+    console.error('Player share page error:', error);
+    return res.status(error.statusCode || 500).send('Unable to load player share page.');
   }
 });
 
