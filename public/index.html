@@ -2845,7 +2845,8 @@
 
                 async shareProfile() {
                     if (!this.selectedPlayer?.id) return;
-                    const url = `${window.location.origin}/?playerId=${encodeURIComponent(this.selectedPlayer.id)}&v=${Date.now()}`;
+                    const baseUrl = `${window.location.origin}/share/player/${encodeURIComponent(this.selectedPlayer.id)}`;
+                    const url = this.sharePreviewUrl(baseUrl);
                     const text = `${this.t('shareProfile')}: ${this.selectedPlayer.displayName || 'GDSQ Player'}`;
 
                     if (navigator.share) {
