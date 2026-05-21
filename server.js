@@ -570,16 +570,24 @@ async function renderRankingSharePage(req, {
   winner = null,
   top = [],
   awards = [],
-  sharePath = ''
+  sharePath = '',
+  winnerImageUrl = '',
+  shareImageUrl = '',
+  kicker = 'GDSQ Pickleball',
+  summaryChips = []
 }) {
   const shareUrl = `${req.protocol}://${req.get('host')}${sharePath || req.originalUrl}`;
   const resolvedWinner = winner || (top || [])[0] || null;
   const winnerName = resolvedWinner?.displayName || 'TBA';
   const winnerImage = publicImageUrl(resolvedWinner?.profileImageUrl) || '/assets/gdsq-logo.png';
-  const heroImage = absoluteUrl(req, winnerImage);
-  const shareImage = hasDefaultHomeBannerAsset
-    ? absoluteUrl(req, publicImageUrl(defaultHomeBannerUrl) || winnerImage)
-    : heroImage;
+  const heroImage = absoluteUrl(req, publicImageUrl(winnerImageUrl) || winnerImage);
+  const shareImage = absoluteUrl(
+    req,
+    publicImageUrl(shareImageUrl)
+      || (hasDefaultHomeBannerAsset ? publicImageUrl(defaultHomeBannerUrl) : '')
+      || publicImageUrl(winnerImageUrl)
+      || winnerImage
+  );
   const topCards = (top || []).slice(0, 5).map((row, index) => `
     <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:#f8fafc;">
       <div style="width:34px;height:34px;border-radius:12px;background:#0b4fd9;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;">${index + 1}</div>
@@ -597,6 +605,10 @@ async function renderRankingSharePage(req, {
       <div style="font-size:13px;color:#0b4fd9;font-weight:800;">${Number(award.winner.totalVotes || 0)} votes</div>
     </div>
   `).join('');
+  const chipMarkup = (summaryChips || [])
+    .filter(Boolean)
+    .map((chip) => `<span style="display:inline-flex;align-items:center;border-radius:999px;background:#e0e7ff;color:#0b4fd9;padding:8px 12px;font-size:12px;font-weight:800;">${escapeHtml(chip)}</span>`)
+    .join('');
 
   return `<!DOCTYPE html>
   <html lang="en">
@@ -617,7 +629,7 @@ async function renderRankingSharePage(req, {
       <section style="background:white;border-radius:28px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
-            <div style="font-size:12px;font-weight:900;color:#0b4fd9;text-transform:uppercase;letter-spacing:.08em;">GDSQ Pickleball</div>
+            <div style="font-size:12px;font-weight:900;color:#0b4fd9;text-transform:uppercase;letter-spacing:.08em;">${escapeHtml(kicker)}</div>
             <h1 style="margin:8px 0 0;font-size:30px;line-height:1.1;font-weight:900;">${escapeHtml(title)}</h1>
             <p style="margin:8px 0 0;color:#64748b;font-size:14px;font-weight:600;">${escapeHtml(subtitle)}</p>
           </div>
@@ -633,6 +645,7 @@ async function renderRankingSharePage(req, {
             </div>
           </div>
         </div>
+        ${chipMarkup ? `<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;">${chipMarkup}</div>` : ''}
         ${topCards ? `<div style="margin-top:20px;"><div style="font-size:18px;font-weight:900;margin-bottom:12px;">Top Rankings</div><div style="display:grid;gap:12px;">${topCards}</div></div>` : ''}
         ${awardCards ? `<div style="margin-top:20px;"><div style="font-size:18px;font-weight:900;margin-bottom:12px;">Category Awards</div><div style="display:grid;gap:12px;">${awardCards}</div></div>` : ''}
         <button onclick="copyLink()" style="margin-top:20px;width:100%;border:none;background:#e0e7ff;color:#0b4fd9;border-radius:16px;padding:14px 16px;font-weight:900;">Copy Link</button>
@@ -958,7 +971,8 @@ async function listRankingVotes({
   voterLineUid = null,
   nomineeLineUid = null,
   period = 'all-time',
-  identifier = ''
+  identifier = '',
+  sessionIds = null
 } = {}) {
   let query = supabase
     .from('ranking_votes')
@@ -968,23 +982,22 @@ async function listRankingVotes({
   if (voterLineUid) query = query.eq('voter_line_uid', voterLineUid);
   if (nomineeLineUid) query = query.eq('nominee_line_uid', nomineeLineUid);
 
-  const normalizedPeriod = normalizeRankingPeriod(period);
-  if (normalizedPeriod !== 'all-time') {
-    const range = periodRangeByIdentifier(normalizedPeriod, identifier);
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('sessions')
-      .select('id')
-      .gte('event_date', range.start)
-      .lte('event_date', range.end);
-
-    if (sessionsError) throw sessionsError;
-
-    const sessionIds = (sessions || []).map((session) => session.id);
+  if (Array.isArray(sessionIds)) {
     if (sessionIds.length === 0) {
       return [];
     }
 
     query = query.in('event_id', sessionIds);
+  } else {
+    const normalizedPeriod = normalizeRankingPeriod(period);
+    if (normalizedPeriod !== 'all-time') {
+      const periodSessionIds = await listSessionIdsForRankingPeriod(normalizedPeriod, identifier);
+      if (periodSessionIds.length === 0) {
+        return [];
+      }
+
+      query = query.in('event_id', periodSessionIds);
+    }
   }
 
   const { data, error } = await query.order('created_at', { ascending: false });
@@ -994,6 +1007,21 @@ async function listRankingVotes({
   }
 
   return data || [];
+}
+
+async function listSessionIdsForRankingPeriod(period = 'all-time', identifier = '') {
+  const normalizedPeriod = normalizeRankingPeriod(period);
+  if (normalizedPeriod === 'all-time') return [];
+
+  const range = periodRangeByIdentifier(normalizedPeriod, identifier);
+  const { data: sessions, error: sessionsError } = await supabase
+    .from('sessions')
+    .select('id')
+    .gte('event_date', range.start)
+    .lte('event_date', range.end);
+
+  if (sessionsError) throw sessionsError;
+  return (sessions || []).map((session) => session.id);
 }
 
 async function findLatestRankingPeriodIdentifier(period = 'all-time') {
@@ -1107,11 +1135,20 @@ function buildAwardWinners(rankings = [], limit = 5) {
   });
 }
 
-async function loadRankingUsersAndJoinedCounts() {
-  const { data: joinedRsvps, error: rsvpError } = await supabase
+async function loadRankingUsersAndJoinedCounts({ sessionIds = null, votes = [] } = {}) {
+  let joinedRsvpsQuery = supabase
     .from('rsvps')
-    .select('user_id, status')
+    .select('user_id, session_id, status')
     .eq('status', 'Joined');
+
+  if (Array.isArray(sessionIds)) {
+    if (sessionIds.length === 0) {
+      return { users: [], joinedByUserId: {} };
+    }
+    joinedRsvpsQuery = joinedRsvpsQuery.in('session_id', sessionIds);
+  }
+
+  const { data: joinedRsvps, error: rsvpError } = await joinedRsvpsQuery;
 
   if (rsvpError) throw rsvpError;
 
@@ -1120,41 +1157,80 @@ async function loadRankingUsersAndJoinedCounts() {
     joinedByUserId[rsvp.user_id] = (joinedByUserId[rsvp.user_id] || 0) + 1;
   }
 
-  const userIds = Object.keys(joinedByUserId);
-  if (userIds.length === 0) {
-    return { users: [], joinedByUserId };
+  const userIds = Object.keys(joinedByUserId).filter(Boolean);
+  const usersById = {};
+
+  if (userIds.length > 0) {
+    const { data: users, error: userError } = await supabase
+      .from('users')
+      .select(userSelect)
+      .in('id', userIds);
+
+    if (userError) throw userError;
+
+    for (const user of users || []) {
+      usersById[user.id] = user;
+    }
   }
 
-  const { data: users, error: userError } = await supabase
-    .from('users')
-    .select(userSelect)
-    .in('id', userIds);
+  const voteLineUids = [...new Set((votes || []).map((vote) => vote.nominee_line_uid).filter(Boolean))];
+  const missingVoteLineUids = voteLineUids.filter((lineUid) => !Object.values(usersById).some((user) => user.line_uid === lineUid));
 
-  if (userError) throw userError;
-  return { users: users || [], joinedByUserId };
+  if (missingVoteLineUids.length > 0) {
+    const { data: votedUsers, error: votedUsersError } = await supabase
+      .from('users')
+      .select(userSelect)
+      .in('line_uid', missingVoteLineUids);
+
+    if (votedUsersError) throw votedUsersError;
+
+    for (const user of votedUsers || []) {
+      usersById[user.id] = user;
+      if (!joinedByUserId[user.id]) joinedByUserId[user.id] = 0;
+    }
+  }
+
+  return { users: Object.values(usersById), joinedByUserId };
 }
 
 async function buildRankingPayload({ period = 'all-time', identifier = '', category = DEFAULT_RANKING_CATEGORY }) {
   const normalizedPeriod = normalizeRankingPeriod(period);
   const normalizedCategory = VOTING_CATEGORY_KEYS.has(category) ? category : DEFAULT_RANKING_CATEGORY;
   const resolvedIdentifier = identifier || defaultPeriodIdentifier(normalizedPeriod);
-  const { users, joinedByUserId } = await loadRankingUsersAndJoinedCounts();
+  const requestedSessionIds = normalizedPeriod === 'all-time'
+    ? null
+    : await listSessionIdsForRankingPeriod(normalizedPeriod, resolvedIdentifier);
   let effectiveIdentifier = resolvedIdentifier;
-  let votes = await listRankingVotes({ period: normalizedPeriod, identifier: resolvedIdentifier });
+  let effectiveSessionIds = requestedSessionIds;
+  let votes = await listRankingVotes({
+    period: normalizedPeriod,
+    identifier: resolvedIdentifier,
+    sessionIds: requestedSessionIds
+  });
   let isFallback = false;
 
   if (normalizedPeriod !== 'all-time' && votes.length === 0) {
     const latestIdentifier = await findLatestRankingPeriodIdentifier(normalizedPeriod);
     if (latestIdentifier && latestIdentifier !== resolvedIdentifier) {
-      const fallbackVotes = await listRankingVotes({ period: normalizedPeriod, identifier: latestIdentifier });
+      const fallbackSessionIds = await listSessionIdsForRankingPeriod(normalizedPeriod, latestIdentifier);
+      const fallbackVotes = await listRankingVotes({
+        period: normalizedPeriod,
+        identifier: latestIdentifier,
+        sessionIds: fallbackSessionIds
+      });
       if (fallbackVotes.length > 0) {
         votes = fallbackVotes;
         effectiveIdentifier = latestIdentifier;
+        effectiveSessionIds = fallbackSessionIds;
         isFallback = true;
       }
     }
   }
 
+  const { users, joinedByUserId } = await loadRankingUsersAndJoinedCounts({
+    sessionIds: effectiveSessionIds,
+    votes
+  });
   const rankings = buildRankingRows({ users, joinedByUserId, votes, category: normalizedCategory });
   const awards = buildAwardWinners(rankings);
   const range = periodRangeByIdentifier(normalizedPeriod, effectiveIdentifier);
@@ -1171,8 +1247,68 @@ async function buildRankingPayload({ period = 'all-time', identifier = '', categ
     awards,
     mvpWinner: awards.find((award) => award.categoryKey === 'mvp_match')?.winner || null,
     isFallback,
-    hasVotes: votes.length > 0
+    hasVotes: votes.length > 0,
+    totalVotes: votes.length,
+    sessionCount: normalizedPeriod === 'all-time'
+      ? [...new Set((votes || []).map((vote) => vote.event_id).filter(Boolean))].length
+      : (effectiveSessionIds || []).length
   };
+}
+
+async function buildEventRankingPayload({ sessionId = '', category = DEFAULT_RANKING_CATEGORY }) {
+  const normalizedCategory = VOTING_CATEGORY_KEYS.has(category) ? category : DEFAULT_RANKING_CATEGORY;
+  const sessionSummary = await getSessionSummary(sessionId);
+
+  if (sessionSummary.error || !sessionSummary.data) {
+    const error = sessionSummary.error || new Error('Session not found.');
+    throw error;
+  }
+
+  const votes = await listRankingVotes({
+    eventId: sessionId
+  });
+
+  const { users, joinedByUserId } = await loadRankingUsersAndJoinedCounts({
+    sessionIds: [sessionId],
+    votes
+  });
+  const rankings = buildRankingRows({
+    users,
+    joinedByUserId,
+    votes,
+    category: normalizedCategory
+  });
+  const awards = buildAwardWinners(rankings);
+  const session = sessionSummary.data;
+
+  return {
+    period: 'by-event',
+    periodId: sessionId,
+    periodLabel: session.title || 'Event',
+    requestedPeriodId: sessionId,
+    requestedPeriodLabel: session.title || 'Event',
+    category: normalizedCategory,
+    rankings,
+    awards,
+    mvpWinner: awards.find((award) => award.categoryKey === 'mvp_match')?.winner || null,
+    isFallback: false,
+    hasVotes: votes.length > 0,
+    totalVotes: votes.length,
+    sessionCount: 1,
+    session
+  };
+}
+
+function eventShareSubtitle(session = {}) {
+  const pieces = [];
+  if (session.eventDate) pieces.push(session.eventDate);
+
+  const timeParts = [session.startTime, session.endTime].filter(Boolean).map((value) => String(value).slice(0, 5));
+  if (timeParts.length === 2) pieces.push(`${timeParts[0]} - ${timeParts[1]}`);
+  else if (timeParts.length === 1) pieces.push(timeParts[0]);
+
+  if (session.location) pieces.push(session.location);
+  return pieces.join(' • ');
 }
 
 function serializeSession(session) {
@@ -2737,6 +2873,28 @@ app.get('/api/rankings', async (req, res) => {
   }
 });
 
+app.get('/api/rankings/event/:sessionId', async (req, res) => {
+  try {
+    const category = VOTING_CATEGORY_KEYS.has(req.query.category) ? req.query.category : DEFAULT_RANKING_CATEGORY;
+    const payload = await buildEventRankingPayload({
+      sessionId: req.params.sessionId,
+      category
+    });
+
+    return res.json({
+      success: true,
+      ...payload
+    });
+  } catch (error) {
+    console.error('Event rankings load error:', error);
+
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Unable to load event rankings.'
+    });
+  }
+});
+
 app.get('/api/admin/app-activity', requireAdmin, async (req, res) => {
   try {
     const { data: users, error } = await supabase
@@ -2906,6 +3064,35 @@ app.get('/awards/monthly/:monthId', async (req, res) => {
   } catch (error) {
     console.error('Monthly awards page error:', error);
     return res.status(500).send('Unable to load monthly awards.');
+  }
+});
+
+app.get('/awards/event/:sessionId', async (req, res) => {
+  try {
+    const payload = await buildEventRankingPayload({
+      sessionId: req.params.sessionId,
+      category: DEFAULT_RANKING_CATEGORY
+    });
+
+    return res.send(await renderRankingSharePage(req, {
+      title: `${payload.session?.title || 'Event'} MVP`,
+      subtitle: eventShareSubtitle(payload.session),
+      winner: payload.mvpWinner,
+      top: payload.rankings.slice(0, 3),
+      awards: payload.awards,
+      sharePath: req.originalUrl,
+      winnerImageUrl: payload.mvpWinner?.profileImageUrl || '',
+      shareImageUrl: payload.session?.posterUrl || '',
+      kicker: 'GDSQ Event Awards',
+      summaryChips: [
+        `${payload.session?.joinedCount || 0} joined`,
+        `${payload.totalVotes || 0} votes`,
+        payload.session?.courtCount ? `${payload.session.courtCount} courts` : ''
+      ]
+    }));
+  } catch (error) {
+    console.error('Event awards page error:', error);
+    return res.status(error.statusCode || 500).send('Unable to load event awards.');
   }
 });
 
