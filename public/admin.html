@@ -112,6 +112,12 @@
                 <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('default-settings')">
                     <i class="fa-solid fa-sliders mr-2 text-gdsq"></i><span x-text="t('jumpDefaultSettings')">Default Settings</span>
                 </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('shop-preorders')">
+                    <i class="fa-solid fa-bag-shopping mr-2 text-gdsq"></i><span x-text="t('jumpShopPreorders')">Shop Preorders</span>
+                </button>
+                <button class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-left text-sm font-bold hover:bg-gray-100" @click="scrollToSection('shop-products')">
+                    <i class="fa-solid fa-shirt mr-2 text-gdsq"></i><span x-text="t('jumpShopProducts')">Shop Products</span>
+                </button>
             </div>
         </div>
 
@@ -607,6 +613,118 @@
             </section>
         </div>
 
+        <section id="shop-products" class="admin-jump-target mt-5 rounded-lg bg-white p-4 shadow-sm" :class="sectionHighlightId === 'shop-products' ? 'admin-jump-highlight' : ''">
+            <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-wide text-gdsq">SHOP</p>
+                    <h2 class="text-xl font-black" x-text="t('shopProducts')">จัดการสินค้า</h2>
+                    <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('shopProductsHelp')">เพิ่มรูป ราคา ไซซ์ และสีสำหรับพรีออเดอร์</p>
+                </div>
+                <button class="rounded-full border border-gray-300 px-4 py-2 text-xs font-bold text-gdsq" @click="resetShopProductForm()" x-text="t('newProduct')">เพิ่มสินค้าใหม่</button>
+            </div>
+
+            <div class="mt-4 grid gap-4 lg:grid-cols-[1.05fr_1fr]">
+                <form class="space-y-3 rounded-xl bg-gray-50 p-4" @submit.prevent="saveShopProduct()">
+                    <p class="font-black" x-text="shopProductForm.id ? t('editProduct') : t('addProduct')">เพิ่มสินค้า</p>
+                    <input class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" x-model="shopProductForm.name" :placeholder="t('productName')" required>
+                    <textarea class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" rows="2" x-model="shopProductForm.description" :placeholder="t('productDescription')"></textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" type="number" min="0" x-model="shopProductForm.price" :placeholder="t('normalPrice')" required>
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" type="number" min="0" x-model="shopProductForm.preorderPrice" :placeholder="t('preorderPrice')">
+                    </div>
+                    <input class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" x-model="shopProductForm.coverImageUrl" :placeholder="t('coverImageUrl')">
+                    <textarea class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" rows="2" x-model="shopProductForm.imageUrls" :placeholder="t('galleryImageUrls')"></textarea>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" x-model="shopProductForm.sizes" :placeholder="t('sizesHelp')">
+                        <input class="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm" x-model="shopProductForm.colors" :placeholder="t('colorsHelp')">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select class="rounded-lg border border-gray-300 px-3 py-3 text-sm" x-model="shopProductForm.status">
+                            <option value="preorder">Preorder</option>
+                            <option value="coming_soon">Coming Soon</option>
+                            <option value="sold_out">Sold Out</option>
+                        </select>
+                        <input class="rounded-lg border border-gray-300 px-3 py-3 text-sm" type="date" x-model="shopProductForm.preorderDeadline">
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input class="w-24 rounded-lg border border-gray-300 px-3 py-3 text-sm" type="number" x-model="shopProductForm.displayOrder" :placeholder="t('displayOrder')">
+                        <label class="flex items-center gap-2 text-sm font-bold text-gray-600">
+                            <input type="checkbox" x-model="shopProductForm.isActive">
+                            <span x-text="t('active')">Active</span>
+                        </label>
+                    </div>
+                    <button class="w-full rounded-lg bg-gdsq px-4 py-3 text-sm font-bold text-white disabled:opacity-50" type="submit" :disabled="isLoading" x-text="shopProductForm.id ? t('save') : t('addProduct')">เพิ่มสินค้า</button>
+                </form>
+
+                <div class="space-y-3">
+                    <template x-for="product in shopProducts" :key="product.id">
+                        <article class="flex gap-3 rounded-xl border border-gray-100 p-3">
+                            <img class="h-20 w-16 rounded-lg bg-gray-100 object-cover" :src="imageUrl(product.coverImageUrl) || appSettings.homeBannerUrl" alt="Product">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-black" x-text="product.name"></p>
+                                        <p class="text-sm font-bold text-gdsq" x-text="moneyText(product.preorderPrice || product.price)"></p>
+                                    </div>
+                                    <span class="rounded-full px-2 py-1 text-[10px] font-black" :class="product.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'" x-text="product.isActive ? t('active') : t('inactive')"></span>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <button class="rounded-lg border border-gray-200 px-2 py-1 text-xs font-bold text-gdsq" @click="editShopProduct(product)" x-text="t('edit')">Edit</button>
+                                    <button class="rounded-lg border border-gray-200 px-2 py-1 text-xs font-bold text-gray-700" @click="toggleShopProduct(product)" x-text="product.isActive ? t('deactivate') : t('activate')">Toggle</button>
+                                    <button class="rounded-lg border border-red-100 px-2 py-1 text-xs font-bold text-red-600" @click="deleteShopProduct(product)" x-text="t('delete')">Delete</button>
+                                </div>
+                            </div>
+                        </article>
+                    </template>
+                    <p class="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500" x-show="shopProducts.length === 0" x-text="t('noShopProducts')">ยังไม่มีสินค้า</p>
+                </div>
+            </div>
+            <p class="mt-3 rounded-lg bg-blue-50 p-3 text-sm font-semibold text-gdsq" x-show="shopProductMessage" x-text="shopProductMessage"></p>
+        </section>
+
+        <section id="shop-preorders" class="admin-jump-target mt-5 rounded-lg bg-white shadow-sm" :class="sectionHighlightId === 'shop-preorders' ? 'admin-jump-highlight' : ''">
+            <div class="flex items-center justify-between border-b px-4 py-3">
+                <div>
+                    <h2 class="font-black" x-text="t('shopPreorders')">Shop Preorders</h2>
+                    <p class="mt-1 text-xs font-semibold text-gray-500" x-text="t('shopPreordersHelp')">ดูรายการพรีออเดอร์ล่าสุดและอัปเดตสถานะได้จากตรงนี้</p>
+                </div>
+                <button class="rounded-full border border-gray-300 px-3 py-1 text-xs font-bold text-gdsq" @click="loadShopPreorders()" x-text="t('refresh')">Refresh</button>
+            </div>
+            <div class="divide-y">
+                <template x-for="preorder in shopPreorders" :key="preorder.id">
+                    <div class="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-3">
+                                <img class="h-12 w-12 rounded-2xl object-cover bg-gray-100" :src="preorder.productCoverImageUrl || 'https://ui-avatars.com/api/?background=0044CC&color=fff&name=GDSQ'" alt="Product">
+                                <div class="min-w-0">
+                                    <p class="truncate font-black" x-text="preorder.productName || '-'"></p>
+                                    <p class="truncate text-sm font-semibold text-gray-600" x-text="preorder.displayName || '-'"></p>
+                                </div>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-gray-500">
+                                <span class="rounded-full bg-gray-100 px-3 py-1" x-text="`${t('size')}: ${preorder.selectedSize || '-'}`"></span>
+                                <span class="rounded-full bg-gray-100 px-3 py-1" x-text="`${t('color')}: ${preorder.selectedColor || '-'}`"></span>
+                                <span class="rounded-full bg-gray-100 px-3 py-1" x-text="`${t('quantity')}: ${preorder.quantity || 1}`"></span>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500" x-show="preorder.phone" x-text="preorder.phone"></p>
+                            <p class="mt-2 text-xs text-gray-500" x-show="preorder.note" x-text="preorder.note"></p>
+                            <p class="mt-2 text-xs text-gray-400" x-text="formatDate(preorder.createdAt)"></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full px-3 py-1 text-xs font-black" :class="preorderStatusClass(preorder.status)" x-text="preorder.status"></span>
+                            <select class="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold" :value="preorder.status" @change="updatePreorderStatus(preorder, $event.target.value)">
+                                <option value="pending">pending</option>
+                                <option value="confirmed">confirmed</option>
+                                <option value="paid">paid</option>
+                                <option value="cancelled">cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                </template>
+                <p class="px-4 py-6 text-center text-sm text-gray-500" x-show="shopPreorders.length === 0" x-text="t('noShopPreorders')">ยังไม่มีรายการพรีออเดอร์</p>
+            </div>
+        </section>
+
         <div class="mt-5 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" x-show="errorMessage" x-text="errorMessage"></div>
         </div>
     </div>
@@ -686,6 +804,25 @@
                 sectionHighlightTimer: null,
                 rsvpFilter: 'all',
                 homeBanners: [],
+                shopProducts: [],
+                shopPreorders: [],
+                shopPreorderMessage: '',
+                shopProductMessage: '',
+                shopProductForm: {
+                    id: '',
+                    name: '',
+                    description: '',
+                    price: 0,
+                    preorderPrice: '',
+                    status: 'preorder',
+                    coverImageUrl: '',
+                    imageUrls: '',
+                    sizes: '',
+                    colors: '',
+                    preorderDeadline: '',
+                    displayOrder: 0,
+                    isActive: true
+                },
                 homeBannerForm: {
                     id: '',
                     title: '',
@@ -754,12 +891,36 @@
                         jumpCreateEvent: 'สร้างกิจกรรม',
                         jumpHomeBanner: 'อัปเดตหน้า Home',
                         jumpDefaultSettings: 'ค่าเริ่มต้น',
+                        jumpShopPreorders: 'พรีออเดอร์สินค้า',
+                        jumpShopProducts: 'จัดการสินค้า',
                         selectEventFirst: 'กรุณาเลือกกิจกรรมก่อน',
                         jumpedToSection: 'เลื่อนไปยังส่วนที่เลือกแล้ว',
                         adminStepCreate: 'สร้างหรือเลือกกิจกรรม',
                         adminStepShare: 'คัดลอกลิงก์ส่งให้ผู้เล่น',
                         adminStepPayment: 'ตรวจสลิปและกด Mark Paid',
                         adminStepExport: 'ดาวน์โหลด CSV ตอนต้องสรุปรายชื่อ',
+                        shopPreorders: 'พรีออเดอร์สินค้า',
+                        shopPreordersHelp: 'ดูรายการพรีออเดอร์ล่าสุดและอัปเดตสถานะได้จากตรงนี้',
+                        noShopPreorders: 'ยังไม่มีรายการพรีออเดอร์',
+                        shopProducts: 'จัดการสินค้า Shop',
+                        shopProductsHelp: 'เพิ่มรูป ราคา ไซซ์ และสีเพื่อแสดงในหน้าร้าน',
+                        newProduct: 'เพิ่มสินค้าใหม่',
+                        addProduct: 'เพิ่มสินค้า',
+                        editProduct: 'แก้ไขสินค้า',
+                        productName: 'ชื่อสินค้า',
+                        productDescription: 'รายละเอียดสินค้า',
+                        normalPrice: 'ราคาปกติ',
+                        preorderPrice: 'ราคาพรีออเดอร์',
+                        coverImageUrl: 'ลิงก์รูปปกสินค้า',
+                        galleryImageUrls: 'ลิงก์รูปเพิ่มเติม คั่นด้วยเครื่องหมาย ,',
+                        sizesHelp: 'ไซซ์ เช่น S, M, L',
+                        colorsHelp: 'สี เช่น Navy, White',
+                        noShopProducts: 'ยังไม่มีสินค้า',
+                        productSaved: 'บันทึกสินค้าแล้ว',
+                        productDeleted: 'ลบหรือซ่อนสินค้าแล้ว',
+                        productDeleteConfirm: 'ยืนยันลบสินค้านี้ไหม? ถ้ามีรายการพรีออเดอร์ ระบบจะซ่อนสินค้าแทน',
+                        size: 'ไซซ์',
+                        color: 'สี',
                         appearance: 'หน้าตาแอพ',
                         homeBannerSettings: 'Home Updates Slider',
                         homeBannerHelp: 'รวมแบนเนอร์หน้า Home และข่าวอัปเดตไว้ในสไลด์เดียว',
@@ -898,12 +1059,36 @@
                         jumpCreateEvent: 'Create Event',
                         jumpHomeBanner: 'Home Updates',
                         jumpDefaultSettings: 'Default Settings',
+                        jumpShopPreorders: 'Shop Preorders',
+                        jumpShopProducts: 'Shop Products',
                         selectEventFirst: 'Please select an event first',
                         jumpedToSection: 'Jumped to the selected section',
                         adminStepCreate: 'Create or select an event',
                         adminStepShare: 'Copy the event link for players',
                         adminStepPayment: 'Review slips and mark paid',
                         adminStepExport: 'Download CSV when needed',
+                        shopPreorders: 'Shop Preorders',
+                        shopPreordersHelp: 'Review recent product preorders and update their status here.',
+                        noShopPreorders: 'No shop preorders yet.',
+                        shopProducts: 'Shop Products',
+                        shopProductsHelp: 'Add images, prices, sizes, and colors for your store.',
+                        newProduct: 'New product',
+                        addProduct: 'Add product',
+                        editProduct: 'Edit product',
+                        productName: 'Product name',
+                        productDescription: 'Product description',
+                        normalPrice: 'Regular price',
+                        preorderPrice: 'Preorder price',
+                        coverImageUrl: 'Cover image URL',
+                        galleryImageUrls: 'Gallery image URLs, separated by commas',
+                        sizesHelp: 'Sizes, e.g. S, M, L',
+                        colorsHelp: 'Colors, e.g. Navy, White',
+                        noShopProducts: 'No products yet.',
+                        productSaved: 'Product saved.',
+                        productDeleted: 'Product removed or hidden.',
+                        productDeleteConfirm: 'Delete this product? Products with preorders will be hidden instead.',
+                        size: 'Size',
+                        color: 'Color',
                         appearance: 'Appearance',
                         homeBannerSettings: 'Home Updates Slider',
                         homeBannerHelp: 'Use one slider for both the old Home banner and club updates.',
@@ -1188,6 +1373,8 @@
                         await this.loadSettings();
                         await this.loadHomeBanners();
                         await this.loadAppActivity();
+                        await this.loadShopProducts();
+                        await this.loadShopPreorders();
                     }
                     if (this.selectedSessionId) {
                         await this.loadRsvps();
@@ -1213,6 +1400,171 @@
                         totalTrackedUsers: 0,
                         latestUser: null
                     };
+                },
+
+                async loadShopPreorders() {
+                    const response = await fetch('/api/admin/preorders');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.errorMessage = result.message || 'Unable to load shop preorders';
+                        return;
+                    }
+
+                    this.shopPreorders = result.preorders || [];
+                },
+
+                resetShopProductForm() {
+                    this.shopProductForm = {
+                        id: '',
+                        name: '',
+                        description: '',
+                        price: 0,
+                        preorderPrice: '',
+                        status: 'preorder',
+                        coverImageUrl: '',
+                        imageUrls: '',
+                        sizes: '',
+                        colors: '',
+                        preorderDeadline: '',
+                        displayOrder: 0,
+                        isActive: true
+                    };
+                    this.shopProductMessage = '';
+                },
+
+                async loadShopProducts() {
+                    const response = await fetch('/api/admin/products');
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.isAuthenticated = false;
+                            return;
+                        }
+                        this.errorMessage = result.message || 'Unable to load products';
+                        return;
+                    }
+
+                    this.shopProducts = result.products || [];
+                },
+
+                editShopProduct(product) {
+                    this.shopProductForm = {
+                        id: product.id,
+                        name: product.name || '',
+                        description: product.description || '',
+                        price: product.price ?? 0,
+                        preorderPrice: product.preorderPrice ?? '',
+                        status: product.status || 'preorder',
+                        coverImageUrl: product.coverImageUrl || '',
+                        imageUrls: (product.imageUrls || []).join(', '),
+                        sizes: (product.sizes || []).join(', '),
+                        colors: (product.colors || []).join(', '),
+                        preorderDeadline: product.preorderDeadline || '',
+                        displayOrder: product.displayOrder || 0,
+                        isActive: product.isActive !== false
+                    };
+                    this.shopProductMessage = '';
+                    this.scrollToSection('shop-products');
+                },
+
+                async saveShopProduct() {
+                    this.isLoading = true;
+                    this.errorMessage = '';
+                    this.shopProductMessage = '';
+
+                    try {
+                        const editing = Boolean(this.shopProductForm.id);
+                        const response = await fetch(editing ? `/api/admin/products/${this.shopProductForm.id}` : '/api/admin/products', {
+                            method: editing ? 'PATCH' : 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.shopProductForm)
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || 'Unable to save product');
+
+                        this.shopProductMessage = this.t('productSaved');
+                        this.resetShopProductForm();
+                        this.shopProductMessage = this.t('productSaved');
+                        await this.loadShopProducts();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async toggleShopProduct(product) {
+                    this.shopProductForm = { ...this.shopProductForm };
+                    const response = await fetch(`/api/admin/products/${product.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ isActive: !product.isActive })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) {
+                        this.errorMessage = result.message || 'Unable to update product';
+                        return;
+                    }
+                    await this.loadShopProducts();
+                },
+
+                async deleteShopProduct(product) {
+                    if (!confirm(this.t('productDeleteConfirm'))) return;
+                    const response = await fetch(`/api/admin/products/${product.id}`, { method: 'DELETE' });
+                    const result = await response.json();
+                    if (!response.ok) {
+                        this.errorMessage = result.message || 'Unable to delete product';
+                        return;
+                    }
+                    this.shopProductMessage = this.t('productDeleted');
+                    if (this.shopProductForm.id === product.id) this.resetShopProductForm();
+                    await this.loadShopProducts();
+                },
+
+                preorderStatusClass(status) {
+                    switch ((status || '').toLowerCase()) {
+                        case 'confirmed':
+                            return 'bg-blue-100 text-blue-700';
+                        case 'paid':
+                            return 'bg-green-100 text-green-700';
+                        case 'cancelled':
+                            return 'bg-red-100 text-red-700';
+                        default:
+                            return 'bg-amber-100 text-amber-700';
+                    }
+                },
+
+                async updatePreorderStatus(preorder, status) {
+                    this.isLoading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const response = await fetch(`/api/admin/preorders/${preorder.id}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ status })
+                        });
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to update preorder status');
+                        }
+
+                        preorder.status = result.preorder?.status || status;
+                        await this.loadShopPreorders();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
                 },
 
                 resetHomeBannerForm() {

@@ -736,17 +736,139 @@
             </section>
 
             <section id="shop-section" class="public-jump-target mt-7 px-5" :class="sectionHighlightId === 'shop-section' ? 'public-jump-highlight rounded-2xl' : ''" x-show="activeTab === 'shop'" x-cloak>
-                <h1 class="text-xl font-black" x-text="t('shop')">Shop</h1>
-                <div class="mt-4 space-y-3">
-                    <article class="rounded-2xl bg-white p-5 shadow-sm">
-                        <p class="text-lg font-black">Court Booking</p>
-                        <p class="mt-1 text-sm text-gray-500">Reserve a pickleball court with the GDSQ team.</p>
-                        <a class="mt-4 inline-flex rounded-xl bg-gdsq px-5 py-3 text-sm font-black text-white" href="https://line.me/R/" target="_blank">Contact on LINE</a>
+                <div x-show="shopView === 'list'">
+                    <p class="text-xs font-black uppercase tracking-[0.22em] text-gdsq" x-text="t('shopCollection')">GDSQ Collection</p>
+                    <h1 class="mt-1 text-3xl font-black text-gdsqNavy" x-text="t('shopGearTitle')">Gear. Style. Community.</h1>
+                    <p class="mt-2 text-sm font-semibold text-gray-500" x-text="t('shopIntro')">พรีออเดอร์สินค้า GDSQ ได้จากหน้านี้ แล้วทีมงานจะติดต่อกลับทาง LINE</p>
+                    <div class="mt-5 overflow-hidden rounded-3xl bg-gdsqNavy p-5 text-white shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-[0.2em] text-lime-300">GDSQ</p>
+                                <p class="mt-1 text-xl font-black" x-text="t('shopBannerTitle')">Club Gear Preorder</p>
+                                <p class="mt-1 text-xs font-semibold text-blue-100" x-text="t('shopBannerText')">Wear the club. Play together.</p>
+                            </div>
+                            <i class="fa-solid fa-bag-shopping text-4xl text-lime-300"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl p-3 text-sm font-semibold" x-show="shopMessage && shopView !== 'success'" :class="shopMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'" x-text="shopMessage"></div>
+
+                <div class="mt-4 space-y-3" x-show="shopView === 'list'">
+                    <div class="grid gap-3">
+                        <template x-for="product in shopVisibleProducts" :key="product.id">
+                            <article class="flex gap-3 overflow-hidden rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
+                                <button class="relative h-32 w-28 flex-none overflow-hidden rounded-xl bg-gray-50" @click="openShopProduct(product.id)">
+                                    <img class="h-full w-full object-cover" :src="imageUrl(product.coverImageUrl) || homeBannerUrl" :alt="product.name">
+                                    <span class="absolute left-2 top-2 rounded-full px-2 py-1 text-[10px] font-black" :class="productStatusClass(product.status)" x-text="productStatusLabel(product.status)"></span>
+                                </button>
+                                <div class="min-w-0 flex flex-1 flex-col justify-between py-1">
+                                    <div>
+                                        <p class="line-clamp-2 text-base font-black text-gray-900" x-text="product.name"></p>
+                                        <p class="mt-1 line-clamp-1 text-xs font-semibold text-gray-500" x-text="product.description"></p>
+                                        <p class="mt-2 text-lg font-black text-gdsq" x-text="moneyText(product.preorderPrice || product.price)"></p>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <button class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-black text-gdsq" @click="openShopProduct(product.id)" x-text="t('viewDetail')">View Detail</button>
+                                        <button class="rounded-lg bg-gdsq px-3 py-2 text-xs font-black text-white disabled:bg-gray-300" :disabled="product.status !== 'preorder'" @click="startPreorder(product.id)" x-text="t('preorderNow')">Preorder</button>
+                                    </div>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                    <p class="rounded-2xl bg-white p-5 text-center text-sm font-semibold text-gray-500 shadow-sm" x-show="shopVisibleProducts.length === 0" x-text="t('noProducts')">ยังไม่มีสินค้าในตอนนี้</p>
+                </div>
+
+                <div class="mt-2 space-y-4" x-show="shopView === 'detail' && selectedShopProduct" x-cloak>
+                    <button class="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-black text-gdsq" @click="closeShopDetail()">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span x-text="t('backToShop')">Back to Shop</span>
+                    </button>
+
+                    <article class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-gray-100">
+                        <div class="aspect-[4/5] bg-gray-100">
+                            <img class="h-full w-full object-cover" :src="imageUrl(shopMainImage) || imageUrl(selectedShopProduct?.coverImageUrl) || homeBannerUrl" :alt="selectedShopProduct?.name || 'GDSQ product'">
+                        </div>
+                        <div class="flex gap-3 overflow-x-auto px-4 py-4" x-show="currentShopImages.length > 1">
+                            <template x-for="imageUrlItem in currentShopImages" :key="imageUrlItem">
+                                <button class="h-20 w-20 flex-none overflow-hidden rounded-2xl border-2 bg-gray-100" :class="shopMainImage === imageUrlItem ? 'border-gdsq' : 'border-transparent'" @click="shopMainImage = imageUrlItem">
+                                    <img class="h-full w-full object-cover" :src="imageUrl(imageUrlItem)" alt="Product thumbnail">
+                                </button>
+                            </template>
+                        </div>
+                        <div class="space-y-4 p-5">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h2 class="text-2xl font-black text-gray-900" x-text="selectedShopProduct?.name"></h2>
+                                        <span class="rounded-full px-3 py-1 text-[11px] font-black" :class="productStatusClass(selectedShopProduct?.status)" x-text="productStatusLabel(selectedShopProduct?.status)"></span>
+                                    </div>
+                                    <p class="mt-1 text-sm font-semibold text-gray-500" x-text="selectedShopProduct?.description"></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400" x-text="selectedShopProduct?.preorderPrice ? t('preorderPrice') : t('price')">Price</p>
+                                    <p class="text-2xl font-black text-gdsq" x-text="moneyText(selectedShopProduct?.preorderPrice || selectedShopProduct?.price || 0)"></p>
+                                </div>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="rounded-2xl bg-gray-50 p-4" x-show="(selectedShopProduct?.sizes || []).length > 0">
+                                    <p class="text-xs font-black uppercase tracking-[0.18em] text-gray-400" x-text="t('availableSizes')">Available Sizes</p>
+                                    <div class="mt-3 flex flex-wrap gap-2">
+                                        <template x-for="size in (selectedShopProduct?.sizes || [])" :key="size">
+                                            <button class="rounded-lg px-4 py-2 text-xs font-black ring-1" :class="preorderForm.selectedSize === size ? 'bg-gdsq text-white ring-gdsq' : 'bg-white text-gray-700 ring-gray-200'" @click="preorderForm.selectedSize = size" x-text="size"></button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="rounded-2xl bg-gray-50 p-4" x-show="(selectedShopProduct?.colors || []).length > 0">
+                                    <p class="text-xs font-black uppercase tracking-[0.18em] text-gray-400" x-text="t('availableColors')">Available Colors</p>
+                                    <div class="mt-3 flex flex-wrap gap-2">
+                                        <template x-for="color in (selectedShopProduct?.colors || [])" :key="color">
+                                            <button class="rounded-full px-4 py-2 text-xs font-black ring-1" :class="preorderForm.selectedColor === color ? 'bg-gdsq text-white ring-gdsq' : 'bg-white text-gray-700 ring-gray-200'" @click="preorderForm.selectedColor = color" x-text="color"></button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl bg-blue-50 p-4" x-show="selectedShopProduct?.preorderDeadline">
+                                <p class="text-xs font-black uppercase tracking-[0.18em] text-gdsq" x-text="t('preorderDeadline')">Preorder Deadline</p>
+                                <p class="mt-1 text-sm font-bold text-gray-700" x-text="formatShopDate(selectedShopProduct?.preorderDeadline)"></p>
+                            </div>
+
+                            <div class="rounded-3xl border border-blue-100 bg-blue-50/50 p-4" x-show="selectedShopProduct?.status === 'preorder'">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-base font-black text-gray-900" x-text="t('preorderFormTitle')">Preorder Form</p>
+                                        <p class="mt-1 text-sm font-semibold text-gray-500" x-text="lineUid ? t('preorderLoggedInHint') : t('preorderLoginRequired')">Please login with LINE before preorder.</p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 space-y-3" x-show="lineUid">
+                                    <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" type="number" min="1" x-model="preorderForm.quantity" :placeholder="t('quantity')">
+                                    <input class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" x-model="preorderForm.phone" :placeholder="t('phoneOptional')">
+                                    <textarea class="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm" rows="3" x-model="preorderForm.note" :placeholder="t('preorderNoteOptional')"></textarea>
+                                    <button class="w-full rounded-xl bg-gdsq px-5 py-4 text-base font-black text-white disabled:opacity-50" :disabled="isLoading" @click="submitPreorder()">
+                                        <span x-show="!isLoading" x-text="t('submitPreorder')">Submit Preorder</span>
+                                        <span x-show="isLoading" x-text="t('submitting')">Submitting...</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </article>
-                    <article class="rounded-2xl bg-white p-5 shadow-sm">
-                        <p class="text-lg font-black">GDSQ Merch</p>
-                        <p class="mt-1 text-sm text-gray-500">Coming soon: shirts, paddles, and community drops.</p>
-                    </article>
+                </div>
+
+                <div class="mt-8 rounded-3xl bg-white px-5 py-10 text-center shadow-sm ring-1 ring-gray-100" x-show="shopView === 'success'" x-cloak>
+                    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-lime-100 text-3xl text-gdsq">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <p class="mt-5 text-xs font-black uppercase tracking-[0.22em] text-gdsq" x-text="t('pendingReview')">Pending Review</p>
+                    <h2 class="mt-2 text-2xl font-black text-gdsqNavy" x-text="t('preorderReceived')">Preorder submitted</h2>
+                    <p class="mt-3 text-sm font-semibold leading-6 text-gray-500" x-text="t('preorderSubmitted')"></p>
+                    <div class="mt-5 rounded-2xl bg-gray-50 p-4 text-left">
+                        <p class="text-xs font-black uppercase tracking-[0.16em] text-gray-400" x-text="t('product')">Product</p>
+                        <p class="mt-1 font-black" x-text="preorderSuccessProductName"></p>
+                    </div>
+                    <button class="mt-6 w-full rounded-xl bg-gdsq px-5 py-4 text-sm font-black text-white" @click="backToShopHome()" x-text="t('backToShop')">Back to Shop</button>
                 </div>
             </section>
 
@@ -1296,6 +1418,20 @@
                 sessions: [],
                 pastSessions: [],
                 eventViewMode: 'upcoming',
+                shopProducts: [],
+                shopView: 'list',
+                selectedShopProduct: null,
+                shopMainImage: '',
+                shopMessage: '',
+                shopMessageType: 'success',
+                preorderSuccessProductName: '',
+                preorderForm: {
+                    selectedSize: '',
+                    selectedColor: '',
+                    quantity: 1,
+                    phone: '',
+                    note: ''
+                },
                 players: [],
                 rankings: [],
                 rankingMeta: {
@@ -1513,6 +1649,20 @@
                     return this.sessions;
                 },
 
+                get shopVisibleProducts() {
+                    return this.shopProducts.filter((product) => product.isActive !== false);
+                },
+
+                get currentShopImages() {
+                    const product = this.selectedShopProduct;
+                    if (!product) return [];
+                    const images = [...(product.imageUrls || [])];
+                    if (product.coverImageUrl && !images.includes(product.coverImageUrl)) {
+                        images.unshift(product.coverImageUrl);
+                    }
+                    return images.filter(Boolean);
+                },
+
                 get joinedPlayers() {
                     return this.sessionPlayers.filter((player) => player.status === 'Joined');
                 },
@@ -1562,6 +1712,37 @@
                         players: 'Players',
                         rankings: 'Rankings',
                         shop: 'Shop',
+                        shopCollection: 'GDSQ COLLECTION',
+                        shopGearTitle: 'Gear. Style. Community.',
+                        shopBannerTitle: 'Club Gear Preorder',
+                        shopBannerText: 'ใส่สไตล์ของคลับ แล้วไปเล่นด้วยกัน',
+                        shopIntro: 'พรีออเดอร์สินค้า GDSQ ได้จากหน้านี้ แล้วทีมงานจะติดต่อกลับทาง LINE',
+                        noProducts: 'ยังไม่มีสินค้าในตอนนี้',
+                        viewDetail: 'ดูรายละเอียด',
+                        preorderNow: 'พรีออเดอร์',
+                        preorderPrice: 'ราคาพรีออเดอร์',
+                        backToShop: 'กลับไปหน้าร้าน',
+                        availableSizes: 'ไซซ์ที่เปิดรับ',
+                        availableColors: 'สีที่เปิดรับ',
+                        preorderDeadline: 'ปิดรับพรีออเดอร์',
+                        preorderFormTitle: 'ฟอร์มพรีออเดอร์',
+                        preorderLoggedInHint: 'เลือกไซซ์ สี และจำนวน แล้วส่งคำสั่งจองได้เลย',
+                        preorderLoginRequired: 'กรุณาเข้าสู่ระบบ LINE ก่อนพรีออเดอร์',
+                        selectSize: 'เลือกไซซ์',
+                        selectColor: 'เลือกสี',
+                        quantity: 'จำนวน',
+                        phoneOptional: 'เบอร์โทร (ถ้ามี)',
+                        preorderNoteOptional: 'หมายเหตุเพิ่มเติม (ถ้ามี)',
+                        submitPreorder: 'ส่งพรีออเดอร์',
+                        submitting: 'กำลังส่ง...',
+                        preorderSubmitted: 'ส่งพรีออเดอร์แล้ว ทีมงานจะติดต่อกลับทาง LINE',
+                        preorderReceived: 'รับรายการพรีออเดอร์แล้ว',
+                        pendingReview: 'รอตรวจสอบรายการ',
+                        product: 'สินค้า',
+                        preorderFailed: 'ส่งพรีออเดอร์ไม่สำเร็จ',
+                        comingSoon: 'เร็ว ๆ นี้',
+                        soldOut: 'Sold Out',
+                        preorderStatus: 'Preorder',
                         profile: 'Profile',
                         createEvent: 'สร้างกิจกรรม',
                         createEventHelp: 'สร้างกิจกรรมแล้วขึ้นหน้าแอพทันที',
@@ -1827,6 +2008,37 @@
                         players: 'Players',
                         rankings: 'Rankings',
                         shop: 'Shop',
+                        shopCollection: 'GDSQ COLLECTION',
+                        shopGearTitle: 'Gear. Style. Community.',
+                        shopBannerTitle: 'Club Gear Preorder',
+                        shopBannerText: 'Wear the club. Play together.',
+                        shopIntro: 'Browse GDSQ products and submit a preorder. We will follow up via LINE.',
+                        noProducts: 'No products right now',
+                        viewDetail: 'View Detail',
+                        preorderNow: 'Preorder',
+                        preorderPrice: 'Preorder Price',
+                        backToShop: 'Back to Shop',
+                        availableSizes: 'Available Sizes',
+                        availableColors: 'Available Colors',
+                        preorderDeadline: 'Preorder Deadline',
+                        preorderFormTitle: 'Preorder Form',
+                        preorderLoggedInHint: 'Choose size, color, and quantity, then submit your preorder.',
+                        preorderLoginRequired: 'Please login with LINE before preorder.',
+                        selectSize: 'Select size',
+                        selectColor: 'Select color',
+                        quantity: 'Quantity',
+                        phoneOptional: 'Phone (optional)',
+                        preorderNoteOptional: 'Note (optional)',
+                        submitPreorder: 'Submit Preorder',
+                        submitting: 'Submitting...',
+                        preorderSubmitted: 'Preorder submitted. We will contact you via LINE.',
+                        preorderReceived: 'Preorder submitted',
+                        pendingReview: 'Pending Review',
+                        product: 'Product',
+                        preorderFailed: 'Unable to submit preorder',
+                        comingSoon: 'Coming Soon',
+                        soldOut: 'Sold Out',
+                        preorderStatus: 'Preorder',
                         profile: 'Profile',
                         createEvent: 'Create Event',
                         createEventHelp: 'Publish a community event instantly.',
@@ -2305,6 +2517,135 @@
                     return text;
                 },
 
+                productStatusLabel(status) {
+                    const value = String(status || '').toLowerCase();
+                    if (value === 'coming_soon') return this.t('comingSoon');
+                    if (value === 'sold_out') return this.t('soldOut');
+                    return this.t('preorderStatus');
+                },
+
+                productStatusClass(status) {
+                    const value = String(status || '').toLowerCase();
+                    if (value === 'coming_soon') return 'bg-amber-50 text-amber-700';
+                    if (value === 'sold_out') return 'bg-rose-50 text-rose-700';
+                    return 'bg-blue-50 text-gdsq';
+                },
+
+                formatShopDate(value) {
+                    if (!value) return '';
+                    return new Intl.DateTimeFormat(this.language === 'th' ? 'th-TH' : 'en-US', {
+                        dateStyle: 'medium'
+                    }).format(new Date(value));
+                },
+
+                resetPreorderForm() {
+                    this.preorderForm = {
+                        selectedSize: '',
+                        selectedColor: '',
+                        quantity: 1,
+                        phone: this.profile.phone || '',
+                        note: ''
+                    };
+                },
+
+                async loadShopProducts() {
+                    try {
+                        const response = await fetch('/api/shop/products');
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('preorderFailed'));
+                        this.shopProducts = result.products || [];
+                    } catch (error) {
+                        this.shopMessageType = 'error';
+                        this.shopMessage = error.message || this.t('preorderFailed');
+                    }
+                },
+
+                async openShopProduct(productId) {
+                    if (!productId) return;
+                    this.shopMessage = '';
+                    try {
+                        const response = await fetch(`/api/shop/products/${encodeURIComponent(productId)}`);
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('preorderFailed'));
+                        this.selectedShopProduct = result.product;
+                        this.shopView = 'detail';
+                        this.shopMainImage = result.product.coverImageUrl || result.product.imageUrls?.[0] || '';
+                        this.resetPreorderForm();
+                        this.queueSectionScroll('shop-section');
+                    } catch (error) {
+                        this.shopMessageType = 'error';
+                        this.shopMessage = error.message || this.t('preorderFailed');
+                    }
+                },
+
+                async startPreorder(productId) {
+                    await this.openShopProduct(productId);
+                    if (!this.lineUid) {
+                        this.shopMessageType = 'error';
+                        this.shopMessage = this.t('preorderLoginRequired');
+                        return;
+                    }
+                    this.queueSectionScroll('shop-section');
+                },
+
+                closeShopDetail() {
+                    this.selectedShopProduct = null;
+                    this.shopView = 'list';
+                    this.shopMainImage = '';
+                    this.resetPreorderForm();
+                },
+
+                backToShopHome() {
+                    this.selectedShopProduct = null;
+                    this.shopMainImage = '';
+                    this.shopView = 'list';
+                    this.shopMessage = '';
+                    this.resetPreorderForm();
+                },
+
+                async submitPreorder() {
+                    if (!this.selectedShopProduct?.id) return;
+                    if (!this.lineUid) {
+                        this.shopMessageType = 'error';
+                        this.shopMessage = this.t('preorderLoginRequired');
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.shopMessage = '';
+
+                    try {
+                        const response = await fetch('/api/shop/preorders', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                productId: this.selectedShopProduct.id,
+                                lineUid: this.lineUid,
+                                displayName: this.profile.displayName || this.displayName,
+                                pictureUrl: this.profile.profileImageUrl || '',
+                                phone: this.preorderForm.phone,
+                                selectedSize: this.preorderForm.selectedSize,
+                                selectedColor: this.preorderForm.selectedColor,
+                                quantity: this.preorderForm.quantity,
+                                note: this.preorderForm.note
+                            })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.message || this.t('preorderFailed'));
+
+                        this.shopMessageType = 'success';
+                        this.shopMessage = this.t('preorderSubmitted');
+                        this.preorderSuccessProductName = this.selectedShopProduct.name;
+                        this.shopView = 'success';
+                        this.resetPreorderForm();
+                    } catch (error) {
+                        this.shopMessageType = 'error';
+                        this.shopMessage = error.message || this.t('preorderFailed');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
                 get eventDateText() {
                     if (!this.eventDate) return this.t('dateTba');
                     return new Intl.DateTimeFormat(this.language === 'th' ? 'th-TH' : 'en-US', {
@@ -2333,6 +2674,7 @@
                         this.homeBannerUrl = config.settings?.homeBannerUrl || '/assets/gdsq-home-banner.png';
                         this.applyDefaultEventSettings(config.settings?.defaultEventSettings || {});
                         await this.loadHomeFeedBanners();
+                        await this.loadShopProducts();
                         this.hideAppLoader();
                         window.addEventListener('resize', () => {
                             this.currentHomeFeedIndex = Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
