@@ -40,6 +40,8 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}
 const adminCookieName = 'gdsq_admin_session';
 const sessionSelect = 'id, title, max_players, court_count, event_date, start_time, end_time, price_thb, payment_mode, deposit_amount_thb, estimated_total_thb, final_amount_thb, payment_note_public, payment_qr_url, payment_bank_name, payment_account_name, payment_account_number, payment_promptpay_id, location, address, skill_level, description, poster_url, created_by_user_id, status, created_at';
 const userSelect = 'id, line_uid, display_name, phone, profile_image_url, created_at';
+const productSelect = 'id, name, description, price, preorder_price, status, cover_image_url, image_urls, sizes, colors, preorder_deadline, is_active, display_order, created_at, updated_at';
+const preorderSelect = 'id, product_id, line_uid, display_name, picture_url, phone, selected_size, selected_color, quantity, note, status, created_at, updated_at';
 const paymentSlipBucket = process.env.PAYMENT_SLIP_BUCKET || 'payment-slips';
 const defaultHomeBannerUrl = '/assets/gdsq-home-banner.png';
 const hasDefaultHomeBannerAsset = fs.existsSync(path.join(__dirname, 'public', 'assets', 'gdsq-home-banner.png'));
@@ -1485,6 +1487,170 @@ function serializeAdminActivityUser(user) {
   };
 }
 
+function parseListField(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  if (value === null || value === undefined || value === '') {
+    return [];
+  }
+
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text) return [];
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+      }
+    } catch (error) {
+      // fall through to comma-split
+    }
+    return text.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+
+  return [];
+}
+
+function serializeProduct(product) {
+  const imageUrls = parseListField(product.image_urls);
+  const sizes = parseListField(product.sizes);
+  const colors = parseListField(product.colors);
+  const coverImageUrl = product.cover_image_url || imageUrls[0] || '';
+
+  return {
+    id: product.id,
+    name: product.name || '',
+    description: product.description || '',
+    price: Number(product.price || 0),
+    preorderPrice: product.preorder_price === null || product.preorder_price === undefined ? null : Number(product.preorder_price),
+    status: product.status || 'preorder',
+    coverImageUrl,
+    imageUrls: coverImageUrl && imageUrls.length === 0 ? [coverImageUrl] : imageUrls,
+    sizes,
+    colors,
+    preorderDeadline: product.preorder_deadline || null,
+    isActive: product.is_active !== false,
+    displayOrder: Number(product.display_order || 0),
+    createdAt: product.created_at || null,
+    updatedAt: product.updated_at || null
+  };
+}
+
+function serializePreorder(preorder, productById = {}) {
+  const product = productById[preorder.product_id] || null;
+  return {
+    id: preorder.id,
+    productId: preorder.product_id,
+    productName: product?.name || '',
+    productCoverImageUrl: product?.coverImageUrl || '',
+    lineUid: preorder.line_uid || '',
+    displayName: preorder.display_name || '',
+    pictureUrl: preorder.picture_url || '',
+    phone: preorder.phone || '',
+    selectedSize: preorder.selected_size || '',
+    selectedColor: preorder.selected_color || '',
+    quantity: Number(preorder.quantity || 1),
+    note: preorder.note || '',
+    status: preorder.status || 'pending',
+    createdAt: preorder.created_at || null,
+    updatedAt: preorder.updated_at || null
+  };
+}
+
+function parseProductPayload(body = {}, { partial = false } = {}) {
+  const allowedStatuses = new Set(['preorder', 'coming_soon', 'sold_out']);
+  const payload = {};
+  const name = String(body.name || '').trim();
+  const status = String(body.status || 'preorder').trim().toLowerCase();
+  const price = Number(body.price ?? 0);
+  const preorderPrice = body.preorderPrice === '' || body.preorderPrice === null || body.preorderPrice === undefined
+    ? null
+    : Number(body.preorderPrice);
+
+  if (!partial || body.name !== undefined) {
+    if (!name) return { data: null, error: 'Product name is required.' };
+    payload.name = name;
+  }
+  if (!partial || body.description !== undefined) payload.description = String(body.description || '').trim() || null;
+  if (!partial || body.price !== undefined) {
+    if (!Number.isFinite(price) || price < 0) return { data: null, error: 'Price must be zero or greater.' };
+    payload.price = price;
+  }
+  if (!partial || body.preorderPrice !== undefined) {
+    if (preorderPrice !== null && (!Number.isFinite(preorderPrice) || preorderPrice < 0)) {
+      return { data: null, error: 'Preorder price must be zero or greater.' };
+    }
+    payload.preorder_price = preorderPrice;
+  }
+  if (!partial || body.status !== undefined) {
+    if (!allowedStatuses.has(status)) return { data: null, error: 'Invalid product status.' };
+    payload.status = status;
+  }
+  if (!partial || body.coverImageUrl !== undefined) payload.cover_image_url = String(body.coverImageUrl || '').trim() || null;
+  if (!partial || body.imageUrls !== undefined) payload.image_urls = parseListField(body.imageUrls);
+  if (!partial || body.sizes !== undefined) payload.sizes = parseListField(body.sizes);
+  if (!partial || body.colors !== undefined) payload.colors = parseListField(body.colors);
+  if (!partial || body.preorderDeadline !== undefined) payload.preorder_deadline = body.preorderDeadline || null;
+  if (!partial || body.isActive !== undefined) payload.is_active = body.isActive !== false;
+  if (!partial || body.displayOrder !== undefined) payload.display_order = Number(body.displayOrder || 0);
+  payload.updated_at = new Date().toISOString();
+
+  return { data: payload, error: null };
+}
+
+async function listShopProducts({ activeOnly = true } = {}) {
+  let query = supabase
+    .from('products')
+    .select(productSelect)
+    .order('display_order', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (activeOnly) {
+    query = query.eq('is_active', true);
+  }
+
+  const { data, error } = await query;
+  if (error) return { data: null, error };
+
+  return {
+    data: (data || []).map(serializeProduct),
+    error: null
+  };
+}
+
+async function findProduct(productId, { activeOnly = false } = {}) {
+  if (!uuidPattern.test(String(productId || ''))) {
+    return { data: null, error: null };
+  }
+
+  let query = supabase
+    .from('products')
+    .select(productSelect)
+    .eq('id', productId)
+    .maybeSingle();
+
+  if (activeOnly) {
+    query = query.eq('is_active', true);
+  }
+
+  const { data, error } = await query;
+  if (error) return { data: null, error };
+  return { data: data ? serializeProduct(data) : null, error: null };
+}
+
+async function getHostedCount(userId) {
+  const { count, error } = await supabase
+    .from('sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('created_by_user_id', userId)
+    .neq('status', 'Cancelled');
+
+  if (error) throw error;
+  return Number(count || 0);
+}
+
 async function upsertLineUser({ lineUid, displayName, profileImageUrl, phone }) {
   const { data: existingUser, error: findUserError } = await supabase
     .from('users')
@@ -2379,6 +2545,167 @@ app.get('/api/public/home-banners', async (req, res) => {
   }
 });
 
+app.get('/api/shop/products', async (req, res) => {
+  try {
+    const { data, error } = await listShopProducts({ activeOnly: true });
+    if (error) throw error;
+
+    return res.json({
+      success: true,
+      products: data || []
+    });
+  } catch (error) {
+    console.error('Shop products load error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load shop products.'
+    });
+  }
+});
+
+app.get('/api/shop/products/:productId', async (req, res) => {
+  try {
+    const { data: product, error } = await findProduct(req.params.productId, { activeOnly: true });
+    if (error) throw error;
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      product
+    });
+  } catch (error) {
+    console.error('Shop product detail error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load product detail.'
+    });
+  }
+});
+
+app.post('/api/shop/preorders', async (req, res) => {
+  try {
+    const {
+      productId,
+      lineUid,
+      displayName,
+      pictureUrl,
+      phone,
+      selectedSize,
+      selectedColor,
+      quantity,
+      note
+    } = req.body || {};
+
+    if (!String(lineUid || '').trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please login with LINE before preorder.'
+      });
+    }
+
+    const { data: product, error } = await findProduct(productId, { activeOnly: true });
+    if (error) throw error;
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found.'
+      });
+    }
+
+    if (String(product.status || '').toLowerCase() !== 'preorder') {
+      return res.status(400).json({
+        success: false,
+        message: 'This product is not open for preorder right now.'
+      });
+    }
+
+    const cleanSize = String(selectedSize || '').trim();
+    const cleanColor = String(selectedColor || '').trim();
+    const cleanPhone = String(phone || '').trim();
+    const cleanNote = String(note || '').trim();
+    const parsedQuantity = Number(quantity || 1);
+
+    if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Quantity must be at least 1.'
+      });
+    }
+
+    if ((product.sizes || []).length > 0 && !cleanSize) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a size.'
+      });
+    }
+
+    if ((product.colors || []).length > 0 && !cleanColor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select a color.'
+      });
+    }
+
+    if (cleanSize && (product.sizes || []).length > 0 && !product.sizes.includes(cleanSize)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected size is not available.'
+      });
+    }
+
+    if (cleanColor && (product.colors || []).length > 0 && !product.colors.includes(cleanColor)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected color is not available.'
+      });
+    }
+
+    await upsertLineUser({
+      lineUid: String(lineUid).trim(),
+      displayName: String(displayName || '').trim() || 'LINE User',
+      profileImageUrl: String(pictureUrl || '').trim() || null,
+      phone: cleanPhone || null
+    });
+
+    const { data: preorder, error: preorderError } = await supabase
+      .from('product_preorders')
+      .insert({
+        product_id: product.id,
+        line_uid: String(lineUid).trim(),
+        display_name: String(displayName || '').trim() || 'LINE User',
+        picture_url: String(pictureUrl || '').trim() || null,
+        phone: cleanPhone || null,
+        selected_size: cleanSize || null,
+        selected_color: cleanColor || null,
+        quantity: parsedQuantity,
+        note: cleanNote || null,
+        status: 'pending',
+        updated_at: new Date().toISOString()
+      })
+      .select(preorderSelect)
+      .single();
+
+    if (preorderError) throw preorderError;
+
+    return res.status(201).json({
+      success: true,
+      preorder: serializePreorder(preorder, { [product.id]: product }),
+      message: 'Preorder submitted. We will contact you via LINE.'
+    });
+  } catch (error) {
+    console.error('Create preorder error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to submit preorder.'
+    });
+  }
+});
+
 app.get('/api/admin/home-banners', requireAdmin, async (req, res) => {
   try {
     const settings = await getAppSettings();
@@ -2396,6 +2723,173 @@ app.get('/api/admin/home-banners', requireAdmin, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Unable to load home banners.'
+    });
+  }
+});
+
+app.get('/api/admin/preorders', requireAdmin, async (req, res) => {
+  try {
+    const [{ data: rows, error: preordersError }, { data: productRows, error: productsError }] = await Promise.all([
+      supabase
+        .from('product_preorders')
+        .select(preorderSelect)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('products')
+        .select(productSelect)
+    ]);
+
+    if (preordersError) throw preordersError;
+    if (productsError) throw productsError;
+
+    const productById = Object.fromEntries((productRows || []).map((row) => {
+      const product = serializeProduct(row);
+      return [product.id, product];
+    }));
+
+    return res.json({
+      success: true,
+      preorders: (rows || []).map((row) => serializePreorder(row, productById))
+    });
+  } catch (error) {
+    console.error('Admin preorders load error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to load preorders.'
+    });
+  }
+});
+
+app.get('/api/admin/products', requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await listShopProducts({ activeOnly: false });
+    if (error) throw error;
+    return res.json({ success: true, products: data || [] });
+  } catch (error) {
+    console.error('Admin products load error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to load products.' });
+  }
+});
+
+app.post('/api/admin/products', requireAdmin, async (req, res) => {
+  try {
+    const { data: payload, error: validationError } = parseProductPayload(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
+    }
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert(payload)
+      .select(productSelect)
+      .single();
+
+    if (error) throw error;
+    return res.status(201).json({
+      success: true,
+      product: serializeProduct(data),
+      message: 'Product created.'
+    });
+  } catch (error) {
+    console.error('Create product error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to create product.' });
+  }
+});
+
+app.patch('/api/admin/products/:productId', requireAdmin, async (req, res) => {
+  try {
+    const { data: payload, error: validationError } = parseProductPayload(req.body, { partial: true });
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
+    }
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(payload)
+      .eq('id', req.params.productId)
+      .select(productSelect)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ success: false, message: 'Product not found.' });
+    return res.json({
+      success: true,
+      product: serializeProduct(data),
+      message: 'Product updated.'
+    });
+  } catch (error) {
+    console.error('Update product error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to update product.' });
+  }
+});
+
+app.delete('/api/admin/products/:productId', requireAdmin, async (req, res) => {
+  try {
+    const { count, error: countError } = await supabase
+      .from('product_preorders')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_id', req.params.productId);
+    if (countError) throw countError;
+
+    if (Number(count || 0) > 0) {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', req.params.productId);
+      if (error) throw error;
+      return res.json({ success: true, archived: true, message: 'Product hidden because it already has preorders.' });
+    }
+
+    const { error } = await supabase.from('products').delete().eq('id', req.params.productId);
+    if (error) throw error;
+    return res.json({ success: true, archived: false, message: 'Product deleted.' });
+  } catch (error) {
+    console.error('Delete product error:', error);
+    return res.status(500).json({ success: false, message: 'Unable to delete product.' });
+  }
+});
+
+app.patch('/api/admin/preorders/:preorderId', requireAdmin, async (req, res) => {
+  try {
+    const { preorderId } = req.params;
+    const allowedStatuses = new Set(['pending', 'confirmed', 'paid', 'cancelled']);
+    const nextStatus = String(req.body?.status || '').trim().toLowerCase();
+
+    if (!allowedStatuses.has(nextStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid preorder status.'
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('product_preorders')
+      .update({
+        status: nextStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', preorderId)
+      .select(preorderSelect)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Preorder not found.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      preorder: serializePreorder(data),
+      message: 'Preorder updated.'
+    });
+  } catch (error) {
+    console.error('Admin preorder update error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to update preorder.'
     });
   }
 });
