@@ -3030,6 +3030,7 @@ app.get('/', async (req, res) => {
     const htmlPath = path.join(__dirname, 'public', 'index.html');
     const html = await require('fs').promises.readFile(htmlPath, 'utf8');
     const sessionId = req.query.sessionId;
+    const shopProductId = req.query.shopProductId;
     const appSettings = await getAppSettings();
     let meta = buildMetaTags({
       title: 'GDSQ Pickleball',
@@ -3038,7 +3039,28 @@ app.get('/', async (req, res) => {
       url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
     });
 
-    if (sessionId) {
+    if (shopProductId) {
+      const { data: product } = await findProduct(shopProductId, { activeOnly: true });
+
+      if (product) {
+        const price = product.preorderPrice ?? product.price;
+        const statusText = product.status === 'preorder'
+          ? 'Preorder available'
+          : (product.status === 'sold_out' ? 'Sold out' : 'Coming soon');
+        const description = [
+          price === null || price === undefined ? '' : `THB ${price}`,
+          statusText,
+          product.description
+        ].filter(Boolean).join(' · ');
+
+        meta = buildMetaTags({
+          title: `${product.name} | GDSQ Shop`,
+          description: description || 'View this GDSQ Pickleball product.',
+          imageUrl: absoluteUrl(req, publicImageUrl(product.coverImageUrl) || '/assets/gdsq-logo.png'),
+          url: `${req.protocol}://${req.get('host')}${req.originalUrl}`
+        });
+      }
+    } else if (sessionId) {
       const { data: session } = await findSession(sessionId);
 
       if (session) {
