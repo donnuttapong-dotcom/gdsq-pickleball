@@ -208,6 +208,7 @@
                     <h3 class="text-sm font-black" x-text="homeBannerForm.id ? t('editBannerItem') : t('addBannerItem')">Add Update Item</h3>
                     <p class="mt-2 text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeFeedHelp')">Recommended image size: 16:9 or 4:5</p>
                     <p class="mt-1 text-xs font-semibold leading-relaxed text-gray-500" x-text="t('homeFeedMaxHelp')">Maximum active updates shown on Home: 6</p>
+                    <p class="mt-1 text-xs font-semibold leading-relaxed text-gdsq" x-text="t('shopHomeUpdateHelp')">From Shop Products, choose Promote to Home Updates to link directly to product detail.</p>
                     <p class="mt-1 text-xs font-semibold leading-relaxed text-amber-700" x-show="appSettings.homeBannerUrl" x-text="t('homeBannerLegacyHelp')">Legacy main banner is kept as a fallback until you add active updates.</p>
                     <div class="mt-3 space-y-3">
                         <input class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" type="text" :placeholder="t('bannerTitle')" x-model="homeBannerForm.title">
@@ -670,6 +671,7 @@
                                 </div>
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     <button class="rounded-lg border border-gray-200 px-2 py-1 text-xs font-bold text-gdsq" @click="editShopProduct(product)" x-text="t('edit')">Edit</button>
+                                    <button class="rounded-lg bg-blue-50 px-2 py-1 text-xs font-bold text-gdsq" @click="promoteShopProduct(product)" x-text="t('promoteToHome')">Promote</button>
                                     <button class="rounded-lg border border-gray-200 px-2 py-1 text-xs font-bold text-gray-700" @click="toggleShopProduct(product)" x-text="product.isActive ? t('deactivate') : t('activate')">Toggle</button>
                                     <button class="rounded-lg border border-red-100 px-2 py-1 text-xs font-bold text-red-600" @click="deleteShopProduct(product)" x-text="t('delete')">Delete</button>
                                 </div>
@@ -904,6 +906,9 @@
                         noShopPreorders: 'ยังไม่มีรายการพรีออเดอร์',
                         shopProducts: 'จัดการสินค้า Shop',
                         shopProductsHelp: 'เพิ่มรูป ราคา ไซซ์ และสีเพื่อแสดงในหน้าร้าน',
+                        promoteToHome: 'โปรโมตหน้า Home',
+                        shopPromotionReady: 'เตรียม Home Update จากสินค้าแล้ว ตรวจรูปและกดเพิ่มรายการ',
+                        shopHomeUpdateHelp: 'กดโปรโมตจากสินค้า เพื่อให้ Home Update เปิดไปที่รายละเอียดสินค้านั้นโดยตรง',
                         newProduct: 'เพิ่มสินค้าใหม่',
                         addProduct: 'เพิ่มสินค้า',
                         editProduct: 'แก้ไขสินค้า',
@@ -1072,6 +1077,9 @@
                         noShopPreorders: 'No shop preorders yet.',
                         shopProducts: 'Shop Products',
                         shopProductsHelp: 'Add images, prices, sizes, and colors for your store.',
+                        promoteToHome: 'Promote to Home',
+                        shopPromotionReady: 'Home Update prepared from this product. Review it and save the item.',
+                        shopHomeUpdateHelp: 'Promote a product to make a Home Update open its product detail directly.',
                         newProduct: 'New product',
                         addProduct: 'Add product',
                         editProduct: 'Edit product',
@@ -1471,6 +1479,24 @@
                     };
                     this.shopProductMessage = '';
                     this.scrollToSection('shop-products');
+                },
+
+                promoteShopProduct(product) {
+                    if (!product?.id || !product.coverImageUrl) {
+                        this.errorMessage = this.t('coverImageUrl');
+                        return;
+                    }
+
+                    this.homeBannerForm = {
+                        id: '',
+                        title: product.name || '',
+                        imageUrl: product.coverImageUrl,
+                        linkUrl: `${window.location.origin}/?shopProductId=${encodeURIComponent(product.id)}`,
+                        displayOrder: product.displayOrder || 0,
+                        isActive: true
+                    };
+                    this.homeBannerMessage = this.t('shopPromotionReady');
+                    this.scrollToSection('home-banner');
                 },
 
                 async saveShopProduct() {

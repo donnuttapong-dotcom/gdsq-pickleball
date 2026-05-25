@@ -125,7 +125,7 @@
                         <template x-for="banner in homeFeedBanners" :key="banner.id">
                             <div class="shrink-0 px-1.5" :style="homeFeedCardStyle">
                                 <template x-if="banner.linkUrl">
-                                    <a class="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md" :href="banner.linkUrl" target="_blank" rel="noreferrer">
+                                    <a class="group block overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:-translate-y-0.5 hover:shadow-md" :href="banner.linkUrl" @click.prevent="openHomeUpdate(banner)">
                                         <div class="aspect-[16/9] bg-gray-100">
                                             <img class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" :src="imageUrl(banner.imageUrl)" :alt="banner.title || 'Home update'" @error="$event.target.src = '/assets/gdsq-home-banner.png'">
                                         </div>
@@ -771,6 +771,9 @@
                                     <div class="flex gap-2">
                                         <button class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-black text-gdsq" @click="openShopProduct(product.id)" x-text="t('viewDetail')">View Detail</button>
                                         <button class="rounded-lg bg-gdsq px-3 py-2 text-xs font-black text-white disabled:bg-gray-300" :disabled="product.status !== 'preorder'" @click="startPreorder(product.id)" x-text="t('preorderNow')">Preorder</button>
+                                        <button class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-black text-gdsq" @click="shareShopProduct(product)" :aria-label="t('shareProduct')">
+                                            <i class="fa-solid fa-share-nodes"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </article>
@@ -810,6 +813,10 @@
                                     <p class="text-2xl font-black text-gdsq" x-text="moneyText(selectedShopProduct?.preorderPrice || selectedShopProduct?.price || 0)"></p>
                                 </div>
                             </div>
+                            <button class="flex w-full items-center justify-center gap-2 rounded-xl border border-gdsq/15 bg-blue-50 px-5 py-3 text-sm font-black text-gdsq" @click="shareShopProduct(selectedShopProduct)">
+                                <i class="fa-solid fa-share-nodes"></i>
+                                <span x-text="t('shareProduct')">Share Product</span>
+                            </button>
 
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <div class="rounded-2xl bg-gray-50 p-4" x-show="(selectedShopProduct?.sizes || []).length > 0">
@@ -1403,13 +1410,18 @@
             return new URLSearchParams(window.location.search).get('playerId') || '';
         }
 
+        function initialShopProductId() {
+            return new URLSearchParams(window.location.search).get('shopProductId') || '';
+        }
+
         function eventApp() {
             const initialPlayerProfileId = initialPlayerId();
+            const initialShopProduct = initialShopProductId();
             return {
                 lineUid: null,
                 liffId: '',
                 displayName: null,
-                activeTab: initialPlayerProfileId ? 'playerDetail' : 'home',
+                activeTab: initialPlayerProfileId ? 'playerDetail' : (initialShopProduct ? 'shop' : 'home'),
                 homeShortcutActive: 'events',
                 homeBannerUrl: '/assets/gdsq-home-banner.png',
                 homeFeedBanners: [],
@@ -1505,6 +1517,7 @@
                 guestNames: [],
                 selectedSessionId: initialSessionId(),
                 initialPlayerProfileId,
+                initialShopProductId: initialShopProduct,
                 profile: {
                     displayName: '',
                     phone: '',
@@ -1717,6 +1730,9 @@
                         shopBannerTitle: 'Club Gear Preorder',
                         shopBannerText: 'ใส่สไตล์ของคลับ แล้วไปเล่นด้วยกัน',
                         shopIntro: 'พรีออเดอร์สินค้า GDSQ ได้จากหน้านี้ แล้วทีมงานจะติดต่อกลับทาง LINE',
+                        shareProduct: 'แชร์สินค้าไป LINE',
+                        shareProductText: 'ดูสินค้า GDSQ ชิ้นนี้',
+                        productLinkCopied: 'คัดลอกลิงก์สินค้าแล้ว',
                         noProducts: 'ยังไม่มีสินค้าในตอนนี้',
                         viewDetail: 'ดูรายละเอียด',
                         preorderNow: 'พรีออเดอร์',
@@ -2013,6 +2029,9 @@
                         shopBannerTitle: 'Club Gear Preorder',
                         shopBannerText: 'Wear the club. Play together.',
                         shopIntro: 'Browse GDSQ products and submit a preorder. We will follow up via LINE.',
+                        shareProduct: 'Share Product',
+                        shareProductText: 'Check out this GDSQ product',
+                        productLinkCopied: 'Product link copied.',
                         noProducts: 'No products right now',
                         viewDetail: 'View Detail',
                         preorderNow: 'Preorder',
@@ -2560,6 +2579,59 @@
                     }
                 },
 
+                shopProductShareUrl(product) {
+                    if (!product?.id) return window.location.origin;
+                    const url = new URL(window.location.origin + window.location.pathname);
+                    url.searchParams.set('shopProductId', product.id);
+                    return url.toString();
+                },
+
+                async shareShopProduct(product) {
+                    if (!product?.id) return;
+                    const url = this.shopProductShareUrl(product);
+                    const text = [
+                        this.t('shareProductText'),
+                        product.name,
+                        this.moneyText(product.preorderPrice || product.price || 0),
+                        url
+                    ].filter(Boolean).join('\n');
+
+                    try {
+                        if (window.liff && liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker')) {
+                            await liff.shareTargetPicker([{ type: 'text', text }]);
+                            return;
+                        }
+                        if (navigator.share) {
+                            await navigator.share({ title: product.name, text: this.t('shareProductText'), url });
+                            return;
+                        }
+                        await navigator.clipboard.writeText(url);
+                        this.shopMessageType = 'success';
+                        this.shopMessage = this.t('productLinkCopied');
+                    } catch (error) {
+                        console.warn('Product share failed:', error);
+                    }
+                },
+
+                async openHomeUpdate(banner) {
+                    if (!banner?.linkUrl) return;
+                    const url = new URL(banner.linkUrl, window.location.origin);
+                    const productId = url.searchParams.get('shopProductId');
+
+                    if (url.origin === window.location.origin && productId) {
+                        this.navigateToSection('shop');
+                        await this.openShopProduct(productId);
+                        return;
+                    }
+
+                    if (window.liff && liff.isInClient && liff.isInClient()) {
+                        liff.openWindow({ url: url.toString(), external: false });
+                        return;
+                    }
+
+                    window.location.assign(url.toString());
+                },
+
                 async openShopProduct(productId) {
                     if (!productId) return;
                     this.shopMessage = '';
@@ -2675,6 +2747,9 @@
                         this.applyDefaultEventSettings(config.settings?.defaultEventSettings || {});
                         await this.loadHomeFeedBanners();
                         await this.loadShopProducts();
+                        if (this.initialShopProductId) {
+                            await this.openShopProduct(this.initialShopProductId);
+                        }
                         this.hideAppLoader();
                         window.addEventListener('resize', () => {
                             this.currentHomeFeedIndex = Math.min(this.currentHomeFeedIndex, this.homeFeedMaxIndex);
